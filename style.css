@@ -1,0 +1,132 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
+}
+
+body {
+    background: #0b0b0b;
+    color: white;
+}
+
+/* HEADER */
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 50px;
+    background: #111;
+}
+
+.logo {
+    width: 130px;
+    height: auto;
+    filter: drop-shadow(0 0 5px #00aaff);
+
+}
+
+nav a {
+    margin-left: 20px;
+    text-decoration: none;
+    color: #00aaff;
+    font-weight: bold;
+}
+
+/* HERO */
+.hero {
+    text-align: center;
+    padding: 100px 20px;
+}
+
+.hero h1 {
+    font-size: 42px;
+    margin-bottom: 10px;
+}
+
+.hero p {
+    margin-bottom: 20px;
+    color: #aaa;
+}
+
+/* BOTÕES */
+.btn {
+    background: linear-gradient(45deg, #00aaff, #0066ff);
+    padding: 12px 25px;
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    transition: 0.3s;
+}
+
+.btn:hover {
+    transform: scale(1.05);
+}
+
+/* PORTFOLIO */
+#portfolio {
+    padding: 60px 20px;
+    text-align: center;
+}
+
+.cards {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.card {
+    background: #111;
+    padding: 25px;
+    border-radius: 12px;
+    width: 260px;
+    transition: 0.3s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0 15px #00aaff44;
+}
+
+/* CONTATO */
+
+
+#contato {
+    text-align: center;
+    padding: 60px 20px 200px; /* aumenta o espaço embaixo */
+}
+
+    #contato .btn {
+    display: inline-block;
+    margin-top: 20px;
+}
+
+
+
+
+/* FOOTER */
+footer {
+    text-align: center;
+    padding: 20px;
+    background: #111;
+}
+
+/* WHATSAPP FLUTUANTE */
+.whatsapp {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #25D366;
+    color: white;
+    padding: 14px 16px;
+    border-radius: 50%;
+    font-size: 20px;
+    text-decoration: none;
+    box-shadow: 0 0 10px #000;
+    transition: 0.3s;
+}
+
+.whatsapp:hover {
+    transform: scale(1.1);
+}
