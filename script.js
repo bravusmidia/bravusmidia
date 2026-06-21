@@ -10,16 +10,34 @@ const obs = new IntersectionObserver((entries) => {
 }, { threshold: 0.1 });
 reveals.forEach(r => obs.observe(r));
 
-// ── FORMULÁRIO ──
-function handleSubmit(e) {
+// ── FORMULÁRIO (Formspree) ──
+async function handleSubmit(e) {
   e.preventDefault();
-  const btn = e.target.querySelector('.btn-submit');
+  const form = e.target;
+  const btn = form.querySelector('.btn-submit');
+
   btn.textContent = 'Enviando...';
   btn.disabled = true;
-  setTimeout(() => {
-    document.getElementById('form-success').style.display = 'block';
-    btn.style.display = 'none';
-  }, 1200);
+
+  try {
+    const response = await fetch(form.action, {
+      method: 'POST',
+      body: new FormData(form),
+      headers: { 'Accept': 'application/json' }
+    });
+
+    if (response.ok) {
+      document.getElementById('form-success').style.display = 'block';
+      btn.style.display = 'none';
+      form.reset();
+    } else {
+      btn.textContent = 'Erro ao enviar. Tente novamente.';
+      btn.disabled = false;
+    }
+  } catch (err) {
+    btn.textContent = 'Erro ao enviar. Tente novamente.';
+    btn.disabled = false;
+  }
 }
 
 // ── MENU MOBILE ──
