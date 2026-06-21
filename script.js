@@ -1,3 +1,8 @@
+// Para atualizar o site no navegador:
+// 1. git add .
+// 2. git commit -m "descricao da alteracao"
+// 3. git push origin HEAD:main
+
 // ── SCROLL REVEAL ──
 const reveals = document.querySelectorAll('.reveal');
 const obs = new IntersectionObserver((entries) => {
