@@ -103,6 +103,8 @@ p { margin: 0; }
 .profile-head { display: flex; align-items: center; gap: 16px; }
 .avatar { width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(140deg, #007BFF, #083D91); display: flex; align-items: center; justify-content: center; font-family: var(--display); font-weight: 700; font-size: 28px; color: #FFFFFF; flex-shrink: 0; }
 .avatar--lg { width: 220px; height: 220px; font-size: 88px; background: radial-gradient(circle at 30% 30%, #2690FF, #083D91 70%); box-shadow: 0 0 0 8px rgba(0,123,255,.12); }
+.avatar { overflow: hidden; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 50%; }
 .profile-name { font-family: var(--display); font-weight: 700; font-size: 22px; color: #FFFFFF; }
 .profile-card p { font-size: 17px; color: #D3D9E1; }
 
