@@ -25,7 +25,17 @@ export type FieldKey = (typeof IMPORT_FIELDS)[number]['key'];
 export type Mapping = Partial<Record<FieldKey, string>>;
 export type RawRow = Record<string, string>;
 
-export interface ParsedFile { headers: string[]; rows: RawRow[] }
+export interface ParsedFile {
+  headers: string[];
+  rows: RawRow[];
+  /** Número (1-based) da linha do arquivo onde está o cabeçalho. */
+  headerLine: number;
+  /** Linha real do arquivo para cada item de rows (para mostrar erros na linha certa). */
+  lineNumbers?: number[];
+  /** Aba usada (só XLSX) e todas as abas do arquivo. */
+  sheet?: string;
+  sheets?: string[];
+}
 
 const ALLOWED: Record<string, string[]> = {
   csv: ['text/csv', 'application/vnd.ms-excel', 'text/plain', ''],
@@ -45,32 +55,91 @@ export function checkFile(f: File): string | null {
 }
 
 const clean = (v: unknown) => String(v ?? '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').trim().slice(0, 2000);
+const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
-export async function parseFile(f: File): Promise<ParsedFile> {
+/** Quantos campos de contato um conjunto de títulos de coluna reconhece (nome/telefone/e-mail valem mais). */
+export function headerScore(cells: string[]): number {
+  const m = guessMapping(cells.map(clean).filter(Boolean));
+  let score = 0;
+  for (const k of Object.keys(m)) score += k === 'full_name' || k === 'phone' || k === 'email' ? 3 : 1;
+  return score;
+}
+
+const HEADER_SCAN = 25;
+
+/**
+ * Acha a linha de cabeçalho dentro de uma grade (planilha ou CSV sem cabeçalho fixo).
+ * Planilhas exportadas costumam ter título, resumo ou linhas vazias antes da tabela real.
+ */
+export function locateTable(grid: unknown[][]): { headerIndex: number; score: number } {
+  let best = { headerIndex: 0, score: 0 };
+  const limit = Math.min(grid.length, HEADER_SCAN);
+  for (let i = 0; i < limit; i++) {
+    const cells = (grid[i] ?? []).map(clean);
+    if (cells.filter(Boolean).length < 2) continue;
+    const score = headerScore(cells);
+    if (score > best.score) best = { headerIndex: i, score };
+  }
+  return best;
+}
+
+function gridToParsed(grid: unknown[][], extra: Partial<ParsedFile> = {}): ParsedFile {
+  const { headerIndex } = locateTable(grid);
+  const head = grid[headerIndex] ?? [];
+  const width = Math.max(head.length, ...grid.slice(headerIndex + 1).map((r) => r?.length ?? 0));
+  const used = new Map<string, number>();
+  const headers = Array.from({ length: width }, (_, i) => {
+    const base = clean(head[i]) || `Coluna ${i + 1}`;
+    const n = (used.get(base) ?? 0) + 1; used.set(base, n);
+    return n > 1 ? `${base} (${n})` : base;
+  });
+  const rows: RawRow[] = [];
+  const lines: number[] = [];
+  grid.slice(headerIndex + 1).forEach((r, j) => {
+    const row = Object.fromEntries(headers.map((h, i) => [h, clean(r?.[i])]));
+    if (Object.values(row).some(Boolean)) { rows.push(row); lines.push(headerIndex + 2 + j); }
+  });
+  return finish({ headers, rows, headerLine: headerIndex + 1, lineNumbers: lines, ...extra });
+}
+
+export async function parseFile(f: File, sheetName?: string): Promise<ParsedFile> {
   const ext = f.name.split('.').pop()?.toLowerCase();
   if (ext === 'xlsx') {
     const mod: any = await import('read-excel-file/browser');
-    const data: any[][] = await mod.readSheet(f);
-    const [head, ...rest] = data;
-    const headers = (head ?? []).map((h: unknown, i: number) => clean(h) || `Coluna ${i + 1}`);
-    return finish(headers, rest.map((r) => Object.fromEntries(headers.map((h: string, i: number) => [h, clean(r[i])]))));
+    const all: { sheet: string; data: unknown[][] }[] = await mod.default(f);
+    return pickSheet(all, sheetName);
   }
   const text = await f.text();
   if (ext === 'json') {
     const data = JSON.parse(text);
     const arr: any[] = Array.isArray(data) ? data : Array.isArray(data?.contacts) ? data.contacts : [];
     const headers = Array.from(new Set(arr.flatMap((o) => (o && typeof o === 'object' ? Object.keys(o) : []))));
-    return finish(headers, arr.map((o) => Object.fromEntries(headers.map((h) => [h, clean(o?.[h])]))));
+    return finish({ headers, rows: arr.map((o) => Object.fromEntries(headers.map((h) => [h, clean(o?.[h])]))), headerLine: 1 });
   }
-  if (ext === 'vcf') return finish(['Nome', 'Telefone', 'E-mail', 'Empresa'], parseVcf(text));
-  // CSV / TXT (separador detectado automaticamente)
-  const res = Papa.parse<RawRow>(text, { header: true, skipEmptyLines: 'greedy', transformHeader: (h) => clean(h) });
-  return finish(res.meta.fields ?? [], res.data.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, clean(v)]))));
+  if (ext === 'vcf') return finish({ headers: ['Nome', 'Telefone', 'E-mail', 'Empresa'], rows: parseVcf(text), headerLine: 1 });
+  // CSV / TXT (separador detectado automaticamente; cabeçalho pode não estar na 1ª linha)
+  const res = Papa.parse<string[]>(text, { header: false, skipEmptyLines: false });
+  return gridToParsed(res.data);
 }
 
-function finish(headers: string[], rows: RawRow[]): ParsedFile {
-  if (rows.length > MAX_ROWS) throw new Error(`O arquivo tem ${rows.length} linhas. O limite por importação é ${MAX_ROWS}.`);
-  return { headers, rows };
+/** Escolhe a aba com a tabela de contatos (ou a aba pedida). Exportado para testes. */
+export function pickSheet(all: { sheet: string; data: unknown[][] }[], sheetName?: string): ParsedFile {
+  if (!all.length) return { headers: [], rows: [], headerLine: 1 };
+  const sheets = all.map((s) => s.sheet);
+  let chosen = sheetName ? all.find((s) => s.sheet === sheetName) : undefined;
+  if (!chosen) {
+    // maior pontuação de cabeçalho; empate → aba com mais linhas
+    chosen = [...all].sort((a, b) => {
+      const d = locateTable(b.data).score - locateTable(a.data).score;
+      return d !== 0 ? d : b.data.length - a.data.length;
+    })[0];
+  }
+  return gridToParsed(chosen.data, { sheet: chosen.sheet, sheets });
+}
+
+function finish(p: ParsedFile): ParsedFile {
+  if (p.rows.length > MAX_ROWS) throw new Error(`O arquivo tem ${p.rows.length} linhas. O limite por importação é ${MAX_ROWS}.`);
+  return p;
 }
 
 export function parseVcf(text: string): RawRow[] {
@@ -87,8 +156,6 @@ export function parseVcf(text: string): RawRow[] {
   }
   return out;
 }
-
-const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 
 export function guessMapping(headers: string[]): Mapping {
   const m: Mapping = {};
@@ -110,7 +177,7 @@ export interface PreparedRow {
   data: Record<string, any>;
 }
 
-export function prepareRows(rows: RawRow[], map: Mapping, existing: ExistingIndex): PreparedRow[] {
+export function prepareRows(rows: RawRow[], map: Mapping, existing: ExistingIndex, lineNumbers?: number[]): PreparedRow[] {
   const seenPhones = new Set<string>();
   const seenEmails = new Set<string>();
   return rows.map((r, i) => {
@@ -141,7 +208,7 @@ export function prepareRows(rows: RawRow[], map: Mapping, existing: ExistingInde
     else if (email && existing.emails.has(email)) { status = 'duplicate_existing'; existingId = existing.emails.get(email); }
     else if ((phone.e164 && seenPhones.has(phone.e164)) || (email && seenEmails.has(email))) status = 'duplicate_in_file';
     if (status !== 'invalid') { if (phone.e164) seenPhones.add(phone.e164); if (email) seenEmails.add(email); }
-    return { line: i + 2, status, errors, existingId, data };
+    return { line: lineNumbers?.[i] ?? i + 2, status, errors, existingId, data };
   });
 }
 

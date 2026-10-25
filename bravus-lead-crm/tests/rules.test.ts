@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { normalizePhone, whatsappLink } from '../src/lib/phone';
 import { safeCell, toCSV } from '../src/lib/csv';
-import { guessMapping, parseVcf, prepareRows, summarize } from '../src/lib/importer';
+import { guessMapping, locateTable, parseVcf, pickSheet, prepareRows, summarize } from '../src/lib/importer';
 import { computeDashboard, inactivityLevel, needsTeamReply, waitingLead } from '../src/lib/metrics';
 import { decideSend, windowOpen } from '../supabase/functions/_shared/policy';
 
@@ -152,5 +152,48 @@ describe('métricas do dashboard', () => {
     expect(m.activeClients).toBe(1);
     expect(m.clientsIn).toBe(1);
     expect(m.clientsOut).toBe(1);
+  });
+});
+
+describe('importação — planilha com aba de resumo', () => {
+  const resumo = [
+    ['Resumo da extração'],
+    [],
+    ['Total de registros no PDF', 312],
+    ['Registros após remoção de duplicados exatos', 298],
+    ['Páginas processadas', 14],
+    [],
+    ['Observação', 'Gerado automaticamente'],
+  ];
+  const contatos = [
+    ['Contatos extraídos'],
+    [],
+    ['Nome', 'Empresa', 'Telefone', 'E-mail'],
+    ['Ana Lima', 'Padaria Sol', '(85) 99999-1111', ''],
+    ['', '', '', ''],
+    ['João Melo', '', '85 98888-2222', 'joao@ex.com'],
+  ];
+
+  it('escolhe a aba de contatos, não a de resumo, mesmo sendo a 2ª', () => {
+    const p = pickSheet([{ sheet: 'Resumo', data: resumo }, { sheet: 'Contatos', data: contatos }]);
+    expect(p.sheet).toBe('Contatos');
+    expect(p.sheets).toEqual(['Resumo', 'Contatos']);
+    expect(p.headers).toEqual(['Nome', 'Empresa', 'Telefone', 'E-mail']);
+    expect(p.headerLine).toBe(3);
+    expect(p.rows).toHaveLength(2); // linha em branco ignorada
+    expect(p.lineNumbers).toEqual([4, 6]);
+    const prep = prepareRows(p.rows, guessMapping(p.headers), { phones: new Map(), emails: new Map() }, p.lineNumbers);
+    expect(summarize(prep).valid).toBe(2);
+    expect(prep.map((r) => r.line)).toEqual([4, 6]);
+  });
+
+  it('respeita a aba escolhida manualmente', () => {
+    const p = pickSheet([{ sheet: 'Resumo', data: resumo }, { sheet: 'Contatos', data: contatos }], 'Resumo');
+    expect(p.sheet).toBe('Resumo');
+  });
+
+  it('acha o cabeçalho abaixo de linhas de título', () => {
+    expect(locateTable(contatos).headerIndex).toBe(2);
+    expect(locateTable(resumo).score).toBe(0);
   });
 });

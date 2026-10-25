@@ -43,12 +43,12 @@ function Importer({ onDone }: { onDone: () => void }) {
 
   useEffect(() => { db.list('import_templates', { eq: { org_id: app.orgId } }).then(setTemplates).catch(() => {}); }, [app.orgId]);
 
-  const pick = async (f: File) => {
+  const pick = async (f: File, sheetName?: string) => {
     const err = checkFile(f);
     if (err) return push('error', err);
     try {
-      const p = await parseFile(f);
-      if (!p.rows.length) return push('error', 'Nenhuma linha encontrada no arquivo.');
+      const p = await parseFile(f, sheetName);
+      if (!p.rows.length) return push('error', p.sheets && p.sheets.length > 1 ? `Nenhuma linha encontrada na aba “${p.sheet}”.` : 'Nenhuma linha encontrada no arquivo.');
       setFile(f); setParsed(p); setMap(guessMapping(p.headers)); setResult(null);
       setExisting(await db.list('leads', { eq: { org_id: app.orgId } }));
     } catch (e: any) { push('error', 'Não foi possível ler o arquivo: ' + e.message); }
@@ -58,7 +58,7 @@ function Importer({ onDone }: { onDone: () => void }) {
     if (!parsed) return [];
     const phones = new Map<string, string>(); const emails = new Map<string, string>();
     for (const l of existing) { if (l.phone_e164) phones.set(l.phone_e164, l.id); if (l.email) emails.set(String(l.email).toLowerCase(), l.id); }
-    return prepareRows(parsed.rows, map, { phones, emails });
+    return prepareRows(parsed.rows, map, { phones, emails }, parsed.lineNumbers);
   }, [parsed, map, existing]);
   const sum = summarize(prepared);
 
@@ -119,6 +119,16 @@ function Importer({ onDone }: { onDone: () => void }) {
               <Stat label="Inválidos" value={num(sum.invalid)} tone="red" />
               <Stat label="Com opt-in na planilha" value={num(sum.withConsent)} tone="cyan" hint="Não é registrado automaticamente" />
             </div>
+            {(parsed.sheets && parsed.sheets.length > 1) || parsed.headerLine > 1 ? (
+              <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-ink-soft">
+                {parsed.sheets && parsed.sheets.length > 1 && (
+                  <span className="flex items-center gap-2">Aba da planilha:
+                    <Select className="h-8 w-56 text-xs" value={parsed.sheet ?? ''} onChange={(e) => file && pick(file, e.target.value)} options={parsed.sheets.map((n) => ({ value: n, label: n }))} />
+                  </span>
+                )}
+                {parsed.headerLine > 1 && <span>Cabeçalho encontrado na linha {parsed.headerLine} (linhas acima foram ignoradas).</span>}
+              </div>
+            ) : null}
           </Card>
           <Card title="Mapeamento de colunas" action={templates.length > 0 && <Select className="h-8 w-52 text-xs" value="" onChange={(e) => { const t = templates.find((x) => x.id === e.target.value); if (t) setMap(t.mapping); }} placeholder="Usar modelo salvo…" options={templates.map((t) => ({ value: t.id, label: t.name }))} />}>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
