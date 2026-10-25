@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: light; }
+html.dark { color-scheme: dark; }
+html, body { -webkit-tap-highlight-color: transparent; }
+body { @apply bg-canvas font-sans text-ink antialiased dark:bg-navy-900 dark:text-slate-100; }
+::selection { background: #BFDBFE; color: #101828; }
+* { scrollbar-width: thin; scrollbar-color: #CBD5E1 transparent; }
+html.dark * { scrollbar-color: #334155 transparent; }
+input[type='datetime-local'], input[type='date'] { min-width: 0; }
+@media (min-width: 1920px) { html { font-size: 17px; } }   /* TVs e telas grandes */
+@media (min-width: 2560px) { html { font-size: 19px; } }
