@@ -109,7 +109,7 @@ export function LoginPage() {
         <Button className="w-full" loading={busy} type="submit">{mode === 'login' ? 'Entrar' : mode === 'signup' ? 'Criar conta' : 'Enviar link'}</Button>
       </form>
       <div className="mt-4 flex justify-between text-xs text-slate-400">
-        {mode === 'login' ? <button onClick={() => setMode('signup')}>Criar conta (convidados)</button> : <button onClick={() => setMode('login')}>Já tenho conta</button>}
+        {mode === 'login' ? <button onClick={() => setMode('signup')}>Criar conta</button> : <button onClick={() => setMode('login')}>Já tenho conta</button>}
         {mode === 'login' && <button onClick={() => setMode('reset')}>Esqueci a senha</button>}
       </div>
     </Shell>
