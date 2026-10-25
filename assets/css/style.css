@@ -250,8 +250,8 @@ p { margin: 0; }
 .footer-col a { color: #C9D1DC; text-decoration: none; }
 .footer-col a:hover { color: #FFFFFF; }
 .footer-bottom { margin-top: 40px; border-top: 1px solid #161B23; padding-top: 24px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--text-3); }
-.dev-credit { color: var(--text-2, #cbd5e1); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; transition: color .2s ease; }
-.dev-credit:hover { color: #2F7BFF; }
+.dev-credit { color: var(--text-2); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; transition: color .2s ease; }
+.dev-credit:hover { color: var(--blue-light); }
 .wa-green { color: var(--wa); }
 
 /* Botão flutuante do WhatsApp */
