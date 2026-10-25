@@ -1,0 +1,30 @@
+name: Bravus Lead CRM — testar e publicar
+on:
+  push:
+    branches: [main]
+    paths: ['bravus-lead-crm/**', '.github/workflows/crm-deploy.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: { group: crm-deploy, cancel-in-progress: false }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: bravus-lead-crm } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: bravus-lead-crm/package-lock.json }
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+      - name: Publicar em /crm
+        working-directory: .
+        run: |
+          rm -rf crm && cp -r bravus-lead-crm/dist crm && touch crm/.nojekyll
+          git config user.name "bravus-lead-bot"; git config user.email "actions@users.noreply.github.com"
+          git add crm
+          git diff --cached --quiet || (git commit -m "CRM: publica build automático [skip ci]" && git push)
