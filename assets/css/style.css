@@ -80,6 +80,26 @@ p { margin: 0; }
 .nav a:hover, .nav a[aria-current="page"] { color: #FFFFFF; }
 .nav a[aria-current="page"] { font-weight: 600; }
 .menu-toggle { display: none; background: transparent; border: 1px solid var(--line-2); border-radius: 10px; width: 46px; height: 46px; align-items: center; justify-content: center; cursor: pointer; color: #FFFFFF; }
+/* Menu suspenso (Bravus Academy) */
+.nav-drop { position: relative; }
+.nav-drop-btn { display: inline-flex; align-items: center; gap: 6px; background: transparent; border: 0; padding: 0; font: inherit; font-size: 16px; color: #C9D1DC; cursor: pointer; }
+.nav-drop-btn:hover, .nav-drop.is-open .nav-drop-btn, .nav-drop.is-current .nav-drop-btn { color: #FFFFFF; }
+.nav-drop.is-current .nav-drop-btn { font-weight: 600; }
+.nav-drop-btn svg { transition: transform .2s ease; color: var(--blue-light); }
+.nav-drop.is-open .nav-drop-btn svg { transform: rotate(180deg); }
+.nav-drop-menu { display: none; position: absolute; top: calc(100% + 22px); right: -24px; width: 390px; background: #0F131A; border: 1px solid var(--line-2); border-radius: 16px; padding: 8px; box-shadow: 0 24px 60px rgba(0,0,0,.55); }
+.nav-drop-menu::before { content: ""; position: absolute; left: 0; right: 0; top: -22px; height: 22px; }
+.nav-drop.is-open .nav-drop-menu { display: flex; flex-direction: column; gap: 2px; }
+.nav .nav-drop-menu a { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 10px; color: var(--text); }
+.nav .nav-drop-menu a:hover, .nav .nav-drop-menu a:focus-visible { background: rgba(0,123,255,.10); color: #FFFFFF; }
+.nav .nav-drop-menu a[aria-current="page"] { background: rgba(0,123,255,.14); font-weight: 400; }
+.dd-icon { width: 38px; height: 38px; flex-shrink: 0; border-radius: 10px; background: var(--t); border: 1px solid var(--r); color: var(--c); display: flex; align-items: center; justify-content: center; }
+.dd-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.dd-title { font-weight: 600; font-size: 15px; color: #FFFFFF; line-height: 1.3; }
+.dd-sub { font-size: 13px; color: var(--text-3); line-height: 1.35; }
+.dd-tag { flex-shrink: 0; font-size: 11px; font-weight: 700; letter-spacing: .02em; padding: 3px 8px; border-radius: 999px; color: var(--c); background: var(--t); border: 1px solid var(--r); }
+.nav-drop-menu .dd-all { border-top: 1px solid var(--line); margin-top: 4px; border-radius: 0 0 10px 10px; }
+
 @media (max-width: 860px) {
   .menu-toggle { display: inline-flex; }
   .nav { display: none; position: absolute; top: 100%; left: 0; right: 0; flex-direction: column; align-items: stretch; gap: 0; background: var(--bg); border-bottom: 1px solid var(--line); padding: 8px 24px 16px; }
@@ -87,6 +107,13 @@ p { margin: 0; }
   .nav a { padding: 14px 0; border-bottom: 1px solid var(--line); }
   .nav a:last-child { border-bottom: 0; }
   .brand img { height: 40px; }
+  .nav { max-height: calc(100vh - 76px); overflow-y: auto; }
+  .nav-drop { border-bottom: 1px solid var(--line); }
+  .nav-drop-btn { width: 100%; justify-content: space-between; padding: 14px 0; }
+  .nav-drop-menu { position: static; width: auto; box-shadow: none; border: 0; border-left: 2px solid #1E3A64; border-radius: 0; background: transparent; padding: 0 0 10px 12px; margin-bottom: 6px; }
+  .nav-drop-menu::before { display: none; }
+  .nav .nav-drop-menu a { padding: 10px 10px; border-bottom: 0; }
+  .nav-drop-menu .dd-all { border-top: 0; margin-top: 0; }
 }
 
 /* Hero */
@@ -270,3 +297,53 @@ p { margin: 0; }
   .avatar--lg { width: 220px; height: 220px; font-size: 64px; }
   .fab-wa { right: 16px; bottom: 16px; width: 56px; height: 56px; }
 }
+
+/* Bravus Academy */
+.academy-hero { padding: 88px 24px 64px; background:
+  radial-gradient(ellipse 50% 60% at 80% 20%, rgba(34,211,238,.10), rgba(10,12,16,0) 70%),
+  radial-gradient(ellipse 60% 70% at 20% 0%, rgba(0,123,255,.22), rgba(10,12,16,0) 70%); }
+.academy-hero .container { display: flex; flex-wrap: wrap; align-items: center; gap: 48px; }
+.academy-hero-text { flex: 1 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+.academy-hero h1 { font-weight: 700; font-size: clamp(34px, 4.4vw, 54px); line-height: 1.08; letter-spacing: -.02em; }
+.academy-hero .lead { max-width: 600px; }
+.academy-hero-art { flex: 0 1 360px; min-width: 0; display: flex; justify-content: center; }
+.academy-logo-lg { width: 100%; max-width: 320px; height: auto; filter: drop-shadow(0 0 40px rgba(0,123,255,.35)); }
+.academy-badge { display: inline-flex; align-items: center; gap: 10px; align-self: flex-start; }
+.academy-badge img { height: 36px; width: auto; }
+.academy-badge span { font-size: 13px; font-weight: 600; letter-spacing: .14em; color: var(--blue-light); text-transform: uppercase; }
+.crumbs { font-size: 14px; color: var(--text-3); display: flex; flex-wrap: wrap; gap: 8px; }
+.crumbs a { color: var(--text-2); text-decoration: none; }
+.crumbs a:hover { color: #FFFFFF; }
+
+.product-card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 28px; display: flex; flex-direction: column; gap: 14px; text-decoration: none; color: var(--text); transition: border-color .2s ease, transform .2s ease; }
+.product-card:hover { border-color: var(--r); transform: translateY(-3px); color: var(--text); }
+.product-card .row-wrap { justify-content: space-between; }
+.product-card h2, .product-card h3 { font-weight: 600; font-size: 22px; line-height: 1.25; }
+.product-card p { color: #A7B0BC; flex-grow: 1; }
+.product-card .go { font-weight: 600; color: var(--c); }
+.status { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; color: var(--c); background: var(--t); border: 1px solid var(--r); }
+.status--live { color: #062B16; background: #34D399; border-color: #34D399; }
+
+.book-wrap { flex: 0 1 380px; min-width: 0; display: flex; justify-content: center; perspective: 1200px; }
+.book { width: 280px; aspect-ratio: 3 / 4.2; border-radius: 6px 14px 14px 6px; padding: 26px 22px; display: flex; flex-direction: column; gap: 14px; position: relative; overflow: hidden;
+  background: radial-gradient(ellipse 80% 50% at 70% 10%, rgba(77,163,255,.45), rgba(7,20,48,0) 70%), radial-gradient(ellipse 70% 40% at 10% 100%, rgba(34,211,238,.25), rgba(7,20,48,0) 70%), linear-gradient(160deg, #0B2A5C, #071430 70%);
+  border: 1px solid rgba(77,163,255,.45); box-shadow: -10px 0 0 -4px #06102A, 0 30px 70px rgba(0,0,0,.55), 0 0 60px rgba(0,123,255,.25); transform: rotateY(-12deg); }
+.book::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 10px; background: linear-gradient(90deg, rgba(255,255,255,.18), rgba(255,255,255,0)); }
+.book img { height: 46px; width: auto; align-self: flex-start; }
+.book-kicker { font-size: 10px; font-weight: 700; letter-spacing: .16em; color: #8CC4FF; text-transform: uppercase; margin-top: auto; }
+.book-title { font-family: var(--display); font-weight: 700; font-size: 34px; line-height: 1.02; color: #FFFFFF; letter-spacing: -.01em; }
+.book-sub { font-size: 12px; color: #C9D8EE; line-height: 1.45; }
+.book-foot { font-size: 10px; color: #8CA3C4; letter-spacing: .08em; border-top: 1px solid rgba(140,196,255,.25); padding-top: 10px; }
+@media (max-width: 600px) { .book { width: 230px; transform: none; } .book-title { font-size: 28px; } }
+
+.chapter { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 28px; display: flex; flex-direction: column; gap: 12px; }
+.chapter p { color: #A7B0BC; }
+.chapter .checks li { font-size: 14px; }
+.includes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 16px; }
+.include { border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: flex; gap: 14px; align-items: flex-start; background: var(--bg); }
+.include strong { display: block; color: #FFFFFF; font-size: 16px; }
+.include span { font-size: 14px; color: var(--text-3); }
+.cta-band { border-radius: 22px; border: 1px solid #1E3A64; background: radial-gradient(ellipse 60% 100% at 0% 50%, rgba(0,123,255,.20), rgba(17,21,28,0) 70%), var(--card); padding: 44px 40px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 28px; }
+.cta-band .stack { flex: 1 1 480px; min-width: 0; }
+.cta-band .academy-badge img { height: 30px; }
+@media (max-width: 600px) { .academy-hero { padding: 64px 20px 48px; } .cta-band { padding: 32px 24px; } }

@@ -26,6 +26,29 @@
     });
   }
 
+  // Menu suspenso "Bravus Academy": abre e fecha ao clicar
+  document.querySelectorAll('.nav-drop').forEach(function (drop) {
+    var btn = drop.querySelector('.nav-drop-btn');
+    if (!btn) return;
+    function setOpen(open) {
+      drop.classList.toggle('is-open', open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    btn.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      setOpen(!drop.classList.contains('is-open'));
+    });
+    document.addEventListener('click', function (ev) {
+      if (!drop.contains(ev.target)) setOpen(false);
+    });
+    drop.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && drop.classList.contains('is-open')) { setOpen(false); btn.focus(); }
+    });
+    drop.addEventListener('focusout', function (ev) {
+      if (ev.relatedTarget && !drop.contains(ev.relatedTarget)) setOpen(false);
+    });
+  });
+
   var form = document.getElementById('form-orcamento');
   if (!form) return;
 
