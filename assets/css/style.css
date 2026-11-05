@@ -347,3 +347,12 @@ p { margin: 0; }
 .cta-band .stack { flex: 1 1 480px; min-width: 0; }
 .cta-band .academy-badge img { height: 30px; }
 @media (max-width: 600px) { .academy-hero { padding: 64px 20px 48px; } .cta-band { padding: 32px 24px; } }
+.footer-col a.product-link { display: flex; align-items: center; gap: 12px; }
+.product-link img { width: 28px; height: 28px; border-radius: 7px; object-fit: contain; flex-shrink: 0; }
+.product-link span { display: flex; flex-direction: column; line-height: 1.25; }
+.product-link strong { font-weight: 500; color: #C9D1DC; }
+.product-link small { font-size: 12px; color: var(--text-3); }
+.product-link:hover strong { color: #FFFFFF; }
+@media (min-width: 1024px) {
+  .footer-grid { display: grid; grid-template-columns: 1.3fr repeat(4, auto); gap: 40px; }
+}
