@@ -108,7 +108,12 @@ class SupaStore {
   async upsertSettings(data) { this.chk(await this.sb.from('settings').upsert({ id: 'main', data })); this.emit('settings'); }
   async invoke(name, body) {
     const { data, error } = await this.sb.functions.invoke(name, { body });
-    if (error) throw new Error(error.message || 'Falha na integração'); return data;
+    if (error) {
+      let msg = error.message || 'Falha na integração';
+      try { const j = await error.context.json(); if (j && j.error) msg = j.error; } catch {}
+      throw new Error(msg);
+    }
+    return data;
   }
 }
 
