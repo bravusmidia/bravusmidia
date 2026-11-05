@@ -123,8 +123,19 @@ const DEFAULT_SETTINGS = {
   calls_start: '12:00', meetings_start: '18:30', prospect_goal: 15, followup_goal: 10,
   priscila_start: '09:00', priscila_end: '17:00', morning_hour: '08:00',
   reminder_offsets: [-5, -2, 0, 1, 5, 10], remind_default: 10, lock_minutes: 15,
-  notify: { tarefas: true, financeiro: true, campanhas: true, conteudo: true, chat: true }
+  notify: { tarefas: true, financeiro: true, campanhas: true, conteudo: true, chat: true },
+  shutdown: { auto: false, trigger: 'ambos', days: 5, pause: true, msg: '' }
 };
+/* Comunicado de desligamento (cliente que parou de pagar / sem saldo). Texto editável em Ajustes. */
+const SHUTDOWN_MSG = `⚠️ *COMUNICADO AUTOMÁTICO – BRAVUS MÍDIA*
+
+Informamos que sua conta será desativada por falta de saldo disponível para continuidade das campanhas.
+
+Estamos iniciando o protocolo de desligamento, com a suspensão dos serviços e a desativação das campanhas vinculadas à sua conta.
+
+Caso deseje manter os serviços ativos, solicitamos a regularização do saldo pendente.
+
+*Esta é uma mensagem automática do sistema.*`;
 const S = { me: null, route: 'painel', d: {}, set: { ...DEFAULT_SETTINGS }, agendaDate: today(), agendaWho: null,
   finMonth: curYM(), cliFilter: 'todos', campFilter: 'todas', contentWeek: null, popped: new Set(), startedAt: new Date().toISOString() };
 TABLES.forEach(t => S.d[t] = []);
@@ -209,6 +220,37 @@ function adState(c) {
   if (c.ad_balance != null && c.ad_balance !== '' && Number(c.ad_balance) <= 0) return { k: 'saldo', label: 'Sem saldo', cls: 'warn' };
   if (act.length) return { k: 'on', label: `Online · ${act.length} ativa${act.length > 1 ? 's' : ''}`, cls: 'ok' };
   return { k: 'off', label: 'Offline', cls: '' };
+}
+const shutCfg = () => ({ ...DEFAULT_SETTINGS.shutdown, ...(S.set.shutdown || {}) });
+const shutText = () => (shutCfg().msg || '').trim() || SHUTDOWN_MSG;
+const overdueDays = c => S.d.invoices.filter(i => i.client_id === c.id && invStatus(i) === 'atrasado').reduce((m, i) => Math.max(m, dayDiff(today(), i.due_date)), 0);
+const overdueSum = c => S.d.invoices.filter(i => i.client_id === c.id && invStatus(i) === 'atrasado').reduce((a, i) => a + +i.amount, 0);
+function fillMsg(tpl, c) {
+  return String(tpl).replace(/\{cliente\}/gi, c.name || '').replace(/\{contato\}/gi, (c.contact || c.name || '').split(' ')[0])
+    .replace(/\{valor\}/gi, brl(overdueSum(c))).replace(/\{dias\}/gi, String(overdueDays(c)));
+}
+const waTo = (c, msg) => { const wa = onlyDigits(c.whatsapp || c.phone).replace(/^55/, ''); return `https://wa.me/${wa ? '55' + wa : ''}?text=${encodeURIComponent(msg)}`; };
+const shutSentAt = c => (S.d.activity.filter(a => a.client_id === c.id && /^Enviou comunicado de desligamento/.test(a.action)).map(a => a.created_at).sort().pop()) || null;
+/* motivo pelo qual o cliente entrou na regra (ou null) */
+function shutReason(c) {
+  const cfg = shutCfg(); if (c.op_status === 'cancelado') return null;
+  const saldo = (c.services || []).includes('trafego') && adState(c).k === 'saldo';
+  const od = overdueDays(c), atraso = od >= (Number(cfg.days) || 0) && od > 0;
+  if ((cfg.trigger === 'saldo' || cfg.trigger === 'ambos') && saldo) return 'Sem saldo na conta de anúncios';
+  if ((cfg.trigger === 'atraso' || cfg.trigger === 'ambos') && atraso) return `Pagamento atrasado há ${od} dia(s)`;
+  return null;
+}
+/* pendente = entrou na regra e ainda não recebeu o comunicado nos últimos 30 dias */
+const shutDue = () => !shutCfg().auto ? [] : S.d.clients.filter(c => shutReason(c) && !(shutSentAt(c) && dayDiff(today(), shutSentAt(c).slice(0, 10)) < 30));
+function shutdownModal(id) {
+  const c = client(id); if (!c) return; const cfg = shutCfg(); const wa = onlyDigits(c.whatsapp || c.phone); const sent = shutSentAt(c);
+  modal('Comunicado de desligamento — ' + c.name, `
+    ${!wa ? '<div class="infobox" style="margin-bottom:12px">Este cliente não tem WhatsApp cadastrado. Edite o cliente e preencha o número.</div>' : ''}
+    ${sent ? `<p class="note" style="margin-bottom:10px">Último comunicado enviado em ${new Date(sent).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}.</p>` : ''}
+    <label class="fl">Mensagem (pode ajustar só para este envio)<textarea id="shutTxt" style="min-height:240px">${esc(fillMsg(shutText(), c))}</textarea></label>
+    <label class="sw" style="margin-top:10px"><input type="checkbox" id="shutPause" ${cfg.pause ? 'checked' : ''}> Marcar cliente como <b>Pausado</b> ao enviar</label>
+    <p class="note" style="margin-top:8px">Abre o WhatsApp com a mensagem pronta para ${esc(c.whatsapp || c.phone || '—')}; é só tocar em enviar. O envio fica registrado no histórico do cliente.</p>`,
+    { wide: true, footer: `<button type="button" class="btn" data-act="closeModal">Cancelar</button><span class="sp"></span><button type="button" class="btn bad" data-act="shutdownSend" data-id="${c.id}" ${wa ? '' : 'disabled'}>${ic('wa')}Enviar no WhatsApp</button>` });
 }
 const adChip = c => { const s = adState(c); return `<span class="chip ${s.cls}"><i class="dot ${s.k === 'on' ? 'on' : s.k === 'prob' ? 'bad' : s.k === 'saldo' ? 'warn' : ''}"></i>${esc(s.label)}</span>`; };
 const metrics = x => {
@@ -347,6 +389,7 @@ async function tick() {
         const st = adState(c);
         if (st.k === 'prob' || st.k === 'saldo') await notifyUsers(team().map(p => p.id), st.k === 'saldo' ? 'Cliente sem saldo na conta de anúncios' : 'Problema em conta de anúncios', c.name, 'alerta', `ad:${c.id}:${st.k}:${d}`, 'campanhas');
       }
+      for (const c of shutDue()) await notifyUsers(admins(), `Comunicado de desligamento pronto: ${c.name}`, shutReason(c) + ' · toque para enviar no WhatsApp', 'alerta', `shut:${c.id}:${curYM()}`, 'clientes');
       const appr = S.d.content.filter(c => c.status === 'aprovacao').length;
       if (appr && nf.conteudo !== false && hm >= S.set.morning_hour) await notifyUsers([me.id], appr === 1 ? 'Existe 1 publicação aguardando aprovação' : `Existem ${appr} publicações aguardando aprovação`, 'Revise antes de publicar.', 'conteudo', `appr:${d}:${appr}`, 'conteudo');
     }
@@ -542,6 +585,7 @@ V.painel = () => {
 
   // Assistente Bravus: prioridades calculadas (sem IA paga)
   const prio = [];
+  if (isAdmin()) shutDue().forEach(c => prio.push(['bad', `Enviar comunicado de desligamento: ${c.name}`, shutReason(c), 'clientes', { act: 'shutdownOpen', id: c.id }]));
   inad.forEach(c => prio.push(['bad', `Cobrar ${c.name}`, 'Pagamento em atraso', 'financeiro']));
   traf.filter(c => adState(c).k === 'prob').forEach(c => prio.push(['bad', `Verificar conta de anúncios de ${c.name}`, 'Problema reportado', 'campanhas']));
   traf.filter(c => adState(c).k === 'saldo').forEach(c => prio.push(['warn', `${c.name} está sem saldo`, 'Avisar o cliente para recarregar', 'campanhas']));
@@ -567,7 +611,7 @@ V.painel = () => {
   </div>
   <div class="grid g2" style="margin-top:14px">
     <div class="card"><h3>${ic('spark')}Prioridades de hoje<span class="sp"></span><span class="chip blue">Assistente Bravus</span></h3>
-      <div class="list">${prio.length ? prio.slice(0, 8).map(p => `<a class="li" href="#${p[3]}"><i class="dot ${p[0] === 'bad' ? 'bad' : p[0] === 'warn' ? 'warn' : 'on'}"></i><div class="t"><b>${esc(p[1])}</b><small>${esc(p[2])}</small></div>${ic('right')}</a>`).join('') : empty('Tudo em ordem por aqui. ✅')}</div>
+      <div class="list">${prio.length ? prio.slice(0, 8).map(p => `<a class="li" href="#${p[3]}"${p[4] ? ` data-act="${p[4].act}" data-id="${p[4].id}"` : ''}><i class="dot ${p[0] === 'bad' ? 'bad' : p[0] === 'warn' ? 'warn' : 'on'}"></i><div class="t"><b>${esc(p[1])}</b><small>${esc(p[2])}</small></div>${ic('right')}</a>`).join('') : empty('Tudo em ordem por aqui. ✅')}</div>
     </div>
     <div class="card"><h3>${ic('target')}Status dos clientes de tráfego<span class="sp"></span><a class="small" href="#campanhas">ver tudo</a></h3>
       <div class="list">${traf.length ? traf.slice().sort((a, b) => adState(a).k.localeCompare(adState(b).k)).slice(0, 8).map(c => `<div class="li" data-act="openClient" data-id="${c.id}" style="cursor:pointer"><div class="t"><b>${esc(c.name)}</b><small>${c.ad_balance != null && c.ad_balance !== '' ? `Saldo: ${brl(c.ad_balance)} (${esc(c.ad_balance_source || 'manual')})` : 'Saldo não informado'}</small></div>${adChip(c)}</div>`).join('') : empty('Nenhum cliente com tráfego pago cadastrado.')}</div>
@@ -606,6 +650,7 @@ V.clientes = () => {
   if (f === 'cancel') cl = cl.filter(c => c.op_status === 'cancelado'); else if (f === 'todos') cl = cl.filter(c => c.op_status !== 'cancelado');
   const tabs = [['todos', 'Ativos'], ['online', 'Online'], ['offline', 'Offline'], ['inad', 'Inadimplentes'], ['cancel', 'Cancelados']];
   return head('Clientes', `${ativos} de ${S.set.max_clients} vagas usadas`, `${isAdmin() ? `<label class="btn" title="Importar planilha (ex.: Metrifiquei)">${ic('down')}<span class="hide-m">Importar</span><input type="file" accept=".csv,text/csv" data-act-change="importCsv" hidden></label>` : ''}<button class="btn pri" data-act="editClient">${ic('plus')}Cliente</button>`) +
+    (isAdmin() && shutDue().length ? `<div class="card" style="margin-bottom:14px;border-color:rgba(255,107,122,.45)"><h3>${ic('bell')}Comunicados de desligamento pendentes<span class="sp"></span><a class="small" href="#ajustes">editar texto</a></h3><div class="list">${shutDue().map(c => `<div class="li"><div class="t"><b>${esc(c.name)}</b><small>${esc(shutReason(c))}</small></div><button class="btn sm bad" data-act="shutdownOpen" data-id="${c.id}">${ic('wa')}Enviar</button></div>`).join('')}</div></div>` : '') +
     `<div class="tabs" style="margin-bottom:14px">${tabs.map(t => `<button data-act="cliFilter" data-f="${t[0]}" class="${f === t[0] ? 'on' : ''}">${t[1]}</button>`).join('')}</div>
     <div class="grid g3">${cl.length ? cl.map(c => `<div class="ccard" data-act="openClient" data-id="${c.id}">
       <div class="hd"><span class="av" style="background:linear-gradient(135deg,#1c5fe6,#0b1a3d)">${esc(initials(c.name))}</span><b>${esc(c.name)}</b>${adChip(c)}</div>
@@ -649,7 +694,7 @@ function clientDetail(id) {
     <div class="sec">Histórico de atividades</div>
     <div class="list">${acts.length ? acts.map(a => `<div class="li"><div class="t"><b style="font-weight:500">${esc(a.action)}</b><small>${esc(firstName(a.user_id))} · ${new Date(a.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</small></div></div>`).join('') : empty('Sem registros ainda.')}</div>
     <form data-form="clientNote" class="row" style="margin-top:10px"><input type="hidden" name="id" value="${c.id}"><input name="text" placeholder="Registrar atividade (ex.: liguei, enviei proposta)" maxlength="300"><button class="btn">Registrar</button></form>`,
-    { wide: true, footer: `${wa ? `<a class="btn ok" href="https://wa.me/55${wa.replace(/^55/, '')}" target="_blank" rel="noopener">${ic('wa')}WhatsApp</a>` : ''}<button type="button" class="btn" data-act="clientReport" data-id="${c.id}">${ic('file')}Relatório</button><span class="sp"></span><button type="button" class="btn pri" data-act="editClient" data-id="${c.id}">${ic('edit')}Editar</button>` });
+    { wide: true, footer: `${wa ? `<a class="btn ok" href="https://wa.me/55${wa.replace(/^55/, '')}" target="_blank" rel="noopener">${ic('wa')}WhatsApp</a>` : ''}<button type="button" class="btn" data-act="clientReport" data-id="${c.id}">${ic('file')}Relatório</button>${isAdmin() ? `<button type="button" class="btn bad" data-act="shutdownOpen" data-id="${c.id}" title="Comunicado de desligamento">${ic('bell')}<span class="hide-m">Desligamento</span></button>` : ''}<span class="sp"></span><button type="button" class="btn pri" data-act="editClient" data-id="${c.id}">${ic('edit')}Editar</button>` });
 }
 
 /* ---------- IMPORTAR CLIENTES (CSV do Metrifiquei ou planilha simples) ---------- */
@@ -917,6 +962,15 @@ V.ajustes = () => {
     <div class="cks">${[['tarefas', 'Tarefas e reuniões'], ['financeiro', 'Cobranças'], ['campanhas', 'Campanhas'], ['conteudo', 'Conteúdo'], ['chat', 'Chat']].map(n => `<label><input type="checkbox" name="nf_${n[0]}" ${(s.notify || {})[n[0]] !== false ? 'checked' : ''}>${n[1]}</label>`).join('')}</div>
     <div><button class="btn pri">Salvar ajustes</button></div>
   </form>
+  <form class="card f" data-form="saveShutdown" style="margin-top:14px"><h3>${ic('bell')}Comunicado de desligamento (WhatsApp)</h3>
+    <label class="sw"><input type="checkbox" name="auto" ${shutCfg().auto ? 'checked' : ''}> <b>Automático ligado</b> — o app identifica sozinho quem entrou na regra e deixa o comunicado pronto (alerta + Prioridades de hoje)</label>
+    <div class="f2">${sel('Quando disparar', 'trigger', [['ambos', 'Sem saldo OU mensalidade atrasada'], ['saldo', 'Só quando ficar sem saldo'], ['atraso', 'Só quando a mensalidade atrasar']], shutCfg().trigger)}${fld('Dias de atraso para disparar', 'days', shutCfg().days, 'number', 'min="1" max="90"')}</div>
+    <label class="fl">Texto da mensagem<textarea name="msg" style="min-height:260px">${esc(shutText())}</textarea></label>
+    <p class="note">Pode usar: <b>{cliente}</b> nome da empresa · <b>{contato}</b> primeiro nome do contato · <b>{valor}</b> total em atraso · <b>{dias}</b> dias de atraso. Negrito do WhatsApp: *texto*.</p>
+    <label class="sw"><input type="checkbox" name="pause" ${shutCfg().pause ? 'checked' : ''}> Marcar o cliente como Pausado quando o comunicado for enviado</label>
+    <p class="note">Desligado: o comunicado só sai quando você clicar em “Desligamento” no cliente. Ligado: o app avisa e deixa pronto; você confirma o envio com 1 toque. Envio 100% sem toque exige a API oficial do WhatsApp com modelo aprovado pela Meta.</p>
+    <div class="row wrap"><button class="btn pri">Salvar comunicado</button><button type="button" class="btn" data-act="shutdownReset">Restaurar texto padrão</button></div>
+  </form>
   <div class="card" style="margin-top:14px"><h3>${ic('cal')}Rotinas automáticas (Daily e Weekend)<span class="sp"></span><button class="btn sm" data-act="newTemplate">${ic('plus')}Rotina</button></h3>
     <div class="list">${tpls.map(t => `<div class="li"><span class="tm num" style="color:var(--blue2);font-weight:700;width:46px">${esc(t.time || '—')}</span><div class="t"><b>${esc(t.title)}</b><small>${esc(firstName(t.assignee))} · ${DN.map((n, i) => (t.days || []).includes(i) ? `<b style="color:var(--tx)">${n}</b>` : `<span style="opacity:.35">${n}</span>`).join(' ')}${t.goal ? ' · meta ' + t.goal : ''}</small></div><button class="btn sm ic" data-act="editTemplate" data-id="${t.id}">${ic('edit')}</button></div>`).join('') || empty('Sem rotinas.')}</div>
     <p class="note" style="margin-top:8px">As tarefas do dia são criadas automaticamente a partir destas rotinas. Mudanças valem a partir do próximo dia gerado.</p></div>
@@ -953,6 +1007,15 @@ const A = {
   },
   editClient: d => { if (!d.id && S.d.clients.filter(c => c.op_status !== 'cancelado').length >= S.set.max_clients) return toast('Limite de clientes atingido', `Seu espaço comporta ${S.set.max_clients} clientes. Aumente em Ajustes.`, 'warn'); clientForm(d.id ? client(d.id) : {}); },
   openClient: d => clientDetail(d.id),
+  shutdownOpen: d => { if (!isAdmin()) return toast('Somente o administrador envia o comunicado', '', 'warn'); shutdownModal(d.id); },
+  shutdownSend: async d => {
+    const c = client(d.id); if (!c) return; const txt = ($('#shutTxt') || {}).value || fillMsg(shutText(), c); const pause = !!($('#shutPause') || {}).checked;
+    window.open(waTo(c, txt), '_blank', 'noopener');
+    await log(`Enviou comunicado de desligamento${shutReason(c) ? ' (' + shutReason(c) + ')' : ''}`, c.id);
+    if (pause && c.op_status !== 'pausado' && c.op_status !== 'cancelado') { await store.update('clients', c.id, { op_status: 'pausado' }); await log('Cliente pausado (protocolo de desligamento)', c.id); }
+    closeModal(); toast('Comunicado aberto no WhatsApp', pause ? 'Cliente marcado como Pausado.' : 'Registrado no histórico.', 'ok'); await refresh();
+  },
+  shutdownReset: () => { const t = $('form[data-form="saveShutdown"] textarea[name="msg"]'); if (t) t.value = SHUTDOWN_MSG; toast('Texto padrão restaurado', 'Clique em “Salvar comunicado” para gravar.'); },
   delClient: d => confirmBox('Excluir cliente?', 'Isto apaga o cliente, as campanhas e as cobranças ligadas a ele. Para manter o histórico, prefira marcar como “Cancelado”.', 'Excluir', async () => {
     const c = client(d.id); for (const t of ['campaigns', 'invoices']) for (const r of S.d[t].filter(x => x.client_id === d.id)) await store.remove(t, r.id);
     await store.remove('clients', d.id); await log(`Excluiu o cliente ${c && c.name}`); toast('Cliente excluído', '', 'ok'); await refresh(); }, true),
@@ -1148,6 +1211,11 @@ const F = {
       priscila_start: v.priscila_start, priscila_end: v.priscila_end, morning_hour: v.morning_hour, lock_minutes: num(v.lock_minutes) || 15, reminder_offsets: offs, priscila_finance: form.priscila_finance.checked,
       notify: Object.fromEntries(['tarefas', 'financeiro', 'campanhas', 'conteudo', 'chat'].map(k => [k, !!form['nf_' + k].checked])) };
     await store.upsertSettings(s); S.set = s; await log('Atualizou os ajustes'); toast('Ajustes salvos', '', 'ok'); armLock(); await refresh();
+  },
+  saveShutdown: async (v, fd, form) => {
+    const msg = String(v.msg || '').trim(); if (!msg) return toast('Escreva o texto do comunicado', '', 'warn');
+    const s = { ...S.set, shutdown: { auto: form.auto.checked, trigger: v.trigger, days: Math.max(1, num(v.days) || 5), pause: form.pause.checked, msg } };
+    await store.upsertSettings(s); S.set = s; await log(`Atualizou o comunicado de desligamento (automático ${s.shutdown.auto ? 'ligado' : 'desligado'})`); toast('Comunicado salvo', s.shutdown.auto ? 'Automático ligado.' : 'Automático desligado — envio só manual.', 'ok'); await refresh();
   },
   savePin: async v => {
     if (v.pin.length < 6 || v.pin !== v.pin2) return toast('As senhas não conferem ou têm menos de 6 caracteres', '', 'bad');
