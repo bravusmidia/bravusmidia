@@ -724,7 +724,7 @@ V.financeiro = () => {
   const exp = S.d.expenses.filter(e => ym(e.date) === k).sort((a, b) => b.date.localeCompare(a.date));
   const label = (l => l[0].toUpperCase() + l.slice(1))(new Date(k + '-15T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
   const shift = n => { const d = new Date(k + '-15T12:00:00'); d.setMonth(d.getMonth() + n); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
-  return head('Financeiro', 'Bravus Finance · entradas, saídas e cobranças', isAdmin() ? `<button class="btn" data-act="genInvoices" data-m="${k}">${ic('sync')}<span class="hide-m">Gerar mensalidades</span></button><button class="btn pri" data-act="newInvoice">${ic('plus')}Cobrança</button>` : '') + `
+  return head('Financeiro', 'Bravus Finance · entradas, saídas e cobranças', isAdmin() ? `${SUPA ? `<button class="btn" data-act="asaasSync">${ic('sync')}<span class="hide-m">Sincronizar Asaas</span></button>` : ''}<button class="btn" data-act="genInvoices" data-m="${k}">${ic('sync')}<span class="hide-m">Gerar mensalidades</span></button><button class="btn pri" data-act="newInvoice">${ic('plus')}Cobrança</button>` : '') + `
     <div class="datebar" style="margin-bottom:14px"><button class="btn sm ic" data-act="finMonth" data-m="${shift(-1)}">${ic('left')}</button><b>${label}</b><button class="btn sm ic" data-act="finMonth" data-m="${shift(1)}">${ic('right')}</button></div>
     <div class="grid g4">${kpi('Entrou', brl(fm.recebido), 'confirmado', 'hl')}${kpi('A receber', brl(fm.aReceber), '', 'y')}${kpi('Atrasado (total)', brl(fm.atrasado), '', fm.atrasado ? 'r' : '')}${kpi('Saiu', brl(fm.saidas), `saldo do mês ${brl(fm.saldo)}`, fm.saidas ? 'r' : '')}</div>
     <div class="card" style="margin-top:14px"><h3>${ic('wallet')}Cobranças<span class="sp"></span><span class="small muted">${inv.length}</span></h3>
@@ -733,7 +733,7 @@ V.financeiro = () => {
         ${isAdmin() ? `<button class="btn sm ic" data-act="editInvoice" data-id="${i.id}">${ic('edit')}</button>` : ''}</div>`; }).join('') : empty('Sem cobranças neste mês. Use “Gerar mensalidades” para criar a partir dos contratos.')}</div></div>
     <div class="card" style="margin-top:14px"><h3>${ic('down')}Saídas / despesas<span class="sp"></span>${isAdmin() ? `<button class="btn sm" data-act="newExpense">${ic('plus')}Despesa</button>` : ''}</h3>
       <div class="list">${exp.length ? exp.map(e => `<div class="li"><div class="t"><b>${esc(e.description)}</b><small>${esc(e.category || 'Geral')} · ${fdate(e.date)}</small></div><b class="num" style="color:var(--bad)">− ${brl(e.amount)}</b>${isAdmin() ? `<button class="btn sm ic" data-act="delExpense" data-id="${e.id}">${ic('trash')}</button>` : ''}</div>`).join('') : empty('Nenhuma despesa registrada no mês.')}</div></div>
-    <p class="note" style="margin-top:10px">Uma cobrança só fica “Paga” com confirmação: pelo Asaas (automático) ou quando você confirmar que o dinheiro caiu na conta.</p>`;
+    <p class="note" style="margin-top:10px">Uma cobrança só fica “Paga” com confirmação: pelo Asaas (automático) ou quando você confirmar que o dinheiro caiu na conta. Clientes cobrados pelo Asaas (assinaturas) entram pelo botão “Sincronizar Asaas” e se atualizam sozinhos.</p>`;
 };
 function invoiceForm(i = {}) {
   modal(i.id ? 'Editar cobrança' : 'Nova cobrança', `<div class="f"><input type="hidden" name="id" value="${esc(i.id || '')}">
@@ -966,13 +966,23 @@ const A = {
   delInvoice: d => confirmBox('Excluir cobrança?', 'Prefira “Cancelado” para manter o histórico.', 'Excluir', async () => { await store.remove('invoices', d.id); await refresh(); }, true),
   genInvoices: async d => {
     const k = d.m; let n = 0;
-    for (const c of S.d.clients.filter(c => c.op_status !== 'cancelado' && +c.contract_value > 0)) {
+    for (const c of S.d.clients.filter(c => c.op_status !== 'cancelado' && +c.contract_value > 0 && !c.asaas_customer_id)) { // cobrados pelo Asaas entram pela sincronização
       if (S.d.invoices.some(i => i.client_id === c.id && ym(i.due_date) === k && /mensalidade/i.test(i.description || ''))) continue;
       const [y, m] = k.split('-').map(Number); const last = new Date(y, m, 0).getDate();
       const due = `${k}-${pad(Math.min(+c.due_day || 10, last))}`;
       await store.insert('invoices', { client_id: c.id, amount: +c.contract_value, due_date: due, description: `Mensalidade ${monthName(k)}/${y}`, status: 'pendente' }); n++;
     }
     await log(`Gerou ${n} mensalidade(s) de ${k}`); toast(n ? `${n} mensalidade(s) criada(s)` : 'Tudo já estava gerado', '', 'ok'); await refresh();
+  },
+  asaasSync: async (d, el) => {
+    el.disabled = true; toast('Sincronizando com o Asaas…', 'Isso leva alguns segundos.');
+    try {
+      const r = await store.invoke('asaas-sync');
+      toast('Asaas sincronizado', `${r.linked} cliente(s) ligados · ${r.created} cobrança(s) nova(s) · ${r.updated} atualizada(s)`, 'ok');
+      if (r.unmatched && r.unmatched.length) toast('Clientes do Asaas sem cadastro no app', r.unmatched.join(', '), 'warn');
+      await refresh();
+    } catch (e) { toast('Não foi possível sincronizar', e.message, 'warn'); }
+    el.disabled = false;
   },
   payInvoice: d => {
     const i = S.d.invoices.find(x => x.id === d.id);
