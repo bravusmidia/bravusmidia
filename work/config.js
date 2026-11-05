@@ -1,8 +1,7 @@
-// BRAVUS WORK — configuração pública (NÃO coloque senhas/tokens aqui).
-// Deixe vazio para rodar em "modo local" (dados só neste aparelho).
-// Depois de criar o projeto no Supabase, preencha com a URL e a "anon public key".
+// BRAVUS WORK — configuração pública (NÃO coloque senhas/tokens secretos aqui).
+// A chave "publishable" é feita para ficar no navegador; quem protege os dados são as regras RLS do banco.
 window.BW_CONFIG = {
-  SUPABASE_URL: "",
-  SUPABASE_ANON_KEY: "",
-  VAPID_PUBLIC_KEY: "" // chave pública para push com o app fechado (ver README)
+  SUPABASE_URL: "https://widrjidmnzhkaofaraov.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_F_D3QYHH_JKnfTpQrY3t3w_stC0L1Hw",
+  VAPID_PUBLIC_KEY: ""
 };

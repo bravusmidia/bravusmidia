@@ -99,8 +99,9 @@ class SupaStore {
   }
   async insert(t, row) { const r = this.chk(await this.sb.from(t).insert(row).select().single()); this.emit(t); return r; }
   async insertUnique(t, row) {
-    const { data, error } = await this.sb.from(t).upsert(row, { onConflict: 'user_id,key', ignoreDuplicates: true }).select();
-    if (error) throw new Error(error.message); this.emit(t); return data && data[0] || null;
+    // sem .select(): quem cria o aviso nem sempre pode ler o aviso de outra pessoa (regra de segurança)
+    const { error } = await this.sb.from(t).upsert(row, { onConflict: 'user_id,key', ignoreDuplicates: true });
+    if (error) throw new Error(error.message); this.emit(t); return null;
   }
   async update(t, id, patch) { const r = this.chk(await this.sb.from(t).update(patch).eq('id', id).select().maybeSingle()); this.emit(t); return r; }
   async remove(t, id) { this.chk(await this.sb.from(t).delete().eq('id', id)); this.emit(t); }
@@ -1143,7 +1144,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && S.
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
   if (SUPA) {
     try {
-      const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm');
+      const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm');
       sb = createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
       store = new SupaStore(sb); store.listen();
       const { data } = await sb.auth.getSession();
