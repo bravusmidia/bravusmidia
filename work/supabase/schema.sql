@@ -41,10 +41,13 @@ create or replace function is_team() returns boolean
 language sql stable security definer set search_path = public as
 $$ select exists(select 1 from profiles where id = auth.uid() and role in ('admin','comercial')) $$;
 
+-- (plpgsql: só é validada quando usada, por isso pode vir antes da tabela settings)
 create or replace function can_finance() returns boolean
-language sql stable security definer set search_path = public as
-$$ select is_admin() or (is_team() and coalesce(
-     (select (data->>'priscila_finance')::boolean from settings where agency_id = my_agency() and id = 'main'), false)) $$;
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if is_admin() then return true; end if;
+  return is_team() and coalesce((select (data->>'priscila_finance')::boolean from settings where agency_id = my_agency() and id = 'main'), false);
+end $$;
 
 -- ---------- CONFIGURAÇÕES ----------
 create table if not exists settings (
@@ -175,48 +178,75 @@ alter table notifications enable row level security;
 alter table activity enable row level security;
 alter table push_subs enable row level security;
 
+drop policy if exists ag_sel on agencies;
 create policy ag_sel on agencies for select using (id = my_agency());
 
+drop policy if exists pr_sel on profiles;
 create policy pr_sel on profiles for select using (agency_id = my_agency());
+drop policy if exists pr_upd_self on profiles;
 create policy pr_upd_self on profiles for update using (id = auth.uid())
   with check (id = auth.uid() and role = (select role from profiles where id = auth.uid()));
+drop policy if exists pr_upd_admin on profiles;
 create policy pr_upd_admin on profiles for update using (is_admin() and agency_id = my_agency());
 
+drop policy if exists st_sel on settings;
 create policy st_sel on settings for select using (agency_id = my_agency() and is_team());
+drop policy if exists st_all on settings;
 create policy st_all on settings for all using (agency_id = my_agency() and is_admin()) with check (agency_id = my_agency() and is_admin());
 
 -- Equipe (admin + comercial) trabalha em clientes, campanhas, tarefas, conteúdo, chat
 do $$ declare t text; begin
   foreach t in array array['clients','campaigns','tasks','content','messages','activity'] loop
+    execute format('drop policy if exists %1$s_sel on %1$s; drop policy if exists %1$s_ins on %1$s; drop policy if exists %1$s_upd on %1$s', t);
     execute format('create policy %1$s_sel on %1$s for select using (agency_id = my_agency() and is_team())', t);
     execute format('create policy %1$s_ins on %1$s for insert with check (agency_id = my_agency() and is_team())', t);
     execute format('create policy %1$s_upd on %1$s for update using (agency_id = my_agency() and is_team())', t);
   end loop;
 end $$;
 -- Excluir: só admin (exceto as próprias tarefas/conteúdo)
+drop policy if exists clients_del on clients;
 create policy clients_del on clients for delete using (agency_id = my_agency() and is_admin());
+drop policy if exists campaigns_del on campaigns;
 create policy campaigns_del on campaigns for delete using (agency_id = my_agency() and is_admin());
+drop policy if exists tasks_del on tasks;
 create policy tasks_del on tasks for delete using (agency_id = my_agency() and (is_admin() or assignee = auth.uid()));
+drop policy if exists content_del on content;
 create policy content_del on content for delete using (agency_id = my_agency() and is_team());
+drop policy if exists messages_del on messages;
 create policy messages_del on messages for delete using (agency_id = my_agency() and (is_admin() or user_id = auth.uid()));
 
 -- Financeiro: só admin (ou Priscila se o admin liberar em Ajustes)
+drop policy if exists inv_sel on invoices;
 create policy inv_sel on invoices for select using (agency_id = my_agency() and can_finance());
+drop policy if exists inv_all on invoices;
 create policy inv_all on invoices for all using (agency_id = my_agency() and is_admin()) with check (agency_id = my_agency() and is_admin());
+drop policy if exists exp_sel on expenses;
 create policy exp_sel on expenses for select using (agency_id = my_agency() and can_finance());
+drop policy if exists exp_all on expenses;
 create policy exp_all on expenses for all using (agency_id = my_agency() and is_admin()) with check (agency_id = my_agency() and is_admin());
 
 -- Notificações: cada um vê só as suas; equipe pode avisar a equipe
+drop policy if exists nt_sel on notifications;
 create policy nt_sel on notifications for select using (user_id = auth.uid());
+drop policy if exists nt_upd on notifications;
 create policy nt_upd on notifications for update using (user_id = auth.uid());
+drop policy if exists nt_del on notifications;
 create policy nt_del on notifications for delete using (user_id = auth.uid());
+drop policy if exists nt_ins on notifications;
 create policy nt_ins on notifications for insert with check (agency_id = my_agency() and is_team()
   and user_id in (select id from profiles where agency_id = my_agency()));
 
+drop policy if exists ps_all on push_subs;
 create policy ps_all on push_subs for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- Tempo real (chat, presença, alertas)
-alter publication supabase_realtime add table messages, notifications, profiles, tasks, clients, campaigns, invoices, content;
+do $$ declare t text; begin
+  foreach t in array array['messages','notifications','profiles','tasks','clients','campaigns','invoices','content'] loop
+    if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = t) then
+      execute format('alter publication supabase_realtime add table %I', t);
+    end if;
+  end loop;
+end $$;
 
 -- =====================================================================
 -- ALERTAS AUTOMÁTICOS NO SERVIDOR (funcionam mesmo com o app fechado)
