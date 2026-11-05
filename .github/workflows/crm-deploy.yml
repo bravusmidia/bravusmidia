@@ -17,10 +17,8 @@ jobs:
         with: { node-version: 22, cache: npm, cache-dependency-path: bravus-lead-crm/package-lock.json }
       - run: npm ci
       - run: npm test
+      # Projeto Supabase (URL, chave pública e schema "crm") vem de bravus-lead-crm/.env.production
       - run: npm run build
-        env:
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
       - name: Publicar em /crm
         working-directory: .
         run: |
