@@ -6,6 +6,8 @@ export type Mode = 'supabase' | 'demo' | 'unconfigured';
 
 const CFG_KEY = 'bravus.lead.supabase';
 const MODE_KEY = 'bravus.lead.mode';
+// O CRM roda dentro do projeto Supabase do Bravus Work, no schema separado "crm".
+export const DB_SCHEMA = (import.meta.env.VITE_SUPABASE_SCHEMA as string | undefined) || 'crm';
 
 export function getConfig(): { url: string; key: string } | null {
   const envUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -36,12 +38,12 @@ export function getMode(): Mode {
 }
 export function setDemo(on: boolean) { on ? localStorage.setItem(MODE_KEY, 'demo') : localStorage.removeItem(MODE_KEY); }
 
-let _sb: SupabaseClient | null = null;
-export function sb(): SupabaseClient {
+let _sb: SupabaseClient<any, any, any> | null = null;
+export function sb(): SupabaseClient<any, any, any> {
   if (_sb) return _sb;
   const c = getConfig();
   if (!c) throw new Error('Supabase não configurado');
-  _sb = createClient(c.url, c.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' } });
+  _sb = createClient(c.url, c.key, { db: { schema: DB_SCHEMA }, auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' } });
   return _sb;
 }
 

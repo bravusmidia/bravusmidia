@@ -1,0 +1,357 @@
+activities	id	uuid	t
+activities	org_id	uuid	t
+activities	lead_id	uuid	f
+activities	type	text	t
+activities	direction	text	f
+activities	summary	text	t
+activities	occurred_at	timestamp with time zone	t
+activities	created_by	uuid	f
+activities	created_at	timestamp with time zone	t
+audit_logs	id	bigint	t
+audit_logs	org_id	uuid	f
+audit_logs	actor_id	uuid	f
+audit_logs	table_name	text	t
+audit_logs	record_id	uuid	f
+audit_logs	action	text	t
+audit_logs	changes	jsonb	f
+audit_logs	created_at	timestamp with time zone	t
+automation_runs	id	uuid	t
+automation_runs	org_id	uuid	t
+automation_runs	automation_id	uuid	t
+automation_runs	event_key	text	t
+automation_runs	outcome	text	t
+automation_runs	detail	text	f
+automation_runs	created_at	timestamp with time zone	t
+automations	id	uuid	t
+automations	org_id	uuid	t
+automations	name	text	t
+automations	trigger	text	t
+automations	conditions	jsonb	t
+automations	action	text	t
+automations	params	jsonb	t
+automations	active	boolean	t
+automations	simulate	boolean	t
+automations	created_at	timestamp with time zone	t
+clients	id	uuid	t
+clients	org_id	uuid	t
+clients	lead_id	uuid	f
+clients	name	text	t
+clients	company	text	f
+clients	phone_e164	text	f
+clients	email	extensions.citext	f
+clients	document	text	f
+clients	city	text	f
+clients	owner_id	uuid	f
+clients	status	text	t
+clients	started_at	date	t
+clients	churned_at	date	f
+clients	churn_reason	text	f
+clients	notes	text	f
+clients	created_at	timestamp with time zone	t
+clients	updated_at	timestamp with time zone	t
+consents	id	uuid	t
+consents	org_id	uuid	t
+consents	lead_id	uuid	t
+consents	channel	text	t
+consents	purpose	text	t
+consents	status	text	t
+consents	source	text	t
+consents	evidence	text	f
+consents	recorded_by	uuid	f
+consents	recorded_at	timestamp with time zone	t
+conversations	id	uuid	t
+conversations	org_id	uuid	t
+conversations	lead_id	uuid	f
+conversations	wa_id	text	t
+conversations	phone_e164	text	t
+conversations	contact_name	text	f
+conversations	status	text	t
+conversations	assigned_to	uuid	f
+conversations	automation_paused	boolean	t
+conversations	unread_count	integer	t
+conversations	last_inbound_at	timestamp with time zone	f
+conversations	last_outbound_at	timestamp with time zone	f
+conversations	last_message_preview	text	f
+conversations	created_at	timestamp with time zone	t
+conversations	updated_at	timestamp with time zone	t
+files	id	uuid	t
+files	org_id	uuid	t
+files	lead_id	uuid	f
+files	client_id	uuid	f
+files	name	text	t
+files	mime_type	text	f
+files	size_bytes	bigint	f
+files	storage_path	text	t
+files	uploaded_by	uuid	f
+files	created_at	timestamp with time zone	t
+import_templates	id	uuid	t
+import_templates	org_id	uuid	t
+import_templates	name	text	t
+import_templates	mapping	jsonb	t
+import_templates	created_at	timestamp with time zone	t
+imports	id	uuid	t
+imports	org_id	uuid	t
+imports	file_name	text	t
+imports	file_type	text	f
+imports	strategy	text	t
+imports	total_rows	integer	t
+imports	inserted	integer	t
+imports	updated	integer	t
+imports	skipped	integer	t
+imports	rejected	integer	t
+imports	duplicates	integer	t
+imports	errors	jsonb	t
+imports	created_by	uuid	f
+imports	created_at	timestamp with time zone	t
+integrations	id	uuid	t
+integrations	org_id	uuid	t
+integrations	provider	text	t
+integrations	mode	text	t
+integrations	phone_number_id	text	f
+integrations	waba_id	text	f
+integrations	display_phone	text	f
+integrations	status	text	t
+integrations	last_checked_at	timestamp with time zone	f
+integrations	last_error	text	f
+integrations	created_at	timestamp with time zone	t
+integrations	updated_at	timestamp with time zone	t
+invitations	id	uuid	t
+invitations	org_id	uuid	t
+invitations	email	extensions.citext	t
+invitations	role	crm.app_role	t
+invitations	job_title	text	f
+invitations	invited_by	uuid	f
+invitations	accepted_at	timestamp with time zone	f
+invitations	revoked_at	timestamp with time zone	f
+invitations	created_at	timestamp with time zone	t
+leads	id	uuid	t
+leads	org_id	uuid	t
+leads	full_name	text	t
+leads	company	text	f
+leads	phone_original	text	f
+leads	phone_e164	text	f
+leads	phone_valid	boolean	t
+leads	whatsapp	text	f
+leads	email	extensions.citext	f
+leads	website	text	f
+leads	instagram	text	f
+leads	facebook	text	f
+leads	city	text	f
+leads	state	text	f
+leads	segment	text	f
+leads	service_id	uuid	f
+leads	source	text	f
+leads	campaign	text	f
+leads	entered_at	date	t
+leads	stage_id	uuid	f
+leads	owner_id	uuid	f
+leads	temperature	text	f
+leads	potential_value	numeric(12,2)	t
+leads	probability	integer	f
+leads	next_action	text	f
+leads	next_follow_up_at	timestamp with time zone	f
+leads	last_interaction_at	timestamp with time zone	f
+leads	last_inbound_at	timestamp with time zone	f
+leads	last_outbound_at	timestamp with time zone	f
+leads	last_attempt_at	timestamp with time zone	f
+leads	waiting_on	text	f
+leads	consent_status	text	t
+leads	consent_source	text	f
+leads	consent_at	timestamp with time zone	f
+leads	opted_out	boolean	t
+leads	notes	text	f
+leads	tags	text[]	t
+leads	lost_reason	text	f
+leads	won_at	timestamp with time zone	f
+leads	lost_at	timestamp with time zone	f
+leads	import_id	uuid	f
+leads	archived_at	timestamp with time zone	f
+leads	created_by	uuid	f
+leads	created_at	timestamp with time zone	t
+leads	updated_at	timestamp with time zone	t
+memberships	id	uuid	t
+memberships	org_id	uuid	t
+memberships	user_id	uuid	t
+memberships	role	crm.app_role	t
+memberships	job_title	text	f
+memberships	active	boolean	t
+memberships	created_at	timestamp with time zone	t
+message_templates	id	uuid	t
+message_templates	org_id	uuid	t
+message_templates	name	text	t
+message_templates	language	text	t
+message_templates	category	text	t
+message_templates	status	text	t
+message_templates	body	text	f
+message_templates	variables	integer	t
+message_templates	meta_id	text	f
+message_templates	synced_at	timestamp with time zone	f
+message_templates	created_at	timestamp with time zone	t
+messages	id	uuid	t
+messages	org_id	uuid	t
+messages	conversation_id	uuid	t
+messages	direction	text	t
+messages	wa_message_id	text	f
+messages	type	text	t
+messages	body	text	f
+messages	template_name	text	f
+messages	status	text	t
+messages	error_code	text	f
+messages	error_message	text	f
+messages	sent_by	uuid	f
+messages	created_at	timestamp with time zone	t
+messages	status_updated_at	timestamp with time zone	f
+notifications	id	uuid	t
+notifications	org_id	uuid	t
+notifications	user_id	uuid	t
+notifications	title	text	t
+notifications	body	text	f
+notifications	link	text	f
+notifications	read_at	timestamp with time zone	f
+notifications	created_at	timestamp with time zone	t
+organizations	id	uuid	t
+organizations	name	text	t
+organizations	settings	jsonb	t
+organizations	created_at	timestamp with time zone	t
+organizations	updated_at	timestamp with time zone	t
+payments	id	uuid	t
+payments	org_id	uuid	t
+payments	sale_id	uuid	f
+payments	client_id	uuid	f
+payments	description	text	f
+payments	amount	numeric(12,2)	t
+payments	due_date	date	t
+payments	status	text	t
+payments	paid_at	date	f
+payments	method	text	f
+payments	confirmed_by	uuid	f
+payments	created_at	timestamp with time zone	t
+pipeline_stages	id	uuid	t
+pipeline_stages	org_id	uuid	t
+pipeline_stages	name	text	t
+pipeline_stages	position	integer	t
+pipeline_stages	color	text	t
+pipeline_stages	kind	text	t
+pipeline_stages	probability	integer	t
+pipeline_stages	entry_criteria	text	f
+pipeline_stages	exit_criteria	text	f
+pipeline_stages	created_at	timestamp with time zone	t
+profiles	id	uuid	t
+profiles	full_name	text	f
+profiles	email	extensions.citext	f
+profiles	phone	text	f
+profiles	avatar_url	text	f
+profiles	theme	text	t
+profiles	current_org_id	uuid	f
+profiles	created_at	timestamp with time zone	t
+profiles	updated_at	timestamp with time zone	t
+proposal_revisions	id	uuid	t
+proposal_revisions	org_id	uuid	t
+proposal_revisions	proposal_id	uuid	t
+proposal_revisions	version	integer	t
+proposal_revisions	snapshot	jsonb	t
+proposal_revisions	created_by	uuid	f
+proposal_revisions	created_at	timestamp with time zone	t
+proposals	id	uuid	t
+proposals	org_id	uuid	t
+proposals	lead_id	uuid	f
+proposals	client_id	uuid	f
+proposals	title	text	t
+proposals	items	jsonb	t
+proposals	setup_total	numeric(12,2)	t
+proposals	monthly_total	numeric(12,2)	t
+proposals	discount	numeric(12,2)	t
+proposals	valid_until	date	f
+proposals	conditions	text	f
+proposals	notes	text	f
+proposals	status	text	t
+proposals	version	integer	t
+proposals	owner_id	uuid	f
+proposals	sent_at	timestamp with time zone	f
+proposals	created_at	timestamp with time zone	t
+proposals	updated_at	timestamp with time zone	t
+prospects	id	uuid	t
+prospects	org_id	uuid	t
+prospects	company	text	t
+prospects	niche	text	f
+prospects	discovery_channel	text	f
+prospects	contact_name	text	f
+prospects	phone_original	text	f
+prospects	phone_e164	text	f
+prospects	email	extensions.citext	f
+prospects	instagram	text	f
+prospects	city	text	f
+prospects	service_id	uuid	f
+prospects	owner_id	uuid	f
+prospects	status	text	t
+prospects	approached_at	timestamp with time zone	f
+prospects	cadence_step	integer	t
+prospects	result	text	f
+prospects	next_action	text	f
+prospects	next_action_at	timestamp with time zone	f
+prospects	notes	text	f
+prospects	lead_id	uuid	f
+prospects	created_at	timestamp with time zone	t
+prospects	updated_at	timestamp with time zone	t
+sales	id	uuid	t
+sales	org_id	uuid	t
+sales	lead_id	uuid	f
+sales	client_id	uuid	f
+sales	proposal_id	uuid	f
+sales	service_id	uuid	f
+sales	description	text	f
+sales	setup_value	numeric(12,2)	t
+sales	monthly_value	numeric(12,2)	t
+sales	discount	numeric(12,2)	t
+sales	duration_months	integer	f
+sales	closed_at	date	t
+sales	start_date	date	f
+sales	renewal_date	date	f
+sales	contract_status	text	t
+sales	owner_id	uuid	f
+sales	notes	text	f
+sales	created_at	timestamp with time zone	t
+sales	updated_at	timestamp with time zone	t
+services	id	uuid	t
+services	org_id	uuid	t
+services	name	text	t
+services	description	text	f
+services	setup_price	numeric(12,2)	t
+services	monthly_price	numeric(12,2)	t
+services	recurring	boolean	t
+services	active	boolean	t
+services	created_at	timestamp with time zone	t
+stage_history	id	uuid	t
+stage_history	org_id	uuid	t
+stage_history	lead_id	uuid	t
+stage_history	from_stage	uuid	f
+stage_history	to_stage	uuid	f
+stage_history	changed_by	uuid	f
+stage_history	changed_at	timestamp with time zone	t
+suppression_list	id	uuid	t
+suppression_list	org_id	uuid	t
+suppression_list	phone_e164	text	t
+suppression_list	reason	text	t
+suppression_list	source	text	f
+suppression_list	created_by	uuid	f
+suppression_list	created_at	timestamp with time zone	t
+tasks	id	uuid	t
+tasks	org_id	uuid	t
+tasks	lead_id	uuid	f
+tasks	assignee_id	uuid	f
+tasks	type	text	t
+tasks	title	text	t
+tasks	priority	text	t
+tasks	due_at	timestamp with time zone	t
+tasks	status	text	t
+tasks	result	text	f
+tasks	notes	text	f
+tasks	completed_at	timestamp with time zone	f
+tasks	source	text	t
+tasks	created_by	uuid	f
+tasks	created_at	timestamp with time zone	t
+tasks	updated_at	timestamp with time zone	t
+webhook_events	id	text	t
+webhook_events	org_id	uuid	f
+webhook_events	kind	text	t
+webhook_events	received_at	timestamp with time zone	t

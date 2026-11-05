@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import clsx from 'clsx';
 import { Send, FileText, ArrowLeft, Check, CheckCheck, AlertCircle, Clock, UserCheck, ShieldAlert, MessageCircle } from 'lucide-react';
-import { db, getMode, sb, type Row } from '../lib/backend';
+import { db, getMode, sb, DB_SCHEMA, type Row } from '../lib/backend';
 import { useApp } from '../lib/session';
 import { dateTime, relative } from '../lib/format';
 import { formatPhone, whatsappLink } from '../lib/phone';
@@ -34,7 +34,7 @@ export default function Inbox() {
     load().catch(() => setConvs([]));
     if (getMode() !== 'supabase') return;
     const ch = sb().channel('inbox-' + app.orgId)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `org_id=eq.${app.orgId}` }, () => load())
+      .on('postgres_changes', { event: '*', schema: DB_SCHEMA, table: 'conversations', filter: `org_id=eq.${app.orgId}` }, () => load())
       .subscribe();
     return () => { sb().removeChannel(ch); };
   }, [app.orgId]); // eslint-disable-line
@@ -126,7 +126,7 @@ function Thread({ conv, lead, integ, onBack, onChange }: { conv: Row | null; lea
     load().catch(() => {});
     const t = setInterval(() => setNow(new Date()), 30000);
     if (getMode() !== 'supabase' || !conv) return () => clearInterval(t);
-    const ch = sb().channel('msgs-' + conv.id).on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conv.id}` }, () => load()).subscribe();
+    const ch = sb().channel('msgs-' + conv.id).on('postgres_changes', { event: '*', schema: DB_SCHEMA, table: 'messages', filter: `conversation_id=eq.${conv.id}` }, () => load()).subscribe();
     return () => { clearInterval(t); sb().removeChannel(ch); };
   }, [conv?.id]); // eslint-disable-line
   useEffect(() => { end.current?.scrollIntoView({ block: 'end' }); }, [msgs.length]);

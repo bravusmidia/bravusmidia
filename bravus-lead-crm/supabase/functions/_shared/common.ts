@@ -24,6 +24,7 @@ export function json(req: Request, body: unknown, status = 200) {
 
 export function adminClient(): SupabaseClient {
   return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+    db: { schema: 'crm' }, // o CRM vive no schema "crm" do projeto do Bravus Work
     auth: { persistSession: false },
   });
 }
