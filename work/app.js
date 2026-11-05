@@ -318,7 +318,7 @@ async function tick() {
       if (prosp && prosp.goal) body += ` Meta: ${prosp.goal - (prosp.count || 0)} empresas para prospectar.`;
       if (fu && fu.goal) body += ` ${fu.goal - (fu.count || 0)} follow-ups pendentes.`;
       const dow = new Date().getDay();
-      await notifyUsers([me.id], `${dow === 0 || dow === 6 ? 'Bravus Weekend' : 'Bom dia'}, ${firstName(me.id)}! Confira sua programação.`, body, 'rotina', `morning:${d}`, 'agenda');
+      await notifyUsers([me.id], `${dow === 0 || dow === 6 ? 'Bravus Weekend' : (h => h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite')(new Date().getHours())}, ${firstName(me.id)}! Confira sua programação.`, body, 'rotina', `morning:${d}`, 'agenda');
     }
     if (nf.tarefas !== false) for (const t of mineToday) {
       if (t.status === 'feito' || !t.time) continue;
@@ -600,7 +600,7 @@ V.clientes = () => {
   if (f === 'inad') cl = cl.filter(c => clientFin(c) === 'inadimplente');
   if (f === 'cancel') cl = cl.filter(c => c.op_status === 'cancelado'); else if (f === 'todos') cl = cl.filter(c => c.op_status !== 'cancelado');
   const tabs = [['todos', 'Ativos'], ['online', 'Online'], ['offline', 'Offline'], ['inad', 'Inadimplentes'], ['cancel', 'Cancelados']];
-  return head('Clientes', `${ativos} de ${S.set.max_clients} vagas usadas`, `<button class="btn pri" data-act="editClient">${ic('plus')}Cliente</button>`) +
+  return head('Clientes', `${ativos} de ${S.set.max_clients} vagas usadas`, `${isAdmin() ? `<label class="btn" title="Importar planilha (ex.: Metrifiquei)">${ic('down')}<span class="hide-m">Importar</span><input type="file" accept=".csv,text/csv" data-act-change="importCsv" hidden></label>` : ''}<button class="btn pri" data-act="editClient">${ic('plus')}Cliente</button>`) +
     `<div class="tabs" style="margin-bottom:14px">${tabs.map(t => `<button data-act="cliFilter" data-f="${t[0]}" class="${f === t[0] ? 'on' : ''}">${t[1]}</button>`).join('')}</div>
     <div class="grid g3">${cl.length ? cl.map(c => `<div class="ccard" data-act="openClient" data-id="${c.id}">
       <div class="hd"><span class="av" style="background:linear-gradient(135deg,#1c5fe6,#0b1a3d)">${esc(initials(c.name))}</span><b>${esc(c.name)}</b>${adChip(c)}</div>
@@ -645,6 +645,46 @@ function clientDetail(id) {
     <div class="list">${acts.length ? acts.map(a => `<div class="li"><div class="t"><b style="font-weight:500">${esc(a.action)}</b><small>${esc(firstName(a.user_id))} · ${new Date(a.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</small></div></div>`).join('') : empty('Sem registros ainda.')}</div>
     <form data-form="clientNote" class="row" style="margin-top:10px"><input type="hidden" name="id" value="${c.id}"><input name="text" placeholder="Registrar atividade (ex.: liguei, enviei proposta)" maxlength="300"><button class="btn">Registrar</button></form>`,
     { wide: true, footer: `${wa ? `<a class="btn ok" href="https://wa.me/55${wa.replace(/^55/, '')}" target="_blank" rel="noopener">${ic('wa')}WhatsApp</a>` : ''}<button type="button" class="btn" data-act="clientReport" data-id="${c.id}">${ic('file')}Relatório</button><span class="sp"></span><button type="button" class="btn pri" data-act="editClient" data-id="${c.id}">${ic('edit')}Editar</button>` });
+}
+
+/* ---------- IMPORTAR CLIENTES (CSV do Metrifiquei ou planilha simples) ---------- */
+function parseCsv(text) {
+  text = text.replace(/^\uFEFF/, '');
+  const first = text.split(/\r?\n/)[0]; const d = (first.match(/;/g) || []).length >= (first.match(/,/g) || []).length ? ';' : ',';
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (ch === '"') q = false; else cell += ch; }
+    else if (ch === '"') q = true; else if (ch === d) { row.push(cell); cell = ''; }
+    else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += ch;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  const head = (rows.shift() || []).map(h => h.trim().toLowerCase());
+  return rows.filter(r => r.some(c => c.trim())).map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] || '').trim()])));
+}
+function csvToClients(rows) {
+  const g = (r, ...ks) => { for (const k of ks) { const hit = Object.keys(r).find(h => h === k || h.startsWith(k)); if (hit && r[hit]) return r[hit]; } return ''; };
+  const own = /bravus/i;
+  return rows.map(r => {
+    const raw = g(r, 'nome', 'empresa', 'cliente'); if (!raw) return null;
+    const [a, b] = raw.includes('|') ? raw.split('|').map(x => x.trim()) : ['', raw];
+    const canais = g(r, 'canais', 'canal'); const prod = g(r, 'produto', 'plano');
+    const services = []; if (/meta|google|ads|tr[aá]fego/i.test(canais + ' ' + g(r, 'segmento') + ' ' + prod)) services.push('trafego');
+    const valor = num(String(g(r, 'valor', 'mensalidade', 'contrato')).replace(/[^\d,.-]/g, '').replace(/\.(?=\d{3})/g, '').replace(',', '.'));
+    return { name: b || a, contact: b ? a : '', services, whatsapp: g(r, 'whatsapp', 'telefone', 'celular'), email: g(r, 'e-mail', 'email'),
+      segment: g(r, 'ramo', 'nicho') || '', contract_value: valor || 0, due_day: num(g(r, 'vencimento', 'dia')) || null, op_status: 'ativo', owner: S.me.id,
+      notes: [prod && `Plano: ${prod}`, canais && `Canais: ${canais}`, 'Importado da planilha'].filter(Boolean).join(' · '),
+      _skip: /^sim$/i.test(g(r, 'arquivado')) ? 'arquivado' : own.test(b || a) ? 'é a própria agência' : S.d.clients.some(c => c.name.trim().toLowerCase() === (b || a).toLowerCase()) ? 'já cadastrado' : '' };
+  }).filter(Boolean);
+}
+let IMPORT = [];
+function importPreview(list) {
+  IMPORT = list; const ok = list.filter(c => !c._skip); const free = S.set.max_clients - S.d.clients.filter(c => c.op_status !== 'cancelado').length;
+  modal('Importar clientes', `<p class="small muted" style="margin-bottom:10px">${ok.length} cliente(s) serão cadastrados. Valor do contrato e dia de vencimento não vêm do Metrifiquei: complete depois em cada cliente.</p>
+    <div class="list">${list.map(c => `<div class="li" style="${c._skip ? 'opacity:.45' : ''}"><div class="t"><b>${esc(c.name)}</b><small>${esc(c.contact || '—')} · ${c.services.map(svcName).join(', ') || 'sem serviço'}${c.contract_value ? ' · ' + brl(c.contract_value) : ''}</small></div>${c._skip ? `<span class="chip">${esc(c._skip)}</span>` : '<span class="chip ok">novo</span>'}</div>`).join('')}</div>
+    ${ok.length > free ? `<p class="warnbox" style="margin-top:10px">Só cabem mais ${free} cliente(s) no limite atual. Aumente em Ajustes se precisar.</p>` : ''}`,
+    { footer: `<button type="button" class="btn" data-act="closeModal">Cancelar</button><button type="button" class="btn pri" data-act="importDo" ${!ok.length || ok.length > free ? 'disabled' : ''}>${ic('check')}Importar ${ok.length}</button>` });
 }
 
 /* ---------- CAMPANHAS ---------- */
@@ -901,6 +941,11 @@ const A = {
   authChangeEmail: () => { AUTH.stage = 'email'; AUTH.pin = ''; renderAuth(); },
   moreMenu: () => modal('Menu', `<div class="list">${NAV.filter(navOk).map(n => `<a class="li" href="#${n[0]}" data-act="closeModal">${ic(n[2])}<div class="t"><b>${n[1]}</b></div>${n[0] === 'alertas' && unread() ? `<span class="badge">${unread()}</span>` : ''}</a>`).join('')}<button class="li" data-act="logout" style="width:100%">${ic('lock')}<div class="t" style="text-align:left"><b>Bloquear / sair</b></div></button></div>`),
   cliFilter: d => { S.cliFilter = d.f; renderView(); }, campFilter: d => { S.campFilter = d.f; renderView(); },
+  importDo: async (d, el) => {
+    el.disabled = true; let n = 0;
+    for (const c of IMPORT.filter(c => !c._skip)) { const { _skip, ...row } = c; const r = await store.insert('clients', row); n++; await log(`Importou o cliente ${row.name}`, r && r.id); }
+    closeModal(); toast(`${n} cliente(s) importado(s)`, 'Complete valor e vencimento de cada um.', 'ok'); S.cliFilter = 'todos'; await refresh();
+  },
   editClient: d => { if (!d.id && S.d.clients.filter(c => c.op_status !== 'cancelado').length >= S.set.max_clients) return toast('Limite de clientes atingido', `Seu espaço comporta ${S.set.max_clients} clientes. Aumente em Ajustes.`, 'warn'); clientForm(d.id ? client(d.id) : {}); },
   openClient: d => clientDetail(d.id),
   delClient: d => confirmBox('Excluir cliente?', 'Isto apaga o cliente, as campanhas e as cobranças ligadas a ele. Para manter o histórico, prefira marcar como “Cancelado”.', 'Excluir', async () => {
@@ -1124,6 +1169,12 @@ document.addEventListener('submit', e => {
   Promise.resolve(fn(Object.fromEntries(fd), fd, f)).catch(err => toast('Não foi possível salvar', err.message, 'bad')).finally(() => { if (btn) btn.disabled = false; });
 });
 document.addEventListener('change', async e => {
+  if (e.target.dataset.actChange === 'importCsv') {
+    try { const f = e.target.files[0]; if (!f) return; const list = csvToClients(parseCsv(await f.text())); e.target.value = '';
+      if (!list.length) throw new Error('Não encontrei a coluna "Nome" na planilha.'); importPreview(list);
+    } catch (err) { toast('Não foi possível ler a planilha', err.message, 'bad'); }
+    return;
+  }
   if (e.target.dataset.actChange === 'restore') {
     try { const j = JSON.parse(await e.target.files[0].text()); if (j.app !== 'bravus-work') throw new Error('Arquivo inválido');
       confirmBox('Restaurar backup?', 'Os dados atuais deste aparelho (exceto senhas) serão substituídos.', 'Restaurar', async () => { const keep = store.db.profiles; store.db = j.data; store.db.profiles = keep.map(p => ({ ...p, ...(j.data.profiles || []).find(x => x.id === p.id), pin_hash: p.pin_hash, salt: p.salt })); store.save('all'); await refresh(); toast('Backup restaurado', '', 'ok'); }, true);
