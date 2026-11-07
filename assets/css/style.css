@@ -408,3 +408,17 @@ p { margin: 0; }
   .offer-side { padding: 22px; }
   .guarantee { padding: 28px 22px; justify-content: center; text-align: left; }
 }
+
+/* E-book Fale Sem Medo — capa em tons sóbrios (palco) */
+.book--stage { background: radial-gradient(ellipse 60% 45% at 50% 0%, rgba(255,214,150,.38), rgba(20,22,28,0) 70%), radial-gradient(ellipse 90% 30% at 50% 100%, rgba(34,211,238,.18), rgba(20,22,28,0) 70%), linear-gradient(170deg, #1B2230, #0E1118 70%); border-color: rgba(255,214,150,.35); box-shadow: -10px 0 0 -4px #0A0C10, 0 30px 70px rgba(0,0,0,.55), 0 0 60px rgba(255,200,120,.12); }
+.book--stage .book-kicker { color: #F5C98A; }
+.book--stage .book-foot { border-top-color: rgba(245,201,138,.25); }
+.block-title { color: var(--c4, #34D399); font-size: 15px; letter-spacing: .12em; text-transform: uppercase; }
+
+/* Cards clicáveis (Mentorias) */
+.service--link { position: relative; cursor: pointer; transition: border-color .2s ease, transform .2s ease; }
+.service--link:hover { border-color: #3B6FB8; transform: translateY(-2px); }
+.service--link .card-link { color: inherit; text-decoration: none; }
+.service--link .card-link::after { content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: 1; }
+.service--link .btn { position: relative; z-index: 2; }
+.service--link:focus-within { outline: 2px solid #4DA3FF; outline-offset: 3px; }
