@@ -163,6 +163,7 @@ input:focus, select:focus { outline: 2px solid var(--brasa); outline-offset: 0; 
 .deus.zeus { border-color: var(--ouro); background: color-mix(in srgb, var(--ouro) 7%, var(--carvao)); }
 .deus b { display: block; font-family: var(--f-titulo); font-size: 1.15rem; text-transform: uppercase; line-height: 1.1; }
 .deus small { color: var(--cinza); }
+.deus .cargo { display: inline-block; margin-left: 6px; padding: 1px 6px; font-family: var(--f-texto, inherit); font-size: .7rem; letter-spacing: .08em; vertical-align: middle; border: 1px solid var(--ouro); border-radius: 3px; color: var(--ouro); }
 
 /* info + notícias */
 .info { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .9fr); gap: 24px; align-items: center; }
@@ -250,7 +251,7 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
       <a href="#conta">Conta</a>
       <a href="#classes">Classes</a>
       <a href="#ranking">Ranking</a>
-      <a href="#panteao">Panteão</a>
+      <a href="#deuses-sec">Deuses</a>
       <a href="#informacoes">Informações</a>
       <a href="#galeria">Galeria</a>
       <a href="#etapas">Etapas</a>
@@ -380,8 +381,8 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
     </div>
   </section>
 
-  <section class="bloco" id="panteao" aria-labelledby="t-panteao">
-    <div class="bloco-cab"><div><h2 id="t-panteao">Panteão de DRAKTHAR</h2><p>Os deuses administram o mundo. Zeus comanda os GMs e o clima.</p></div></div>
+  <section class="bloco" id="deuses-sec" aria-labelledby="t-deuses">
+    <div class="bloco-cab"><div><h2 id="t-deuses">Deuses</h2><p>A administração de DRAKTHAR. Zeus é o ADM do jogo; Ares, Hades, Poseidon e Apolo são os GMs.</p></div></div>
     <div class="bloco-corpo">
       <div class="deuses" id="deuses"></div>
     </div>
@@ -450,7 +451,7 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
         <div class="etapa"><span class="n">Etapa 5</span><b>Mundo</b><small>NPCs, missões, Caverna dos Goblins</small></div>
         <div class="etapa"><span class="n">Etapa 6</span><b>Multiplayer</b><small>Servidor, contas, 5 jogadores</small></div>
         <div class="etapa"><span class="n">Etapa 7</span><b>Comunidade</b><small>Chat, amigos, guildas, perfil infantil</small></div>
-        <div class="etapa"><span class="n">Etapa 8</span><b>Deuses</b><small>Zeus, GMs e painel de administração</small></div>
+        <div class="etapa"><span class="n">Etapa 8</span><b>Deuses</b><small>Zeus (ADM), GMs e painel de administração</small></div>
         <div class="etapa"><span class="n">Etapa 9</span><b>Expansão</b><small>9 regiões, 20 sets, dungeons, PvP</small></div>
         <div class="etapa"><span class="n">Etapa 10</span><b>Lançamento</b><small>Hospedagem, testes de carga, versão 1.0</small></div>
       </div>
@@ -560,10 +561,10 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
     return '<div class="patente"><svg class="medalha" viewBox="0 0 44 44" aria-hidden="true"><path d="M22 3l16 7v11c0 10-7 17-16 20C13 38 6 31 6 21V10z" fill="' + tons[i] + '" opacity=".18" stroke="' + tons[i] + '" stroke-width="1.6"/><text x="22" y="27" text-anchor="middle" font-family="Cinzel, serif" font-weight="800" font-size="13" fill="' + tons[i] + '">' + "I II III IV V".split(" ")[i] + '</text></svg><h3>' + f[0] + '</h3><small>' + f[1] + '</small><span class="vazio">Sem jogadores ainda</span></div>';
   }).join("");
 
-  // ---- Panteão
-  var deuses = [["Zeus", "Deus supremo · tempestades"], ["Hades", "Mundo dos mortos · neblina"], ["Cronos", "Tempo · dia e noite"], ["Gaia", "Terra · estações"], ["Urano", "Céu"], ["Érebo", "Escuridão"], ["Eros", "Amor e paixão"], ["Nike", "Vitória"], ["Nêmesis", "Justiça e vingança"], ["Perséfone", "Primavera e submundo"], ["Hécate", "Magia e mistérios"]];
+  // ---- Deuses: Zeus (ADM) e os GMs
+  var deuses = [["Zeus", "Rei dos deuses, trovão e céu", "ADM"], ["Ares", "Deus da guerra", "GM"], ["Hades", "Deus do submundo", "GM"], ["Poseidon", "Deus dos mares", "GM"], ["Apolo", "Deus da luz, música e profecia", "GM"]];
   $("deuses").innerHTML = deuses.map(function (d, i) {
-    return '<div class="deus' + (i === 0 ? ' zeus' : '') + '"><span class="letra">' + d[0].charAt(0) + '</span><div><b>' + d[0] + '</b><small>' + d[1] + '</small></div></div>';
+    return '<div class="deus' + (i === 0 ? ' zeus' : '') + '"><span class="letra">' + d[0].charAt(0) + '</span><div><b>' + d[0] + ' <span class="cargo">' + d[2] + '</span></b><small>' + d[1] + '</small></div></div>';
   }).join("");
 
   // ---- Painel do jogador: as contas abrem com o servidor (Etapa 6)
