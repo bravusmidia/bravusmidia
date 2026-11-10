@@ -154,6 +154,7 @@ input:focus, select:focus { outline: 2px solid var(--brasa); outline-offset: 0; 
 .patente .medalha { width: 44px; height: 44px; }
 .patente h3 { font-family: var(--f-titulo); font-size: 1.2rem; text-transform: uppercase; }
 .patente small { color: var(--cinza); }
+.patente .top { color: var(--marfim); font-size: .95rem; }
 .patente .vazio { color: var(--cinza); font-style: italic; font-size: .9rem; margin-top: 6px; }
 
 /* panteão */
@@ -395,7 +396,7 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
   </section>
 
   <section class="bloco" id="ranking" aria-labelledby="t-ranking">
-    <div class="bloco-cab"><div><h2 id="t-ranking">Ranking de patentes</h2><p>Top 3 de cada faixa de nível. A primeira temporada abre junto com o servidor.</p></div></div>
+    <div class="bloco-cab"><div><h2 id="t-ranking">Ranking de patentes</h2><p>Top 3 de cada faixa de nível, ao vivo. Primeira temporada aberta.</p></div></div>
     <div class="bloco-corpo">
       <div class="patentes" id="patentes"></div>
     </div>
@@ -436,6 +437,7 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
       <div class="bloco-cab"><h2 id="t-noticias">Notícias</h2></div>
       <div class="bloco-corpo">
         <ul class="noticias">
+          <li><div><b>DRAKTHAR 1.0 no ar!</b><p>Contas na nuvem, jogadores juntos no mesmo mundo, chat, monstros, Rei Goblin, níveis, pontos (C), baú (V) e asas a partir do nível 5.</p></div><time datetime="2026-11-10">10/11/2026</time></li>
           <li><div><b>Site oficial no ar</b><p>Clima ao vivo, lista de espera e download da versão de testes.</p></div><time datetime="2026-11-10">10/11/2026</time></li>
           <li><div><b>Etapa 1 concluída</b><p>Eldoria em 3D, cavaleiro jogável, câmera isométrica e 53 testes aprovados.</p></div><time datetime="2026-11-10">10/11/2026</time></li>
           <li><div><b>O céu ganhou vida</b><p>Chuva molha o chão, neve acumula, relâmpagos iluminam a vila e o trovão chega depois.</p></div><time datetime="2026-11-10">10/11/2026</time></li>
@@ -465,16 +467,16 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
     <div class="bloco-cab"><div><h2 id="t-etapas">Etapas de construção</h2><p>O jogo é construído em dez etapas, sempre jogável ao fim de cada uma.</p></div></div>
     <div class="bloco-corpo">
       <div class="etapas">
-        <div class="etapa feita"><span class="n">Etapa 1 · Concluída</span><b>Fundação</b><small>Mundo 3D, cavaleiro, câmera, clima</small></div>
-        <div class="etapa agora"><span class="n">Etapa 2 · Próxima</span><b>Personagens</b><small>Classes, aparência, atributos, nível</small></div>
-        <div class="etapa"><span class="n">Etapa 3</span><b>Combate</b><small>Armas, habilidades, monstros, chefe</small></div>
-        <div class="etapa"><span class="n">Etapa 4</span><b>Equipamentos</b><small>Inventário, sets, baú, banco, pets</small></div>
-        <div class="etapa"><span class="n">Etapa 5</span><b>Mundo</b><small>NPCs, missões, Caverna dos Goblins</small></div>
-        <div class="etapa"><span class="n">Etapa 6</span><b>Multiplayer</b><small>Servidor, contas, 5 jogadores</small></div>
-        <div class="etapa"><span class="n">Etapa 7</span><b>Comunidade</b><small>Chat, amigos, guildas, perfil infantil</small></div>
-        <div class="etapa"><span class="n">Etapa 8</span><b>Deuses</b><small>Zeus (ADM), GMs e painel de administração</small></div>
+        <div class="etapa feita"><span class="n">Etapa 1 · Concluída</span><b>Fundação</b><small>Mundo 3D, câmera, clima e dia/noite</small></div>
+        <div class="etapa feita"><span class="n">Etapa 2 · Concluída</span><b>Personagens</b><small>5 classes, atributos (C), nível, asas</small></div>
+        <div class="etapa feita"><span class="n">Etapa 3 · Concluída</span><b>Combate</b><small>Lobos, goblins, Rei Goblin, golpe especial (Q)</small></div>
+        <div class="etapa feita"><span class="n">Etapa 4 · Parcial</span><b>Equipamentos</b><small>Baú (V), equipamento e saque. Falta: banco e pets</small></div>
+        <div class="etapa agora"><span class="n">Etapa 5 · Próxima</span><b>Mundo</b><small>NPCs, missões, Caverna dos Goblins</small></div>
+        <div class="etapa feita"><span class="n">Etapa 6 · Concluída</span><b>Multiplayer</b><small>Contas na nuvem, jogadores juntos no mundo</small></div>
+        <div class="etapa feita"><span class="n">Etapa 7 · Parcial</span><b>Comunidade</b><small>Chat com filtro. Falta: amigos e guildas</small></div>
+        <div class="etapa feita"><span class="n">Etapa 8 · Parcial</span><b>Deuses</b><small>Zeus e GMs: clima e avisos. Falta: painel</small></div>
         <div class="etapa"><span class="n">Etapa 9</span><b>Expansão</b><small>9 regiões, 20 sets, dungeons, PvP</small></div>
-        <div class="etapa"><span class="n">Etapa 10</span><b>Lançamento</b><small>Hospedagem, testes de carga, versão 1.0</small></div>
+        <div class="etapa feita"><span class="n">Etapa 10 · Versão 1.0</span><b>Lançamento</b><small>No ar em 10/11/2026, grátis no navegador e Windows</small></div>
       </div>
     </div>
   </section>
@@ -578,9 +580,14 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
   // ---- Ranking (vazio até o servidor abrir)
   var faixas = [["Recruta", "Níveis 1–20"], ["Cavaleiro", "Níveis 21–40"], ["Guardião", "Níveis 41–60"], ["Soberano", "Níveis 61–80"], ["Deus da Guerra", "Níveis 81–100"]];
   var tons = ["#b07a4a", "#9aa3ad", "#c5a15a", "#7fb2e6", "#e2582b"];
+  function desenharPatentes(lista) {
   $("patentes").innerHTML = faixas.map(function (f, i) {
-    return '<div class="patente"><svg class="medalha" viewBox="0 0 44 44" aria-hidden="true"><path d="M22 3l16 7v11c0 10-7 17-16 20C13 38 6 31 6 21V10z" fill="' + tons[i] + '" opacity=".18" stroke="' + tons[i] + '" stroke-width="1.6"/><text x="22" y="27" text-anchor="middle" font-family="Cinzel, serif" font-weight="800" font-size="13" fill="' + tons[i] + '">' + "I II III IV V".split(" ")[i] + '</text></svg><h3>' + f[0] + '</h3><small>' + f[1] + '</small><span class="vazio">Sem jogadores ainda</span></div>';
+    var top = (lista || []).filter(function (p) { return p.nivel > i * 20 && p.nivel <= (i + 1) * 20; }).slice(0, 3);
+    var corpo = top.length ? top.map(function (p, k) { return '<span class="top">' + (k + 1) + 'º ' + String(p.nome).replace(/[<>&"]/g, "") + ' · Nv ' + p.nivel + '</span>'; }).join("") : '<span class="vazio">Sem jogadores ainda</span>';
+    return '<div class="patente"><svg class="medalha" viewBox="0 0 44 44" aria-hidden="true"><path d="M22 3l16 7v11c0 10-7 17-16 20C13 38 6 31 6 21V10z" fill="' + tons[i] + '" opacity=".18" stroke="' + tons[i] + '" stroke-width="1.6"/><text x="22" y="27" text-anchor="middle" font-family="Cinzel, serif" font-weight="800" font-size="13" fill="' + tons[i] + '">' + "I II III IV V".split(" ")[i] + '</text></svg><h3>' + f[0] + '</h3><small>' + f[1] + '</small>' + corpo + '</div>';
   }).join("");
+  }
+  desenharPatentes([]);
 
   // ---- Deuses: Zeus (ADM) e os GMs, com bolinha verde (online) / vermelha (offline)
   var SB_URL = "https://widrjidmnzhkaofaraov.supabase.co";
@@ -614,6 +621,9 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
   }
   atualizarStatus();
   setInterval(atualizarStatus, 30000);
+  function atualizarRanking() { rpc("drakthar_ranking").then(desenharPatentes).catch(function () {}); }
+  atualizarRanking();
+  setInterval(atualizarRanking, 60000);
 
   // ---- Contas (Supabase Auth): entrar, criar conta, ver personagens
   function avisar(el, texto, ok) { el.textContent = texto; el.hidden = !texto; el.classList.toggle("ok", !!ok); }
