@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta property="og:title" content="DRAKTHAR — O Domínio dos Dragões">
+<meta property="og:description" content="MMORPG medieval 3D gratuito. O destino é forjado pela espada.">
+<meta property="og:image" content="https://www.bravusmidia.com.br/drakthar/assets/hero.jpg">
+<title>DRAKTHAR</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="DRAKTHAR — O Domínio dos Dragões. MMORPG medieval 3D gratuito da Bravus Mídia.">
+<link rel="icon" href="assets/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800;900&family=Rajdhani:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: portal de servidor de MMORPG — faixa de navegação fixa, hero com o brasão,
+   blocos em painéis escuros com bordas de brasa, grade de 12 colunas que vira 1 no celular.
+   Tema único escuro, por escolha (identidade do jogo). */
+:root {
+  color-scheme: dark;
+  --carvao: #0d0c0e;          /* fundo */
+  --painel: #151215;          /* painéis */
+  --painel-2: #1c1619;
+  --linha: #3a1c1a;           /* bordas */
+  --brasa: #e2582b;           /* acento: fogo do dragão */
+  --brasa-escura: #a8331a;
+  --vinho: #702d35;
+  --ouro: #c5a15a;
+  --ouro-claro: #e6c98a;
+  --marfim: #e8dfc9;
+  --cinza: #a39a8b;
+  --azul: #172c43;
+  --verde: #2fbf6a;
+  --f-logo: "Cinzel", "Trajan Pro", Georgia, serif;
+  --f-titulo: "Rajdhani", "Arial Narrow", system-ui, sans-serif;
+  --f-texto: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --raio: 4px;
+}
+body {
+  background: var(--carvao);
+  color: var(--marfim);
+  font-family: var(--f-texto);
+  font-size: 16px;
+  line-height: 1.55;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--carvao); }
+a { color: inherit; }
+.wrap { max-width: 1200px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+.rotulo { font-family: var(--f-titulo); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: .8rem; color: var(--cinza); }
+
+/* ---------- navegação ---------- */
+.nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: color-mix(in srgb, var(--carvao) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--linha); }
+.nav .wrap { display: flex; align-items: center; gap: 24px; min-height: 64px; }
+.marca { display: flex; align-items: center; gap: 10px; text-decoration: none; flex-shrink: 0; }
+.marca img { width: 36px; height: 36px; }
+.marca span { font-family: var(--f-logo); font-weight: 900; letter-spacing: .12em; color: var(--ouro); }
+.menu { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin-left: auto; }
+.menu::-webkit-scrollbar { display: none; }
+.menu a { font-family: var(--f-titulo); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: .92rem; text-decoration: none; padding: 8px 12px; border-radius: var(--raio); white-space: nowrap; color: var(--marfim); }
+.menu a:hover, .menu a:focus-visible { color: var(--brasa); background: color-mix(in srgb, var(--brasa) 10%, transparent); outline: none; }
+
+/* ---------- hero ---------- */
+.hero { position: relative; overflow: hidden; border-bottom: 1px solid var(--linha); }
+.hero::before { content: ""; position: absolute; inset: 0; background:
+  radial-gradient(60% 80% at 75% 45%, color-mix(in srgb, var(--brasa) 28%, transparent), transparent 70%),
+  linear-gradient(90deg, var(--carvao) 15%, color-mix(in srgb, var(--carvao) 55%, transparent) 55%, color-mix(in srgb, var(--carvao) 70%, transparent)),
+  linear-gradient(0deg, var(--carvao), transparent 40%),
+  url("assets/hero.jpg") center / cover no-repeat; }
+.hero .wrap { position: relative; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 32px; align-items: center; padding-block: 64px 56px; }
+.eyebrow { display: flex; align-items: center; gap: 14px; font-family: var(--f-titulo); font-weight: 700; font-size: 1.15rem; letter-spacing: .1em; text-transform: uppercase; }
+.eyebrow::before, .eyebrow::after { content: ""; height: 2px; width: 56px; background: var(--brasa); }
+.logo-grande { font-family: var(--f-logo); font-weight: 900; font-size: clamp(3rem, 9vw, 6.4rem); line-height: .95; letter-spacing: .04em; margin-block: 18px 10px; text-shadow: 0 6px 30px rgba(0,0,0,.6); }
+.logo-grande .fogo { color: var(--brasa); background: linear-gradient(180deg, #ffb070, var(--brasa) 45%, var(--brasa-escura)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.subtitulo { font-family: var(--f-titulo); font-weight: 700; font-size: clamp(1.4rem, 3vw, 2.2rem); text-transform: uppercase; line-height: 1.1; }
+.subtitulo em { font-style: normal; color: var(--ouro); }
+.hero p.lead { color: var(--cinza); font-size: 1.12rem; max-width: 34em; margin-block: 18px 28px; }
+.botoes { display: flex; flex-wrap: wrap; gap: 12px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 26px; border-radius: var(--raio); font-family: var(--f-titulo); font-weight: 700; font-size: 1.02rem; letter-spacing: .06em; text-transform: uppercase; text-decoration: none; border: 1px solid var(--linha); background: var(--painel); color: var(--marfim); cursor: pointer; transition: transform .15s, border-color .15s, box-shadow .15s; }
+.btn:hover { border-color: var(--brasa); transform: translateY(-1px); }
+.btn:focus-visible { outline: 2px solid var(--ouro); outline-offset: 2px; }
+.btn.primario { background: linear-gradient(180deg, var(--brasa), var(--brasa-escura)); border-color: #ff7a45; color: #fff; box-shadow: 0 8px 28px color-mix(in srgb, var(--brasa) 35%, transparent); }
+.btn.ouro { border-color: var(--ouro); color: var(--ouro-claro); }
+.hero-lado { display: grid; gap: 16px; justify-items: center; }
+.brasao { width: min(340px, 80%); filter: drop-shadow(0 20px 50px color-mix(in srgb, var(--brasa) 40%, transparent)); animation: respira 6s ease-in-out infinite; }
+@keyframes respira { 50% { transform: translateY(-6px); filter: drop-shadow(0 26px 60px color-mix(in srgb, var(--brasa) 55%, transparent)); } }
+
+.cartao-clima { width: 100%; max-width: 420px; display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; padding: 16px 18px; background: color-mix(in srgb, var(--painel) 90%, transparent); border: 1px solid var(--linha); border-radius: 6px; }
+.icone-clima { width: 64px; height: 64px; border: 1px solid var(--linha); border-radius: var(--raio); display: grid; place-items: center; background: var(--carvao); }
+.icone-clima svg { width: 40px; height: 40px; }
+.cartao-clima .rotulo { color: var(--brasa); }
+.cartao-clima strong { display: block; font-family: var(--f-titulo); font-size: 1.7rem; line-height: 1.1; text-transform: uppercase; }
+.cartao-clima small { color: var(--cinza); font-variant-numeric: tabular-nums; }
+
+/* ---------- blocos ---------- */
+section { scroll-margin-top: 80px; }
+.bloco { margin-block: 32px; background: linear-gradient(180deg, var(--painel-2), var(--painel)); border: 1px solid var(--linha); border-radius: 6px; }
+.bloco-cab { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 22px 28px; border-bottom: 1px solid var(--linha); }
+.bloco-cab h2 { display: flex; align-items: center; gap: 14px; font-family: var(--f-titulo); font-weight: 700; font-size: 1.75rem; text-transform: uppercase; letter-spacing: .03em; }
+.bloco-cab h2::before { content: ""; width: 26px; height: 3px; background: var(--brasa); }
+.bloco-cab p { margin: 4px 0 0 40px; color: var(--cinza); }
+.bloco-corpo { padding: 28px; }
+
+/* pilares */
+.pilares { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin-top: -1px; }
+.pilar { padding: 26px 24px; border-left: 1px solid var(--linha); }
+.pilar:first-child { border-left: 0; }
+.pilar b { display: block; font-family: var(--f-titulo); font-size: 2.3rem; line-height: 1; color: var(--brasa); }
+.pilar h3 { font-family: var(--f-titulo); font-size: 1.15rem; text-transform: uppercase; margin-block: 10px 6px; }
+.pilar p { margin: 0; color: var(--cinza); font-size: .95rem; }
+
+/* clima */
+.clima-grade { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr); gap: 20px; }
+.caixa { background: var(--carvao); border: 1px solid var(--linha); border-radius: var(--raio); padding: 22px 24px; min-width: 0; }
+.caixa .grande { font-family: var(--f-titulo); font-weight: 700; font-size: clamp(1.8rem, 4vw, 2.6rem); text-transform: uppercase; line-height: 1.1; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.caixa .efeito { color: var(--brasa); font-family: var(--f-titulo); font-weight: 700; font-size: 1.05rem; margin-top: 6px; }
+.contagem { color: var(--verde) !important; }
+.proximos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 20px; }
+.proximos .caixa { padding: 14px 16px; display: grid; gap: 4px; }
+.proximos .hora { font-family: var(--f-titulo); font-weight: 700; font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+.proximos .tipo { display: flex; align-items: center; gap: 8px; color: var(--marfim); }
+.proximos svg { width: 22px; height: 22px; flex-shrink: 0; }
+.nota { color: var(--cinza); font-size: .9rem; margin: 18px 0 0; }
+
+/* painel + lista */
+.duas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-block: 32px; }
+.duas .bloco { margin: 0; }
+form { display: grid; gap: 14px; }
+label { font-family: var(--f-titulo); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; font-size: .88rem; }
+input, select { width: 100%; min-height: 48px; padding: 0 14px; border-radius: var(--raio); border: 1px solid var(--linha); background: #0a090b; color: var(--marfim); font: inherit; }
+input:focus, select:focus { outline: 2px solid var(--brasa); outline-offset: 0; border-color: transparent; }
+.campo { display: grid; gap: 6px; }
+.form-botoes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px; }
+.aviso { border: 1px solid var(--ouro); background: color-mix(in srgb, var(--ouro) 8%, transparent); color: var(--ouro-claro); border-radius: var(--raio); padding: 12px 14px; font-size: .95rem; }
+.contato { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; color: var(--cinza); font-size: .95rem; }
+.contato code { font-family: var(--f-titulo); font-weight: 700; color: var(--marfim); font-size: 1.05rem; user-select: all; }
+
+/* classes */
+.classes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.classe { background: var(--carvao); border: 1px solid var(--linha); border-radius: var(--raio); padding: 20px 22px; display: grid; gap: 10px; align-content: start; }
+.classe header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.classe h3 { font-family: var(--f-titulo); font-size: 1.5rem; text-transform: uppercase; }
+.selo { font-family: var(--f-titulo); font-weight: 700; font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; padding: 3px 8px; border-radius: 3px; border: 1px solid var(--ouro); color: var(--ouro); white-space: nowrap; }
+.selo.exp { border-color: var(--cinza); color: var(--cinza); }
+.classe dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; font-size: .95rem; }
+.classe dt { color: var(--cinza); }
+.classe dd { margin: 0; }
+.classe .especial { color: var(--brasa); font-family: var(--f-titulo); font-weight: 700; }
+
+/* ranking */
+.patentes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
+.patente { background: var(--carvao); border: 1px solid var(--linha); border-radius: var(--raio); padding: 18px; display: grid; gap: 6px; justify-items: start; }
+.patente .medalha { width: 44px; height: 44px; }
+.patente h3 { font-family: var(--f-titulo); font-size: 1.2rem; text-transform: uppercase; }
+.patente small { color: var(--cinza); }
+.patente .vazio { color: var(--cinza); font-style: italic; font-size: .9rem; margin-top: 6px; }
+
+/* panteão */
+.deuses { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+.deus { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--carvao); border: 1px solid var(--linha); border-radius: var(--raio); }
+.deus .letra { width: 40px; height: 40px; flex-shrink: 0; display: grid; place-items: center; border: 1px solid var(--ouro); border-radius: 50%; font-family: var(--f-logo); font-weight: 800; color: var(--ouro); }
+.deus.zeus { border-color: var(--ouro); background: color-mix(in srgb, var(--ouro) 7%, var(--carvao)); }
+.deus b { display: block; font-family: var(--f-titulo); font-size: 1.15rem; text-transform: uppercase; line-height: 1.1; }
+.deus small { color: var(--cinza); }
+
+/* info + notícias */
+.info { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .9fr); gap: 24px; align-items: center; }
+.tabela-info { display: grid; }
+.tabela-info div { display: flex; justify-content: space-between; gap: 12px; padding: 12px 6px; border-bottom: 1px solid var(--linha); font-family: var(--f-titulo); font-weight: 700; font-size: 1.08rem; }
+.tabela-info div span:first-child::before { content: "› "; color: var(--brasa); }
+.tabela-info div span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.info-lado { display: grid; gap: 14px; justify-items: stretch; text-align: center; }
+.info-lado img { width: 180px; margin: 0 auto; }
+.noticias { list-style: none; margin: 0; padding: 0; }
+.noticias li { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--linha); }
+.noticias li:last-child { border-bottom: 0; }
+.noticias b { font-family: var(--f-titulo); font-size: 1.12rem; text-transform: uppercase; }
+.noticias p { margin: 2px 0 0; color: var(--cinza); font-size: .95rem; }
+.noticias time { font-family: var(--f-titulo); font-weight: 700; color: var(--cinza); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* galeria */
+.galeria { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.galeria figure { margin: 0; position: relative; border: 1px solid var(--linha); border-radius: var(--raio); overflow: hidden; }
+.galeria img { display: block; width: 100%; aspect-ratio: 960 / 465; object-fit: cover; transition: transform .4s; }
+.galeria figure:hover img { transform: scale(1.04); }
+.galeria figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 12px 8px; background: linear-gradient(0deg, rgba(0,0,0,.85), transparent); font-family: var(--f-titulo); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; font-size: .9rem; }
+
+/* etapas */
+.etapas { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.etapa { padding: 14px 16px; border: 1px solid var(--linha); border-radius: var(--raio); background: var(--carvao); display: grid; gap: 4px; }
+.etapa .n { font-family: var(--f-titulo); font-weight: 700; color: var(--cinza); font-size: .85rem; letter-spacing: .08em; text-transform: uppercase; }
+.etapa b { font-family: var(--f-titulo); font-size: 1.1rem; text-transform: uppercase; }
+.etapa small { color: var(--cinza); }
+.etapa.feita { border-color: var(--verde); }
+.etapa.feita .n { color: var(--verde); }
+.etapa.agora { border-color: var(--brasa); }
+.etapa.agora .n { color: var(--brasa); }
+
+/* rodapé */
+footer { border-top: 1px solid var(--linha); margin-top: 48px; background: #09080a; }
+footer .wrap { display: grid; grid-template-columns: auto 1fr auto; gap: 24px; align-items: center; padding-block: 32px calc(32px + env(safe-area-inset-bottom, 0px)); }
+footer img { width: 56px; }
+footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
+.credito { font-family: var(--f-titulo); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; text-align: right; }
+.credito a { color: var(--ouro); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--ouro) 40%, transparent); }
+.credito a:hover { color: var(--ouro-claro); }
+
+/* WhatsApp flutuante */
+.zap { position: fixed; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 25; display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-radius: 6px; background: linear-gradient(180deg, #2fd27a, #1ea85a); color: #fff; text-decoration: none; font-family: var(--f-titulo); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; box-shadow: 0 10px 30px rgba(30,168,90,.35); }
+.zap svg { width: 22px; height: 22px; }
+
+@media (max-width: 960px) {
+  .hero .wrap { grid-template-columns: minmax(0, 1fr); padding-block: 40px; }
+  .hero-lado { order: -1; }
+  .brasao { width: min(220px, 60%); }
+  .pilares { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pilar { border-left: 0; border-top: 1px solid var(--linha); }
+  .clima-grade, .duas, .info { grid-template-columns: minmax(0, 1fr); }
+  .proximos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .classes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .patentes, .etapas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .galeria { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  footer .wrap { grid-template-columns: minmax(0, 1fr); text-align: center; justify-items: center; }
+  .credito { text-align: center; }
+}
+@media (max-width: 560px) {
+  .marca span { display: none; }
+  .pilares, .classes, .patentes, .etapas { grid-template-columns: minmax(0, 1fr); }
+  .bloco-cab, .bloco-corpo { padding-left: 18px; padding-right: 18px; }
+  .bloco-cab p { margin-left: 0; }
+  .form-botoes { grid-template-columns: minmax(0, 1fr); }
+  .zap span { display: none; }
+  .zap { padding: 14px; border-radius: 50%; }
+  .noticias li { flex-direction: column; gap: 4px; }
+}
+@media (prefers-reduced-motion: reduce) { .brasao { animation: none; } .btn, .galeria img { transition: none; } }
+</style>
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)} body{margin:0} img{max-width:100%} [hidden]{display:none!important}</style>
+</head>
+<body>
+
+
+<nav class="nav" aria-label="Principal">
+  <div class="wrap">
+    <a class="marca" href="#inicio"><img src="assets/emblema-512.png" alt=""><span>DRAKTHAR</span></a>
+    <div class="menu">
+      <a href="#inicio">Início</a>
+      <a href="#clima">Clima</a>
+      <a href="#conta">Conta</a>
+      <a href="#classes">Classes</a>
+      <a href="#ranking">Ranking</a>
+      <a href="#panteao">Panteão</a>
+      <a href="#informacoes">Informações</a>
+      <a href="#galeria">Galeria</a>
+      <a href="#etapas">Etapas</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="inicio">
+  <div class="wrap">
+    <div>
+      <div class="eyebrow">O domínio dos dragões</div>
+      <h1 class="logo-grande"><span class="fogo">DRAK</span>THAR</h1>
+      <div class="subtitulo">O destino é forjado pela <em>espada</em>.</div>
+      <p class="lead">MMORPG medieval 3D, gratuito. Explore Eldoria, enfrente tempestades de verdade e escreva sua lenda num mundo onde o céu muda para todos ao mesmo tempo.</p>
+      <div class="botoes">
+        <a class="btn primario" href="#conta">Criar conta</a>
+        <a class="btn" href="https://www.bravusmidia.com.br/drakthar/download/DRAKTHAR-windows.zip">Download para Windows</a>
+        <a class="btn ouro" href="https://www.bravusmidia.com.br/drakthar/jogar/" target="_blank" rel="noopener">Jogar no navegador</a>
+      </div>
+    </div>
+    <div class="hero-lado">
+      <img class="brasao" src="assets/emblema-512.png" alt="Brasão de DRAKTHAR: cabeça de dragão dourada sobre escudo azul">
+      <div class="cartao-clima" aria-live="polite">
+        <div class="icone-clima" id="hero-icone"></div>
+        <div>
+          <div class="rotulo">Agora em Eldoria</div>
+          <strong id="hero-clima">—</strong>
+          <small id="hero-hora">—</small>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="bloco">
+    <div class="pilares">
+      <div class="pilar"><b>01</b><h3>Mundo 3D</h3><p>Vila, castelo, rio e florestas com luz e sombras em tempo real.</p></div>
+      <div class="pilar"><b>02</b><h3>Clima vivo</h3><p>Chuva, tempestade, neve e neblina mudam a velocidade e as magias.</p></div>
+      <div class="pilar"><b>03</b><h3>Progressão justa</h3><p>Do nível 1 ao 100 em cerca de 5 meses, jogando 1 hora por dia.</p></div>
+      <div class="pilar"><b>04</b><h3>Comunidade</h3><p>Grupos, guildas, chat e guerras de guildas em áreas de PvP.</p></div>
+      <div class="pilar"><b>05</b><h3>Proteção</h3><p>Perfil infantil com controle dos pais e chat filtrado.</p></div>
+    </div>
+  </div>
+
+  <section class="bloco" id="clima" aria-labelledby="t-clima">
+    <div class="bloco-cab">
+      <div><h2 id="t-clima">Próximas mudanças de clima</h2><p>Agenda mundial de Eldoria. O jogo usa a mesma agenda, então o céu daqui é o céu de lá.</p></div>
+    </div>
+    <div class="bloco-corpo">
+      <div class="clima-grade">
+        <div class="caixa">
+          <div class="rotulo">Clima atual</div>
+          <div class="grande" id="clima-agora">—</div>
+          <div class="efeito" id="clima-efeito">—</div>
+        </div>
+        <div class="caixa">
+          <div class="rotulo">Muda em</div>
+          <div class="grande contagem" id="clima-contagem">--:--</div>
+          <small class="rotulo" id="clima-hora-jogo">—</small>
+        </div>
+      </div>
+      <div class="proximos" id="clima-proximos"></div>
+      <p class="nota">Cada clima dura 5 minutos. Um dia em DRAKTHAR dura 24 minutos reais: 1 minuto aqui é 1 hora lá.</p>
+    </div>
+  </section>
+
+  <div class="duas" id="conta">
+    <section class="bloco" aria-labelledby="t-painel">
+      <div class="bloco-cab"><h2 id="t-painel">Painel do jogador</h2></div>
+      <div class="bloco-corpo">
+        <form id="form-login" novalidate>
+          <div class="campo"><label for="login-usuario">Usuário</label><input id="login-usuario" name="usuario" autocomplete="username" placeholder="Seu usuário" required></div>
+          <div class="campo"><label for="login-senha">Senha</label><input id="login-senha" name="senha" type="password" autocomplete="current-password" placeholder="Sua senha" required></div>
+          <div class="form-botoes">
+            <button class="btn primario" type="submit">Entrar</button>
+            <button class="btn" type="button" id="btn-recuperar">Recuperar senha</button>
+          </div>
+          <div class="aviso" id="login-aviso" hidden></div>
+        </form>
+      </div>
+    </section>
+
+    <section class="bloco" aria-labelledby="t-lista">
+      <div class="bloco-cab"><h2 id="t-lista">Lista de espera</h2></div>
+      <div class="bloco-corpo">
+        <form id="form-lista" novalidate>
+          <div class="campo"><label for="lista-nick">Nome do personagem</label><input id="lista-nick" name="nick" maxlength="20" placeholder="Ex.: Aldric" required></div>
+          <div class="campo"><label for="lista-classe">Classe que você quer jogar</label>
+            <select id="lista-classe" name="classe">
+              <option>Guerreiro</option><option>Arqueiro</option><option>Mago</option><option>Paladino</option>
+            </select>
+          </div>
+          <button class="btn primario" type="submit">Reservar meu nome pelo WhatsApp</button>
+          <div class="aviso" id="lista-aviso" hidden></div>
+          <div class="contato">WhatsApp da equipe: <code>(85) 99122-5865</code> <button class="btn" type="button" id="btn-copiar" style="min-height:36px;padding:0 14px;font-size:.85rem">Copiar</button></div>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <section class="bloco" id="classes" aria-labelledby="t-classes">
+    <div class="bloco-cab"><div><h2 id="t-classes">Classes</h2><p>Quatro no lançamento, duas na expansão. Nenhuma é invencível.</p></div></div>
+    <div class="bloco-corpo">
+      <div class="classes">
+        <article class="classe"><header><h3>Guerreiro</h3><span class="selo">Lançamento</span></header>
+          <dl><dt>Armas</dt><dd>Espada, machado, escudo, espada de duas mãos</dd><dt>Atributos</dt><dd>Força · Defesa</dd><dt>Especial</dt><dd class="especial">Fúria de Batalha</dd><dt>Caminhos</dt><dd>Espadachim, Protetor, Mestre de Armas</dd></dl></article>
+        <article class="classe"><header><h3>Arqueiro</h3><span class="selo">Lançamento</span></header>
+          <dl><dt>Armas</dt><dd>Arco longo, arco curto, besta</dd><dt>Atributos</dt><dd>Destreza · Precisão</dd><dt>Especial</dt><dd class="especial">Chuva de Flechas</dd><dt>Caminhos</dt><dd>Atirador, Rastreador, Caçador</dd></dl></article>
+        <article class="classe"><header><h3>Mago</h3><span class="selo">Lançamento</span></header>
+          <dl><dt>Armas</dt><dd>Cajado, varinha, grimório</dd><dt>Atributos</dt><dd>Inteligência · Energia</dd><dt>Especial</dt><dd class="especial">Tempestade Arcana</dd><dt>Caminhos</dt><dd>Piromante, Criomante, Elementalista</dd></dl></article>
+        <article class="classe"><header><h3>Paladino</h3><span class="selo">Lançamento</span></header>
+          <dl><dt>Armas</dt><dd>Martelo, espada, escudo</dd><dt>Atributos</dt><dd>Vitalidade · Força</dd><dt>Especial</dt><dd class="especial">Julgamento Divino</dd><dt>Caminhos</dt><dd>Templário, Justicar, Guardião Sagrado</dd></dl></article>
+        <article class="classe"><header><h3>Assassino</h3><span class="selo exp">Expansão</span></header>
+          <dl><dt>Armas</dt><dd>Adagas</dd><dt>Atributos</dt><dd>Destreza · Força</dd><dt>Especial</dt><dd class="especial">Golpe nas Sombras</dd><dt>Caminhos</dt><dd>Lâmina, Sombra, Venenoso</dd></dl></article>
+        <article class="classe"><header><h3>Berserker</h3><span class="selo exp">Expansão</span></header>
+          <dl><dt>Armas</dt><dd>Machados</dd><dt>Atributos</dt><dd>Força · Vitalidade</dd><dt>Especial</dt><dd class="especial">Sangue Fervente</dd><dt>Caminhos</dt><dd>Devastador, Bruto, Furioso</dd></dl></article>
+      </div>
+    </div>
+  </section>
+
+  <section class="bloco" id="ranking" aria-labelledby="t-ranking">
+    <div class="bloco-cab"><div><h2 id="t-ranking">Ranking de patentes</h2><p>Top 3 de cada faixa de nível. A primeira temporada abre junto com o servidor.</p></div></div>
+    <div class="bloco-corpo">
+      <div class="patentes" id="patentes"></div>
+    </div>
+  </section>
+
+  <section class="bloco" id="panteao" aria-labelledby="t-panteao">
+    <div class="bloco-cab"><div><h2 id="t-panteao">Panteão de DRAKTHAR</h2><p>Os deuses administram o mundo. Zeus comanda os GMs e o clima.</p></div></div>
+    <div class="bloco-corpo">
+      <div class="deuses" id="deuses"></div>
+    </div>
+  </section>
+
+  <div class="duas" id="informacoes">
+    <section class="bloco" aria-labelledby="t-info">
+      <div class="bloco-cab"><h2 id="t-info">Informações do jogo</h2></div>
+      <div class="bloco-corpo info">
+        <div class="tabela-info">
+          <div><span>Versão</span><span>0.1.0</span></div>
+          <div><span>Fase</span><span>Etapa 1 de 10</span></div>
+          <div><span>Experiência</span><span>10 × nível</span></div>
+          <div><span>Nível máximo</span><span>100</span></div>
+          <div><span>Regiões</span><span>9</span></div>
+          <div><span>Climas</span><span>6</span></div>
+          <div><span>Jogadores por mundo</span><span>5 no início</span></div>
+          <div><span>Preço</span><span>Gratuito</span></div>
+        </div>
+        <div class="info-lado">
+          <img src="assets/emblema-512.png" alt="">
+          <a class="btn primario" href="https://www.bravusmidia.com.br/drakthar/jogar/" target="_blank" rel="noopener">Jogar agora</a>
+          <a class="btn" href="https://www.bravusmidia.com.br/drakthar/download/DRAKTHAR-windows.zip">Download do cliente</a>
+          <small class="rotulo">Windows 10 ou 11 · placa de vídeo com Vulkan</small>
+        </div>
+      </div>
+    </section>
+
+    <section class="bloco" aria-labelledby="t-noticias">
+      <div class="bloco-cab"><h2 id="t-noticias">Notícias</h2></div>
+      <div class="bloco-corpo">
+        <ul class="noticias">
+          <li><div><b>Site oficial no ar</b><p>Clima ao vivo, lista de espera e download da versão de testes.</p></div><time datetime="2026-11-10">10/11/2026</time></li>
+          <li><div><b>Etapa 1 concluída</b><p>Eldoria em 3D, cavaleiro jogável, câmera isométrica e 52 testes aprovados.</p></div><time datetime="2026-11-10">10/11/2026</time></li>
+          <li><div><b>O céu ganhou vida</b><p>Chuva molha o chão, neve acumula, relâmpagos iluminam a vila e o trovão chega depois.</p></div><time datetime="2026-11-10">10/11/2026</time></li>
+          <li><div><b>DRAKTHAR passa para o 3D</b><p>Visual realista no PC, com versão leve para navegador e celular.</p></div><time datetime="2026-11-10">10/11/2026</time></li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <section class="bloco" id="galeria" aria-labelledby="t-galeria">
+    <div class="bloco-cab"><div><h2 id="t-galeria">Galeria</h2><p>Capturas da versão de testes, em diferentes horários e climas.</p></div></div>
+    <div class="bloco-corpo">
+      <div class="galeria">
+        <figure><img src="assets/galeria/01_manha_limpo.jpg" alt="Praça de Eldoria pela manhã" loading="lazy"><figcaption>Manhã na praça</figcaption></figure>
+        <figure><img src="assets/galeria/03_chuva.jpg" alt="Vila sob chuva" loading="lazy"><figcaption>Chuva</figcaption></figure>
+        <figure><img src="assets/galeria/04_tempestade.jpg" alt="Vila durante tempestade" loading="lazy"><figcaption>Tempestade</figcaption></figure>
+        <figure><img src="assets/galeria/05_neve.jpg" alt="Vila coberta de neve" loading="lazy"><figcaption>Neve</figcaption></figure>
+        <figure><img src="assets/galeria/06_neblina.jpg" alt="Vila na neblina do amanhecer" loading="lazy"><figcaption>Neblina</figcaption></figure>
+        <figure><img src="assets/galeria/07_noite.jpg" alt="Lampiões acesos à noite" loading="lazy"><figcaption>Noite</figcaption></figure>
+        <figure><img src="assets/galeria/09_castelo.jpg" alt="Estrada até o castelo" loading="lazy"><figcaption>Estrada do castelo</figcaption></figure>
+        <figure><img src="assets/galeria/10_ponte_rio.jpg" alt="Ponte de pedra sobre o rio" loading="lazy"><figcaption>Ponte do rio</figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="bloco" id="etapas" aria-labelledby="t-etapas">
+    <div class="bloco-cab"><div><h2 id="t-etapas">Etapas de construção</h2><p>O jogo é construído em dez etapas, sempre jogável ao fim de cada uma.</p></div></div>
+    <div class="bloco-corpo">
+      <div class="etapas">
+        <div class="etapa feita"><span class="n">Etapa 1 · Concluída</span><b>Fundação</b><small>Mundo 3D, cavaleiro, câmera, clima</small></div>
+        <div class="etapa agora"><span class="n">Etapa 2 · Próxima</span><b>Personagens</b><small>Classes, aparência, atributos, nível</small></div>
+        <div class="etapa"><span class="n">Etapa 3</span><b>Combate</b><small>Armas, habilidades, monstros, chefe</small></div>
+        <div class="etapa"><span class="n">Etapa 4</span><b>Equipamentos</b><small>Inventário, sets, baú, banco, pets</small></div>
+        <div class="etapa"><span class="n">Etapa 5</span><b>Mundo</b><small>NPCs, missões, Caverna dos Goblins</small></div>
+        <div class="etapa"><span class="n">Etapa 6</span><b>Multiplayer</b><small>Servidor, contas, 5 jogadores</small></div>
+        <div class="etapa"><span class="n">Etapa 7</span><b>Comunidade</b><small>Chat, amigos, guildas, perfil infantil</small></div>
+        <div class="etapa"><span class="n">Etapa 8</span><b>Deuses</b><small>Zeus, GMs e painel de administração</small></div>
+        <div class="etapa"><span class="n">Etapa 9</span><b>Expansão</b><small>9 regiões, 20 sets, dungeons, PvP</small></div>
+        <div class="etapa"><span class="n">Etapa 10</span><b>Lançamento</b><small>Hospedagem, testes de carga, versão 1.0</small></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <img src="assets/emblema-512.png" alt="">
+    <p>DRAKTHAR — O Domínio dos Dragões · © 2026 Bravus Mídia. Todos os direitos reservados.</p>
+    <div class="credito">Desenvolvido por <a href="https://bravusmidia.com.br" target="_blank" rel="noopener">Andrade</a></div>
+  </div>
+</footer>
+
+<a class="zap" href="https://wa.me/5585991225865?text=Ol%C3%A1!%20Quero%20saber%20mais%20sobre%20o%20DRAKTHAR." target="_blank" rel="noopener" aria-label="Falar no WhatsApp">
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.9 11.9 0 0 0 4.6 4c1.7.7 2.4.8 3.2.7.5-.1 1.5-.6 1.8-1.2.2-.6.2-1.1.1-1.2l-.4-.2z"/></svg>
+  <span>Fale com a equipe</span>
+</a>
+
+<script>
+(function () {
+  // ---- Agenda mundial de clima: mesma regra do jogo (game/scripts/systems/weather_manager.gd)
+  var CLIMAS = [
+    ["limpo", "Céu limpo", 40, "Sem efeitos no jogo"],
+    ["nublado", "Nublado", 22, "Luz mais fria, sem efeitos"],
+    ["chuva", "Chuva", 18, "Movimento −5% · Fogo −10% · Raio +10%"],
+    ["tempestade", "Tempestade", 6, "Movimento −10% · Raio +20% · Relâmpagos"],
+    ["neve", "Neve", 6, "Movimento −15% · Gelo +15%"],
+    ["neblina", "Neblina", 8, "Visão reduzida"]
+  ];
+  var SLOT = 300;
+  function h32(n) {
+    n = n >>> 0;
+    n = ((n ^ 61) ^ (n >>> 16)) >>> 0;
+    n = (n + ((n << 3) >>> 0)) >>> 0;
+    n = (n ^ (n >>> 4)) >>> 0;
+    n = Math.imul(n, 0x27d4eb2d) >>> 0;
+    n = (n ^ (n >>> 15)) >>> 0;
+    return n;
+  }
+  function climaDoBloco(slot) {
+    var r = h32(slot) % 100;
+    for (var i = 0; i < CLIMAS.length; i++) { r -= CLIMAS[i][2]; if (r < 0) return CLIMAS[i]; }
+    return CLIMAS[0];
+  }
+  function icone(tipo) {
+    var o = 'stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"';
+    var nuvem = '<path d="M7 17h10a4 4 0 0 0 .4-8 6 6 0 0 0-11.3 1.5A3.3 3.3 0 0 0 7 17z" ' + o + '/>';
+    var cor = { limpo: "#e6c98a", nublado: "#a39a8b", chuva: "#7fb2e6", tempestade: "#e2582b", neve: "#e8dfc9", neblina: "#a39a8b" }[tipo];
+    var d = {
+      limpo: '<circle cx="12" cy="12" r="4.5" ' + o + '/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" ' + o + '/>',
+      nublado: nuvem,
+      chuva: nuvem + '<path d="M9 19.5l-1 2M13 19.5l-1 2M17 19.5l-1 2" ' + o + '/>',
+      tempestade: nuvem + '<path d="M12.5 17.5l-2 3h3l-2 3" ' + o + '/>',
+      neve: nuvem + '<path d="M9 20.5h.01M13 20.5h.01M17 20.5h.01M11 22.5h.01M15 22.5h.01" ' + o + ' stroke-width="2.6"/>',
+      neblina: '<path d="M4 9h16M3 13h18M5 17h14M8 21h8" ' + o + '/>'
+    }[tipo];
+    return '<svg viewBox="0 0 24 24" style="color:' + cor + '" aria-hidden="true">' + d + '</svg>';
+  }
+  function fase(h) {
+    if (h < 5) return "Madrugada";
+    if (h < 7) return "Amanhecer";
+    if (h < 17.5) return "Dia";
+    if (h < 19.5) return "Entardecer";
+    return "Noite";
+  }
+  function dois(n) { return (n < 10 ? "0" : "") + n; }
+  function horaLocal(ms) { var d = new Date(ms); return dois(d.getHours()) + ":" + dois(d.getMinutes()); }
+  var $ = function (id) { return document.getElementById(id); };
+  var ultimoSlot = -1;
+
+  function atualizar() {
+    var agora = Date.now();
+    var seg = Math.floor(agora / 1000);
+    var slot = Math.floor(seg / SLOT);
+    var resta = SLOT - (seg % SLOT);
+    var c = climaDoBloco(slot);
+    var horaJogo = (agora / 60000) % 24;
+    var hh = Math.floor(horaJogo), mm = Math.floor((horaJogo - hh) * 60);
+    var textoHora = "Hora em DRAKTHAR " + dois(hh) + ":" + dois(mm) + " · " + fase(horaJogo);
+    $("hero-hora").textContent = textoHora;
+    $("clima-hora-jogo").textContent = textoHora;
+    $("clima-contagem").textContent = dois(Math.floor(resta / 60)) + ":" + dois(resta % 60);
+    if (slot !== ultimoSlot) {
+      ultimoSlot = slot;
+      $("hero-clima").textContent = c[1];
+      $("hero-icone").innerHTML = icone(c[0]);
+      $("clima-agora").textContent = c[1];
+      $("clima-efeito").textContent = c[3];
+      var html = "";
+      for (var i = 1; i <= 4; i++) {
+        var p = climaDoBloco(slot + i);
+        html += '<div class="caixa"><span class="rotulo">A partir de</span><span class="hora">' + horaLocal((slot + i) * SLOT * 1000) +
+          '</span><span class="tipo">' + icone(p[0]) + p[1] + '</span></div>';
+      }
+      $("clima-proximos").innerHTML = html;
+    }
+  }
+  atualizar();
+  setInterval(atualizar, 1000);
+
+  // ---- Ranking (vazio até o servidor abrir)
+  var faixas = [["Recruta", "Níveis 1–20"], ["Cavaleiro", "Níveis 21–40"], ["Guardião", "Níveis 41–60"], ["Soberano", "Níveis 61–80"], ["Deus da Guerra", "Níveis 81–100"]];
+  var tons = ["#b07a4a", "#9aa3ad", "#c5a15a", "#7fb2e6", "#e2582b"];
+  $("patentes").innerHTML = faixas.map(function (f, i) {
+    return '<div class="patente"><svg class="medalha" viewBox="0 0 44 44" aria-hidden="true"><path d="M22 3l16 7v11c0 10-7 17-16 20C13 38 6 31 6 21V10z" fill="' + tons[i] + '" opacity=".18" stroke="' + tons[i] + '" stroke-width="1.6"/><text x="22" y="27" text-anchor="middle" font-family="Cinzel, serif" font-weight="800" font-size="13" fill="' + tons[i] + '">' + "I II III IV V".split(" ")[i] + '</text></svg><h3>' + f[0] + '</h3><small>' + f[1] + '</small><span class="vazio">Sem jogadores ainda</span></div>';
+  }).join("");
+
+  // ---- Panteão
+  var deuses = [["Zeus", "Deus supremo · tempestades"], ["Hades", "Mundo dos mortos · neblina"], ["Cronos", "Tempo · dia e noite"], ["Gaia", "Terra · estações"], ["Urano", "Céu"], ["Érebo", "Escuridão"], ["Eros", "Amor e paixão"], ["Nike", "Vitória"], ["Nêmesis", "Justiça e vingança"], ["Perséfone", "Primavera e submundo"], ["Hécate", "Magia e mistérios"]];
+  $("deuses").innerHTML = deuses.map(function (d, i) {
+    return '<div class="deus' + (i === 0 ? ' zeus' : '') + '"><span class="letra">' + d[0].charAt(0) + '</span><div><b>' + d[0] + '</b><small>' + d[1] + '</small></div></div>';
+  }).join("");
+
+  // ---- Painel do jogador: as contas abrem com o servidor (Etapa 6)
+  function avisar(el, texto) { el.textContent = texto; el.hidden = false; }
+  $("form-login").addEventListener("submit", function (e) {
+    e.preventDefault();
+    avisar($("login-aviso"), "As contas abrem junto com o servidor do jogo (Etapa 6). Reserve seu nome na lista de espera ao lado para entrar primeiro.");
+  });
+  $("btn-recuperar").addEventListener("click", function () {
+    avisar($("login-aviso"), "A recuperação de senha chega com as contas, na Etapa 6.");
+  });
+  $("form-lista").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var nick = $("lista-nick").value.trim();
+    if (nick.length < 3) { avisar($("lista-aviso"), "Escreva um nome com pelo menos 3 letras."); $("lista-nick").focus(); return; }
+    var msg = "Quero reservar meu nome no DRAKTHAR. Personagem: " + nick + " · Classe: " + $("lista-classe").value;
+    var link = "https://wa.me/5585991225865?text=" + encodeURIComponent(msg);
+    avisar($("lista-aviso"), "Abrindo o WhatsApp com sua reserva. Se não abrir, envie esta mensagem para (85) 99122-5865: " + msg);
+    var a = document.createElement("a"); a.href = link; a.target = "_blank"; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove();
+  });
+  $("btn-copiar").addEventListener("click", function () {
+    var b = this;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText("85991225865").then(function () { b.textContent = "Copiado"; }, function () { b.textContent = "Selecione o número"; });
+    }
+  });
+})();
+</script>
+
+</body>
+</html>
