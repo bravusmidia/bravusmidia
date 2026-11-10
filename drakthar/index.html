@@ -163,6 +163,19 @@ input:focus, select:focus { outline: 2px solid var(--brasa); outline-offset: 0; 
 .deus.zeus { border-color: var(--ouro); background: color-mix(in srgb, var(--ouro) 7%, var(--carvao)); }
 .deus b { display: block; font-family: var(--f-titulo); font-size: 1.15rem; text-transform: uppercase; line-height: 1.1; }
 .deus small { color: var(--cinza); }
+.deus b { display: flex; align-items: center; gap: 0; }
+.status-dot { display: inline-block; width: 10px; height: 10px; margin-left: 8px; border-radius: 50%; background: #c8402e; box-shadow: 0 0 0 2px color-mix(in srgb, #c8402e 25%, transparent); flex-shrink: 0; }
+.status-dot.on { background: var(--verde); box-shadow: 0 0 0 2px color-mix(in srgb, var(--verde) 30%, transparent), 0 0 8px var(--verde); }
+.status-legenda { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px; color: var(--cinza); font-size: .9rem; }
+.status-legenda span { display: inline-flex; align-items: center; gap: 6px; }
+.status-legenda .status-dot { margin-left: 0; }
+.perso { display: grid; gap: 4px; padding: 12px 14px; background: var(--carvao); border: 1px solid var(--linha); border-radius: var(--raio); }
+.perso b { font-family: var(--f-titulo); font-size: 1.15rem; text-transform: uppercase; color: var(--marfim); }
+.perso small { color: var(--cinza); }
+.perso .pts { color: var(--brasa); font-weight: 600; }
+.lista-perso { display: grid; gap: 10px; }
+.conta-topo { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
+.aviso.ok { border-color: var(--verde); color: var(--verde); background: color-mix(in srgb, var(--verde) 8%, transparent); }
 .deus .cargo { display: inline-block; margin-left: 6px; padding: 1px 6px; font-family: var(--f-texto, inherit); font-size: .7rem; letter-spacing: .08em; vertical-align: middle; border: 1px solid var(--ouro); border-radius: 3px; color: var(--ouro); }
 
 /* info + notícias */
@@ -325,50 +338,57 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
       <div class="bloco-cab"><h2 id="t-painel">Painel do jogador</h2></div>
       <div class="bloco-corpo">
         <form id="form-login" novalidate>
-          <div class="campo"><label for="login-usuario">Usuário</label><input id="login-usuario" name="usuario" autocomplete="username" placeholder="Seu usuário" required></div>
+          <div class="campo"><label for="login-email">E-mail</label><input id="login-email" name="email" type="email" autocomplete="email" placeholder="seu@email.com" required></div>
           <div class="campo"><label for="login-senha">Senha</label><input id="login-senha" name="senha" type="password" autocomplete="current-password" placeholder="Sua senha" required></div>
           <div class="form-botoes">
-            <button class="btn primario" type="submit">Entrar</button>
-            <button class="btn" type="button" id="btn-recuperar">Recuperar senha</button>
+            <button class="btn primario" type="submit" id="btn-entrar">Entrar</button>
+            <button class="btn" type="button" id="btn-recuperar">Esqueci a senha</button>
           </div>
           <div class="aviso" id="login-aviso" hidden></div>
         </form>
+        <div id="painel-conta" hidden>
+          <div class="conta-topo">
+            <div><span class="rotulo">Conta</span><div id="conta-nome" style="font-family:var(--f-titulo);font-weight:700;font-size:1.3rem"></div></div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <a class="btn primario" href="https://www.bravusmidia.com.br/drakthar/jogar/">Jogar agora</a>
+              <button class="btn" type="button" id="btn-sair">Sair</button>
+            </div>
+          </div>
+          <div class="lista-perso" id="lista-perso" style="margin-top:16px"></div>
+          <p class="nota" style="margin-top:12px">Crie personagens e distribua pontos dentro do jogo: tecla C para atributos, V para o baú.</p>
+          <div class="aviso" id="conta-aviso" hidden></div>
+        </div>
       </div>
     </section>
 
-    <section class="bloco" aria-labelledby="t-lista">
-      <div class="bloco-cab"><h2 id="t-lista">Lista de espera</h2></div>
+    <section class="bloco" aria-labelledby="t-criar">
+      <div class="bloco-cab"><h2 id="t-criar">Criar conta</h2></div>
       <div class="bloco-corpo">
-        <form id="form-lista" novalidate>
-          <div class="campo"><label for="lista-nick">Nome do personagem</label><input id="lista-nick" name="nick" maxlength="20" placeholder="Ex.: Aldric" required></div>
-          <div class="campo"><label for="lista-classe">Classe que você quer jogar</label>
-            <select id="lista-classe" name="classe">
-              <option>Guerreiro</option><option>Arqueiro</option><option>Mago</option><option>Paladino</option>
-            </select>
-          </div>
-          <button class="btn primario" type="submit">Reservar meu nome pelo WhatsApp</button>
-          <div class="aviso" id="lista-aviso" hidden></div>
-          <div class="contato">WhatsApp da equipe: <code>(85) 99122-5865</code> <button class="btn" type="button" id="btn-copiar" style="min-height:36px;padding:0 14px;font-size:.85rem">Copiar</button></div>
+        <form id="form-criar" novalidate>
+          <div class="campo"><label for="criar-usuario">Usuário</label><input id="criar-usuario" name="usuario" maxlength="16" autocomplete="username" placeholder="3 a 16: minúsculas, números e _" required></div>
+          <div class="campo"><label for="criar-email">E-mail</label><input id="criar-email" name="email" type="email" autocomplete="email" placeholder="seu@email.com" required></div>
+          <div class="campo"><label for="criar-senha">Senha</label><input id="criar-senha" name="senha" type="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres" required></div>
+          <button class="btn primario" type="submit" id="btn-criar">Criar conta</button>
+          <div class="aviso" id="criar-aviso" hidden></div>
+          <div class="contato">Dúvidas? WhatsApp da equipe: <code>(85) 99122-5865</code> <button class="btn" type="button" id="btn-copiar" style="min-height:36px;padding:0 14px;font-size:.85rem">Copiar</button></div>
         </form>
       </div>
     </section>
   </div>
 
   <section class="bloco" id="classes" aria-labelledby="t-classes">
-    <div class="bloco-cab"><div><h2 id="t-classes">Classes</h2><p>Quatro no lançamento, duas na expansão. Nenhuma é invencível.</p></div></div>
+    <div class="bloco-cab"><div><h2 id="t-classes">Classes</h2><p>Cinco classes, todas disponíveis. Nenhuma é invencível.</p></div></div>
     <div class="bloco-corpo">
       <div class="classes">
         <article class="classe"><header><h3>Guerreiro</h3><span class="selo">Lançamento</span></header>
-          <dl><dt>Armas</dt><dd>Espada, machado, escudo, espada de duas mãos</dd><dt>Atributos</dt><dd>Força · Defesa</dd><dt>Especial</dt><dd class="especial">Fúria de Batalha</dd><dt>Caminhos</dt><dd>Espadachim, Protetor, Mestre de Armas</dd></dl></article>
+          <dl><dt>Armas</dt><dd>Espada, machado, escudo, espada de duas mãos</dd><dt>Atributos</dt><dd>Força · Vitalidade</dd><dt>Especial</dt><dd class="especial">Fúria de Batalha</dd><dt>Caminhos</dt><dd>Espadachim, Protetor, Mestre de Armas</dd></dl></article>
         <article class="classe"><header><h3>Arqueiro</h3><span class="selo">Lançamento</span></header>
-          <dl><dt>Armas</dt><dd>Arco longo, arco curto, besta</dd><dt>Atributos</dt><dd>Destreza · Precisão</dd><dt>Especial</dt><dd class="especial">Chuva de Flechas</dd><dt>Caminhos</dt><dd>Atirador, Rastreador, Caçador</dd></dl></article>
+          <dl><dt>Armas</dt><dd>Arco longo, arco curto, besta</dd><dt>Atributos</dt><dd>Agilidade · Força</dd><dt>Especial</dt><dd class="especial">Chuva de Flechas</dd><dt>Caminhos</dt><dd>Atirador, Rastreador, Caçador</dd></dl></article>
         <article class="classe"><header><h3>Mago</h3><span class="selo">Lançamento</span></header>
-          <dl><dt>Armas</dt><dd>Cajado, varinha, grimório</dd><dt>Atributos</dt><dd>Inteligência · Energia</dd><dt>Especial</dt><dd class="especial">Tempestade Arcana</dd><dt>Caminhos</dt><dd>Piromante, Criomante, Elementalista</dd></dl></article>
+          <dl><dt>Armas</dt><dd>Cajado, varinha, grimório</dd><dt>Atributos</dt><dd>Energia · Agilidade</dd><dt>Especial</dt><dd class="especial">Tempestade Arcana</dd><dt>Caminhos</dt><dd>Piromante, Criomante, Elementalista</dd></dl></article>
         <article class="classe"><header><h3>Paladino</h3><span class="selo">Lançamento</span></header>
           <dl><dt>Armas</dt><dd>Martelo, espada, escudo</dd><dt>Atributos</dt><dd>Vitalidade · Força</dd><dt>Especial</dt><dd class="especial">Julgamento Divino</dd><dt>Caminhos</dt><dd>Templário, Justicar, Guardião Sagrado</dd></dl></article>
-        <article class="classe"><header><h3>Assassino</h3><span class="selo exp">Expansão</span></header>
-          <dl><dt>Armas</dt><dd>Adagas</dd><dt>Atributos</dt><dd>Destreza · Força</dd><dt>Especial</dt><dd class="especial">Golpe nas Sombras</dd><dt>Caminhos</dt><dd>Lâmina, Sombra, Venenoso</dd></dl></article>
-        <article class="classe"><header><h3>Berserker</h3><span class="selo exp">Expansão</span></header>
+        <article class="classe"><header><h3>Berserker</h3><span class="selo">Lançamento</span></header>
           <dl><dt>Armas</dt><dd>Machados</dd><dt>Atributos</dt><dd>Força · Vitalidade</dd><dt>Especial</dt><dd class="especial">Sangue Fervente</dd><dt>Caminhos</dt><dd>Devastador, Bruto, Furioso</dd></dl></article>
       </div>
     </div>
@@ -385,6 +405,7 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
     <div class="bloco-cab"><div><h2 id="t-deuses">Deuses</h2><p>A administração de DRAKTHAR. Zeus é o ADM do jogo; Ares, Hades, Poseidon e Apolo são os GMs.</p></div></div>
     <div class="bloco-corpo">
       <div class="deuses" id="deuses"></div>
+      <div class="status-legenda"><span><i class="status-dot on"></i>Online no jogo ou no site</span><span><i class="status-dot"></i>Offline</span><span id="jogadores-online"></span></div>
     </div>
   </section>
 
@@ -561,30 +582,137 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
     return '<div class="patente"><svg class="medalha" viewBox="0 0 44 44" aria-hidden="true"><path d="M22 3l16 7v11c0 10-7 17-16 20C13 38 6 31 6 21V10z" fill="' + tons[i] + '" opacity=".18" stroke="' + tons[i] + '" stroke-width="1.6"/><text x="22" y="27" text-anchor="middle" font-family="Cinzel, serif" font-weight="800" font-size="13" fill="' + tons[i] + '">' + "I II III IV V".split(" ")[i] + '</text></svg><h3>' + f[0] + '</h3><small>' + f[1] + '</small><span class="vazio">Sem jogadores ainda</span></div>';
   }).join("");
 
-  // ---- Deuses: Zeus (ADM) e os GMs
+  // ---- Deuses: Zeus (ADM) e os GMs, com bolinha verde (online) / vermelha (offline)
+  var SB_URL = "https://widrjidmnzhkaofaraov.supabase.co";
+  var SB_KEY = "sb_publishable_F_D3QYHH_JKnfTpQrY3t3w_stC0L1Hw";   // chave pública; o banco protege os dados
   var deuses = [["Zeus", "Rei dos deuses, trovão e céu", "ADM"], ["Ares", "Deus da guerra", "GM"], ["Hades", "Deus do submundo", "GM"], ["Poseidon", "Deus dos mares", "GM"], ["Apolo", "Deus da luz, música e profecia", "GM"]];
-  $("deuses").innerHTML = deuses.map(function (d, i) {
-    return '<div class="deus' + (i === 0 ? ' zeus' : '') + '"><span class="letra">' + d[0].charAt(0) + '</span><div><b>' + d[0] + ' <span class="cargo">' + d[2] + '</span></b><small>' + d[1] + '</small></div></div>';
-  }).join("");
+  function desenharDeuses(status) {
+    $("deuses").innerHTML = deuses.map(function (d, i) {
+      var st = status && status[d[0]];
+      var on = !!(st && st.online);
+      var onde = on ? (st.onde === "jogo" ? "Online no jogo" : "Online no site") : "Offline";
+      return '<div class="deus' + (i === 0 ? ' zeus' : '') + '"><span class="letra">' + d[0].charAt(0) + '</span><div><b>' + d[0] +
+        ' <span class="cargo">' + d[2] + '</span><i class="status-dot' + (on ? ' on' : '') + '" title="' + onde + '" aria-label="' + onde + '"></i></b><small>' + d[1] + '</small></div></div>';
+    }).join("");
+  }
+  desenharDeuses(null);
 
-  // ---- Painel do jogador: as contas abrem com o servidor (Etapa 6)
-  function avisar(el, texto) { el.textContent = texto; el.hidden = false; }
+  function rpc(fn, args, token) {
+    var h = { "apikey": SB_KEY, "Content-Type": "application/json" };
+    if (token) h["Authorization"] = "Bearer " + token;
+    return fetch(SB_URL + "/rest/v1/rpc/" + fn, { method: "POST", headers: h, body: JSON.stringify(args || {}) })
+      .then(function (r) { return r.text().then(function (t) { var d = t ? JSON.parse(t) : null; if (!r.ok) throw new Error((d && (d.message || d.msg)) || ("Erro " + r.status)); return d; }); });
+  }
+  function atualizarStatus() {
+    rpc("drakthar_deuses_status").then(function (lista) {
+      var m = {}; (lista || []).forEach(function (d) { m[d.nome] = d; });
+      desenharDeuses(m);
+    }).catch(function () { desenharDeuses(null); });
+    rpc("drakthar_online").then(function (n) {
+      $("jogadores-online").textContent = "Jogadores no mundo agora: " + (n || 0);
+    }).catch(function () { $("jogadores-online").textContent = ""; });
+  }
+  atualizarStatus();
+  setInterval(atualizarStatus, 30000);
+
+  // ---- Contas (Supabase Auth): entrar, criar conta, ver personagens
+  function avisar(el, texto, ok) { el.textContent = texto; el.hidden = !texto; el.classList.toggle("ok", !!ok); }
+  var CLASSES = { guerreiro: "Guerreiro", arqueiro: "Arqueiro", mago: "Mago", paladino: "Paladino", berserker: "Berserker" };
+  var sessao = null;
+  function lerSessao() { try { return JSON.parse(localStorage.getItem("drakthar_sessao") || "null"); } catch (e) { return null; } }
+  function gravarSessao(s) { try { if (s) localStorage.setItem("drakthar_sessao", JSON.stringify(s)); else localStorage.removeItem("drakthar_sessao"); } catch (e) {} }
+  function traduzir(msg) {
+    var t = { "Invalid login credentials": "E-mail ou senha incorretos.", "Email not confirmed": "Confirme seu e-mail pelo link que enviamos e tente de novo.",
+      "User already registered": "Esse e-mail já tem conta. Use Entrar.", "Password should be at least 6 characters": "A senha precisa ter pelo menos 6 caracteres." };
+    for (var k in t) if (String(msg).indexOf(k) === 0) return t[k];
+    if (/Could not find the function|does not exist/.test(msg)) return "O servidor do jogo está sendo preparado. Tente de novo mais tarde.";
+    return msg;
+  }
+  function auth(path, body) {
+    return fetch(SB_URL + "/auth/v1/" + path, { method: "POST", headers: { "apikey": SB_KEY, "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.msg || d.error_description || d.message || ("Erro " + r.status)); return d; }); });
+  }
+  function guardar(d) {
+    sessao = { access_token: d.access_token, refresh_token: d.refresh_token, expira: Date.now() + (d.expires_in || 3600) * 1000,
+      usuario: d.user && d.user.user_metadata ? d.user.user_metadata.usuario : null };
+    gravarSessao(sessao);
+  }
+  function token() {
+    if (!sessao) return Promise.reject(new Error("sem sessão"));
+    if (Date.now() < sessao.expira - 60000) return Promise.resolve(sessao.access_token);
+    return auth("token?grant_type=refresh_token", { refresh_token: sessao.refresh_token }).then(function (d) { guardar(d); return sessao.access_token; });
+  }
+  function carregarConta() {
+    return token().then(function (t) {
+      return rpc("drakthar_minha_conta", {}, t).then(function (d) {
+        if (d) return d;
+        // conta confirmada por e-mail: cria a conta do jogo com o usuário escolhido no cadastro
+        if (!sessao.usuario) throw new Error("Abra o jogo para escolher seu nome de usuário.");
+        return rpc("drakthar_registrar", { p_usuario: sessao.usuario }, t).then(function () { return rpc("drakthar_minha_conta", {}, t); });
+      });
+    }).then(mostrarConta);
+  }
+  var pingTimer = null;
+  function mostrarConta(d) {
+    var c = d.conta || {};
+    $("form-login").hidden = true;
+    $("painel-conta").hidden = false;
+    $("conta-nome").textContent = c.usuario + (c.deus ? " · " + c.deus + " (" + String(c.cargo).toUpperCase() + ")" : "");
+    var lista = d.personagens || [];
+    $("lista-perso").innerHTML = lista.length ? lista.map(function (p) {
+      return '<div class="perso"><b>' + p.nome.replace(/[<>&"]/g, "") + '</b><small>' + (CLASSES[p.classe] || p.classe) + ' · Nível ' + p.nivel +
+        '</small><small>Força ' + p.forca + ' · Agilidade ' + p.agilidade + ' · Vitalidade ' + p.vitalidade + ' · Energia ' + p.energia +
+        (p.pontos > 0 ? ' · <span class="pts">' + p.pontos + ' pontos livres</span>' : '') + '</small></div>';
+    }).join("") : '<p class="nota">Nenhum personagem ainda. Entre no jogo para criar o primeiro.</p>';
+    // deuses aparecem online também quando estão no site
+    if (c.deus && !pingTimer) {
+      var ping = function () { token().then(function (t) { return rpc("drakthar_ping", { p_onde: "site" }, t); }).then(atualizarStatus).catch(function () {}); };
+      ping(); pingTimer = setInterval(ping, 30000);
+    }
+  }
+  function sair() {
+    var t = sessao && sessao.access_token;
+    if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
+    if (t) rpc("drakthar_sair", {}, t).catch(function () {}).then(atualizarStatus);
+    sessao = null; gravarSessao(null);
+    $("painel-conta").hidden = true; $("form-login").hidden = false;
+  }
   $("form-login").addEventListener("submit", function (e) {
     e.preventDefault();
-    avisar($("login-aviso"), "As contas abrem junto com o servidor do jogo (Etapa 6). Reserve seu nome na lista de espera ao lado para entrar primeiro.");
+    var email = $("login-email").value.trim(), senha = $("login-senha").value;
+    if (!email || !senha) { avisar($("login-aviso"), "Preencha e-mail e senha."); return; }
+    $("btn-entrar").disabled = true; avisar($("login-aviso"), "Entrando…", true);
+    auth("token?grant_type=password", { email: email, password: senha }).then(function (d) { guardar(d); return carregarConta(); })
+      .then(function () { avisar($("login-aviso"), ""); })
+      .catch(function (err) { avisar($("login-aviso"), traduzir(err.message)); })
+      .then(function () { $("btn-entrar").disabled = false; });
   });
   $("btn-recuperar").addEventListener("click", function () {
-    avisar($("login-aviso"), "A recuperação de senha chega com as contas, na Etapa 6.");
+    avisar($("login-aviso"), "Para trocar a senha, fale com a equipe pelo WhatsApp (85) 99122-5865.", false);
   });
-  $("form-lista").addEventListener("submit", function (e) {
+  $("btn-sair").addEventListener("click", sair);
+  $("form-criar").addEventListener("submit", function (e) {
     e.preventDefault();
-    var nick = $("lista-nick").value.trim();
-    if (nick.length < 3) { avisar($("lista-aviso"), "Escreva um nome com pelo menos 3 letras."); $("lista-nick").focus(); return; }
-    var msg = "Quero reservar meu nome no DRAKTHAR. Personagem: " + nick + " · Classe: " + $("lista-classe").value;
-    var link = "https://wa.me/5585991225865?text=" + encodeURIComponent(msg);
-    avisar($("lista-aviso"), "Abrindo o WhatsApp com sua reserva. Se não abrir, envie esta mensagem para (85) 99122-5865: " + msg);
-    var a = document.createElement("a"); a.href = link; a.target = "_blank"; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove();
+    var u = $("criar-usuario").value.trim().toLowerCase(), email = $("criar-email").value.trim(), senha = $("criar-senha").value;
+    if (!/^[a-z0-9_]{3,16}$/.test(u)) { avisar($("criar-aviso"), "Usuário: 3 a 16 caracteres, só letras minúsculas, números e _."); return; }
+    if (!email) { avisar($("criar-aviso"), "Informe seu e-mail."); return; }
+    if (senha.length < 6) { avisar($("criar-aviso"), "A senha precisa ter pelo menos 6 caracteres."); return; }
+    $("btn-criar").disabled = true; avisar($("criar-aviso"), "Criando conta…", true);
+    auth("signup?redirect_to=" + encodeURIComponent("https://www.bravusmidia.com.br/drakthar/#conta"),
+      { email: email, password: senha, data: { app: "drakthar", usuario: u } })
+      .then(function (d) {
+        if (d.access_token) {
+          guardar(d);
+          return token().then(function (t) { return rpc("drakthar_registrar", { p_usuario: u }, t); }).then(carregarConta)
+            .then(function () { avisar($("criar-aviso"), "Conta criada! Agora é só jogar.", true); });
+        }
+        avisar($("criar-aviso"), "Conta criada! Confirme pelo link que enviamos para " + email + " e depois entre no painel ao lado.", true);
+      })
+      .catch(function (err) { avisar($("criar-aviso"), traduzir(err.message)); })
+      .then(function () { $("btn-criar").disabled = false; });
   });
+  sessao = lerSessao();
+  if (sessao) carregarConta().catch(function () { sair(); });
   $("btn-copiar").addEventListener("click", function () {
     var b = this;
     if (navigator.clipboard) {
