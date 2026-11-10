@@ -339,11 +339,11 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
       <div class="bloco-cab"><h2 id="t-painel">Painel do jogador</h2></div>
       <div class="bloco-corpo">
         <form id="form-login" novalidate>
-          <div class="campo"><label for="login-email">E-mail</label><input id="login-email" name="email" type="email" autocomplete="email" placeholder="seu@email.com" required></div>
-          <div class="campo"><label for="login-senha">Senha</label><input id="login-senha" name="senha" type="password" autocomplete="current-password" placeholder="Sua senha" required></div>
+          <div class="campo"><label for="login-usuario">Usuário</label><input id="login-usuario" name="usuario" autocomplete="username" placeholder="Seu usuário" required></div>
+          <div class="campo"><label for="login-pin">PIN</label><input id="login-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="current-password" placeholder="4 números" required></div>
           <div class="form-botoes">
             <button class="btn primario" type="submit" id="btn-entrar">Entrar</button>
-            <button class="btn" type="button" id="btn-recuperar">Esqueci a senha</button>
+            <button class="btn" type="button" id="btn-recuperar">Esqueci o PIN</button>
           </div>
           <div class="aviso" id="login-aviso" hidden></div>
         </form>
@@ -367,8 +367,9 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
       <div class="bloco-corpo">
         <form id="form-criar" novalidate>
           <div class="campo"><label for="criar-usuario">Usuário</label><input id="criar-usuario" name="usuario" maxlength="16" autocomplete="username" placeholder="3 a 16: minúsculas, números e _" required></div>
-          <div class="campo"><label for="criar-email">E-mail</label><input id="criar-email" name="email" type="email" autocomplete="email" placeholder="seu@email.com" required></div>
-          <div class="campo"><label for="criar-senha">Senha</label><input id="criar-senha" name="senha" type="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres" required></div>
+          <div class="campo"><label for="criar-pin">PIN</label><input id="criar-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" placeholder="4 números" required></div>
+          <div class="campo"><label for="criar-pin2">Repita o PIN</label><input id="criar-pin2" name="pin2" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" placeholder="4 números" required></div>
+          <div class="campo" id="campo-chave" hidden><label for="criar-chave">Chave do Olimpo</label><input id="criar-chave" name="chave" autocomplete="off" placeholder="Só para as contas dos deuses"></div>
           <button class="btn primario" type="submit" id="btn-criar">Criar conta</button>
           <div class="aviso" id="criar-aviso" hidden></div>
           <div class="contato">Dúvidas? WhatsApp da equipe: <code>(85) 99122-5865</code> <button class="btn" type="button" id="btn-copiar" style="min-height:36px;padding:0 14px;font-size:.85rem">Copiar</button></div>
@@ -625,42 +626,26 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
   atualizarRanking();
   setInterval(atualizarRanking, 60000);
 
-  // ---- Contas (Supabase Auth): entrar, criar conta, ver personagens
+  // ---- Contas do jogo: usuário + PIN de 4 números (sem e-mail). Mesma conta no site e no jogo.
   function avisar(el, texto, ok) { el.textContent = texto; el.hidden = !texto; el.classList.toggle("ok", !!ok); }
   var CLASSES = { guerreiro: "Guerreiro", arqueiro: "Arqueiro", mago: "Mago", paladino: "Paladino", berserker: "Berserker" };
+  var DEUSES = ["zeus", "ares", "hades", "poseidon", "apolo"];
   var sessao = null;
-  function lerSessao() { try { return JSON.parse(localStorage.getItem("drakthar_sessao") || "null"); } catch (e) { return null; } }
-  function gravarSessao(s) { try { if (s) localStorage.setItem("drakthar_sessao", JSON.stringify(s)); else localStorage.removeItem("drakthar_sessao"); } catch (e) {} }
+  function lerSessao() { try { return JSON.parse(localStorage.getItem("drakthar_sessao2") || "null"); } catch (e) { return null; } }
+  function gravarSessao(s) { try { if (s) localStorage.setItem("drakthar_sessao2", JSON.stringify(s)); else localStorage.removeItem("drakthar_sessao2"); } catch (e) {} }
   function traduzir(msg) {
-    var t = { "Invalid login credentials": "E-mail ou senha incorretos.", "Email not confirmed": "Confirme seu e-mail pelo link que enviamos e tente de novo.",
-      "User already registered": "Esse e-mail já tem conta. Use Entrar.", "Password should be at least 6 characters": "A senha precisa ter pelo menos 6 caracteres." };
-    for (var k in t) if (String(msg).indexOf(k) === 0) return t[k];
-    if (/Could not find the function|does not exist/.test(msg)) return "O servidor do jogo está sendo preparado. Tente de novo mais tarde.";
-    return msg;
+    msg = String(msg || "");
+    if (/Could not find the function|does not exist/.test(msg)) return "O servidor do jogo está sendo atualizado. Tente de novo em instantes.";
+    return msg.charAt(0).toUpperCase() + msg.slice(1);
   }
-  function auth(path, body) {
-    return fetch(SB_URL + "/auth/v1/" + path, { method: "POST", headers: { "apikey": SB_KEY, "Content-Type": "application/json" }, body: JSON.stringify(body) })
-      .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.msg || d.error_description || d.message || ("Erro " + r.status)); return d; }); });
+  function chamar(fn, args) {
+    return rpc(fn, args).then(function (d) { if (d && d.erro) throw new Error(d.erro); return d; });
   }
-  function guardar(d) {
-    sessao = { access_token: d.access_token, refresh_token: d.refresh_token, expira: Date.now() + (d.expires_in || 3600) * 1000,
-      usuario: d.user && d.user.user_metadata ? d.user.user_metadata.usuario : null };
-    gravarSessao(sessao);
-  }
-  function token() {
-    if (!sessao) return Promise.reject(new Error("sem sessão"));
-    if (Date.now() < sessao.expira - 60000) return Promise.resolve(sessao.access_token);
-    return auth("token?grant_type=refresh_token", { refresh_token: sessao.refresh_token }).then(function (d) { guardar(d); return sessao.access_token; });
-  }
+  function soNumeros(id) { $(id).addEventListener("input", function () { this.value = this.value.replace(/\D/g, "").slice(0, 4); }); }
+  ["login-pin", "criar-pin", "criar-pin2"].forEach(soNumeros);
+  $("criar-usuario").addEventListener("input", function () { $("campo-chave").hidden = DEUSES.indexOf(this.value.trim().toLowerCase()) < 0; });
   function carregarConta() {
-    return token().then(function (t) {
-      return rpc("drakthar_minha_conta", {}, t).then(function (d) {
-        if (d) return d;
-        // conta confirmada por e-mail: cria a conta do jogo com o usuário escolhido no cadastro
-        if (!sessao.usuario) throw new Error("Abra o jogo para escolher seu nome de usuário.");
-        return rpc("drakthar_registrar", { p_usuario: sessao.usuario }, t).then(function () { return rpc("drakthar_minha_conta", {}, t); });
-      });
-    }).then(mostrarConta);
+    return chamar("drakthar_minha_conta", { p_token: sessao.token }).then(mostrarConta);
   }
   var pingTimer = null;
   function mostrarConta(d) {
@@ -670,54 +655,46 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
     $("conta-nome").textContent = c.usuario + (c.deus ? " · " + c.deus + " (" + String(c.cargo).toUpperCase() + ")" : "");
     var lista = d.personagens || [];
     $("lista-perso").innerHTML = lista.length ? lista.map(function (p) {
-      return '<div class="perso"><b>' + p.nome.replace(/[<>&"]/g, "") + '</b><small>' + (CLASSES[p.classe] || p.classe) + ' · Nível ' + p.nivel +
+      return '<div class="perso"><b>' + String(p.nome).replace(/[<>&"]/g, "") + '</b><small>' + (CLASSES[p.classe] || p.classe) + ' · Nível ' + p.nivel +
         '</small><small>Força ' + p.forca + ' · Agilidade ' + p.agilidade + ' · Vitalidade ' + p.vitalidade + ' · Energia ' + p.energia +
         (p.pontos > 0 ? ' · <span class="pts">' + p.pontos + ' pontos livres</span>' : '') + '</small></div>';
     }).join("") : '<p class="nota">Nenhum personagem ainda. Entre no jogo para criar o primeiro.</p>';
-    // deuses aparecem online também quando estão no site
     if (c.deus && !pingTimer) {
-      var ping = function () { token().then(function (t) { return rpc("drakthar_ping", { p_onde: "site" }, t); }).then(atualizarStatus).catch(function () {}); };
+      var ping = function () { rpc("drakthar_ping", { p_token: sessao.token, p_onde: "site" }).then(atualizarStatus).catch(function () {}); };
       ping(); pingTimer = setInterval(ping, 30000);
     }
   }
   function sair() {
-    var t = sessao && sessao.access_token;
     if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
-    if (t) rpc("drakthar_sair", {}, t).catch(function () {}).then(atualizarStatus);
+    if (sessao) rpc("drakthar_sair", { p_token: sessao.token }).catch(function () {}).then(atualizarStatus);
     sessao = null; gravarSessao(null);
     $("painel-conta").hidden = true; $("form-login").hidden = false;
   }
+  function entrouCom(d) { sessao = { token: d.token, usuario: d.usuario }; gravarSessao(sessao); return carregarConta(); }
   $("form-login").addEventListener("submit", function (e) {
     e.preventDefault();
-    var email = $("login-email").value.trim(), senha = $("login-senha").value;
-    if (!email || !senha) { avisar($("login-aviso"), "Preencha e-mail e senha."); return; }
+    var u = $("login-usuario").value.trim().toLowerCase(), pin = $("login-pin").value;
+    if (!u || !/^\d{4}$/.test(pin)) { avisar($("login-aviso"), "Preencha o usuário e o PIN de 4 números."); return; }
     $("btn-entrar").disabled = true; avisar($("login-aviso"), "Entrando…", true);
-    auth("token?grant_type=password", { email: email, password: senha }).then(function (d) { guardar(d); return carregarConta(); })
+    chamar("drakthar_entrar", { p_usuario: u, p_pin: pin }).then(entrouCom)
       .then(function () { avisar($("login-aviso"), ""); })
       .catch(function (err) { avisar($("login-aviso"), traduzir(err.message)); })
       .then(function () { $("btn-entrar").disabled = false; });
   });
   $("btn-recuperar").addEventListener("click", function () {
-    avisar($("login-aviso"), "Para trocar a senha, fale com a equipe pelo WhatsApp (85) 99122-5865.", false);
+    avisar($("login-aviso"), "Para trocar o PIN, fale com a equipe pelo WhatsApp (85) 99122-5865.", false);
   });
   $("btn-sair").addEventListener("click", sair);
   $("form-criar").addEventListener("submit", function (e) {
     e.preventDefault();
-    var u = $("criar-usuario").value.trim().toLowerCase(), email = $("criar-email").value.trim(), senha = $("criar-senha").value;
+    var u = $("criar-usuario").value.trim().toLowerCase(), pin = $("criar-pin").value, pin2 = $("criar-pin2").value, chave = $("criar-chave").value.trim();
     if (!/^[a-z0-9_]{3,16}$/.test(u)) { avisar($("criar-aviso"), "Usuário: 3 a 16 caracteres, só letras minúsculas, números e _."); return; }
-    if (!email) { avisar($("criar-aviso"), "Informe seu e-mail."); return; }
-    if (senha.length < 6) { avisar($("criar-aviso"), "A senha precisa ter pelo menos 6 caracteres."); return; }
+    if (!/^\d{4}$/.test(pin)) { avisar($("criar-aviso"), "O PIN precisa ter 4 números."); return; }
+    if (pin !== pin2) { avisar($("criar-aviso"), "Os dois PINs não são iguais."); return; }
+    var args = { p_usuario: u, p_pin: pin }; if (chave) args.p_chave = chave;
     $("btn-criar").disabled = true; avisar($("criar-aviso"), "Criando conta…", true);
-    auth("signup?redirect_to=" + encodeURIComponent("https://www.bravusmidia.com.br/drakthar/#conta"),
-      { email: email, password: senha, data: { app: "drakthar", usuario: u } })
-      .then(function (d) {
-        if (d.access_token) {
-          guardar(d);
-          return token().then(function (t) { return rpc("drakthar_registrar", { p_usuario: u }, t); }).then(carregarConta)
-            .then(function () { avisar($("criar-aviso"), "Conta criada! Agora é só jogar.", true); });
-        }
-        avisar($("criar-aviso"), "Conta criada! Confirme pelo link que enviamos para " + email + " e depois entre no painel ao lado.", true);
-      })
+    chamar("drakthar_criar_conta", args).then(entrouCom)
+      .then(function () { avisar($("criar-aviso"), "Conta criada! Já pode jogar com o mesmo usuário e PIN.", true); })
       .catch(function (err) { avisar($("criar-aviso"), traduzir(err.message)); })
       .then(function () { $("btn-criar").disabled = false; });
   });
