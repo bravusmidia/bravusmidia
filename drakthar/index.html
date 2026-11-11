@@ -264,8 +264,11 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
 .credito a:hover { color: var(--ouro-claro); }
 
 /* WhatsApp flutuante */
-.zap { position: fixed; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 25; display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-radius: 6px; background: linear-gradient(180deg, #2fd27a, #1ea85a); color: #fff; text-decoration: none; font-family: var(--f-titulo); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; box-shadow: 0 10px 30px rgba(30,168,90,.35); }
-.zap svg { width: 22px; height: 22px; }
+.zap { position: fixed; right: calc(16px + env(safe-area-inset-right, 0px)); top: calc(76px + env(safe-area-inset-top, 0px)); z-index: 25; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(180deg, #2fd27a, #1ea85a); color: #fff; text-decoration: none; box-shadow: 0 8px 24px rgba(30,168,90,.4); transition: transform .15s; }
+.zap:hover { transform: scale(1.08); }
+body:has(.nav.aberto) .zap { display: none; }
+.zap svg { width: 28px; height: 28px; }
+.zap span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 @media (max-width: 960px) {
   .hero .wrap { grid-template-columns: minmax(0, 1fr); padding-block: 40px; }
@@ -288,8 +291,6 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
   .bloco-cab, .bloco-corpo { padding-left: 18px; padding-right: 18px; }
   .bloco-cab p { margin-left: 0; }
   .form-botoes { grid-template-columns: minmax(0, 1fr); }
-  .zap span { display: none; }
-  .zap { padding: 14px; border-radius: 50%; }
   .noticias li { flex-direction: column; gap: 4px; }
 }
 @media (prefers-reduced-motion: reduce) { .brasao, .fumaca i, .fumaca::before { animation: none; } .btn, .galeria img { transition: none; } }
@@ -488,6 +489,7 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
       <div class="bloco-cab"><h2 id="t-noticias">Notícias</h2></div>
       <div class="bloco-corpo">
         <ul class="noticias">
+          <li><div><b>Versão 1.9: 15 habilidades do Guerreiro</b><p>Barra com 9 habilidades (teclas 1 a 9), livro de habilidades (K) com evolução por pontos, sangramento, atordoar e lentidão nos monstros, barra de vida em todos os monstros, nadar no rio, câmera pelas setas e pelo mouse na borda da tela. Poções agora em H e J.</p></div><time datetime="2026-11-11">11/11/2026</time></li>
           <li><div><b>Versão 1.8: trilha sonora e chão realista</b><p>10 músicas de harpa celta e flauta (tecla N liga/desliga), vento ambiente, chão, areia, neve e rochas com textura de foto, sentar de verdade em bancos e montarias, poderes que saem ao apertar 3 a 6 e jogo abrindo mais rápido.</p></div><time datetime="2026-11-11">11/11/2026</time></li>
           <li><div><b>Versão 1.7: Shop e 5 cidades</b><p>Cada classe tem 8 armas e 7 peças de armadura em 6 níveis (Bronze a Divino), com 12 espaços de equipamento. Os monstros derrubam peças da sua classe. Cinco cidades com moradores realistas e fases de nível de 1 a 100. Veja tudo no <a href="shop/">Shop</a>.</p></div><time datetime="2026-11-11">11/11/2026</time></li>
           <li><div><b>Novos reinos!</b><p>Portais nas pontas das estradas levam a Sylvaran (floresta), Vargan (gelo), Kharum (deserto) e às Ruínas dos Goblins. Missões com o Capitão Aldric (tecla E).</p></div><time datetime="2026-11-10">10/11/2026</time></li>

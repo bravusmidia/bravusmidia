@@ -263,8 +263,11 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
 .credito a:hover { color: var(--ouro-claro); }
 
 /* WhatsApp flutuante */
-.zap { position: fixed; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 25; display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-radius: 6px; background: linear-gradient(180deg, #2fd27a, #1ea85a); color: #fff; text-decoration: none; font-family: var(--f-titulo); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; box-shadow: 0 10px 30px rgba(30,168,90,.35); }
-.zap svg { width: 22px; height: 22px; }
+.zap { position: fixed; right: calc(16px + env(safe-area-inset-right, 0px)); top: calc(76px + env(safe-area-inset-top, 0px)); z-index: 25; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(180deg, #2fd27a, #1ea85a); color: #fff; text-decoration: none; box-shadow: 0 8px 24px rgba(30,168,90,.4); transition: transform .15s; }
+.zap:hover { transform: scale(1.08); }
+body:has(.nav.aberto) .zap { display: none; }
+.zap svg { width: 28px; height: 28px; }
+.zap span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 @media (max-width: 960px) {
   .hero .wrap { grid-template-columns: minmax(0, 1fr); padding-block: 40px; }
@@ -287,8 +290,6 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
   .bloco-cab, .bloco-corpo { padding-left: 18px; padding-right: 18px; }
   .bloco-cab p { margin-left: 0; }
   .form-botoes { grid-template-columns: minmax(0, 1fr); }
-  .zap span { display: none; }
-  .zap { padding: 14px; border-radius: 50%; }
   .noticias li { flex-direction: column; gap: 4px; }
 }
 @media (prefers-reduced-motion: reduce) { .brasao, .fumaca i, .fumaca::before { animation: none; } .btn, .galeria img { transition: none; } }
