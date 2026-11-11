@@ -60,6 +60,19 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
 .menu::-webkit-scrollbar { display: none; }
 .menu a { font-family: var(--f-titulo); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: .92rem; text-decoration: none; padding: 8px 12px; border-radius: var(--raio); white-space: nowrap; color: var(--marfim); }
 .menu a:hover, .menu a:focus-visible { color: var(--brasa); background: color-mix(in srgb, var(--brasa) 10%, transparent); outline: none; }
+.menu a.shop { color: var(--carvao); background: linear-gradient(180deg, var(--ouro-claro), var(--ouro, #c5a15a)); }
+.menu a.shop:hover { color: var(--carvao); filter: brightness(1.08); }
+.menu-botao { display: none; margin-left: auto; width: 44px; height: 44px; border: 1px solid var(--linha); border-radius: var(--raio); background: transparent; color: var(--marfim); font-size: 1.4rem; cursor: pointer; }
+@media (max-width: 960px) {
+  .menu-botao { display: block; }
+  .nav .wrap { flex-wrap: wrap; gap: 12px; }
+  .menu { display: none; flex-direction: column; width: 100%; margin-left: 0; padding-bottom: 12px; overflow: visible; }
+  .nav.aberto .menu { display: flex; }
+  .menu a { padding: 12px; font-size: 1rem; border-bottom: 1px solid var(--linha); }
+}
+html, body { overflow-x: hidden; }
+table { max-width: 100%; }
+.tabela-rola { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 /* ---------- hero ---------- */
 .hero { position: relative; overflow: hidden; border-bottom: 1px solid var(--linha); }
@@ -86,7 +99,7 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
 .brasao { position: relative; width: min(340px, 80%); filter: drop-shadow(0 20px 50px color-mix(in srgb, var(--brasa) 40%, transparent)); animation: respira 6s ease-in-out infinite; }
 @keyframes respira { 50% { transform: translateY(-6px); filter: drop-shadow(0 26px 60px color-mix(in srgb, var(--brasa) 55%, transparent)); } }
 
-.cartao-clima { width: 100%; max-width: 420px; display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; padding: 16px 18px; background: color-mix(in srgb, var(--painel) 90%, transparent); border: 1px solid var(--linha); border-radius: 6px; }
+.cartao-clima { width: 100%; max-width: 420px; box-sizing: border-box; min-width: 0; display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; padding: 16px 18px; background: color-mix(in srgb, var(--painel) 90%, transparent); border: 1px solid var(--linha); border-radius: 6px; }
 .icone-clima { width: 64px; height: 64px; border: 1px solid var(--linha); border-radius: var(--raio); display: grid; place-items: center; background: var(--carvao); }
 .icone-clima svg { width: 40px; height: 40px; }
 .cartao-clima .rotulo { color: var(--brasa); }
@@ -288,7 +301,8 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
 <nav class="nav" aria-label="Principal">
   <div class="wrap">
     <a class="marca" href="#inicio" aria-label="DRAKTHAR — início"><img class="marca-simbolo" src="assets/simbolo.webp" alt=""><img class="marca-logo" src="assets/logo-drakthar.webp" alt="DRAKTHAR"></a>
-    <div class="menu">
+    <button class="menu-botao" type="button" aria-label="Abrir menu" aria-expanded="false" onclick="var n=this.closest('.nav');var a=n.classList.toggle('aberto');this.setAttribute('aria-expanded',a);this.textContent=a?'✕':'☰'">☰</button>
+    <div class="menu" onclick="if(event.target.tagName==='A'){var n=this.closest('.nav');n.classList.remove('aberto');var b=n.querySelector('.menu-botao');b.textContent='☰';b.setAttribute('aria-expanded','false')}">
       <a href="#inicio">Início</a>
       <a href="#clima">Clima</a>
       <a href="#conta">Conta</a>
@@ -298,6 +312,7 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
       <a href="#informacoes">Informações</a>
       <a href="#galeria">Galeria</a>
       <a href="#etapas">Etapas</a>
+      <a class="shop" href="shop/">Shop</a>
     </div>
   </div>
 </nav>
@@ -472,6 +487,7 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
       <div class="bloco-cab"><h2 id="t-noticias">Notícias</h2></div>
       <div class="bloco-corpo">
         <ul class="noticias">
+          <li><div><b>Versão 1.7: Shop e 5 cidades</b><p>Cada classe tem 8 armas e 7 peças de armadura em 6 níveis (Bronze a Divino), com 12 espaços de equipamento. Os monstros derrubam peças da sua classe. Cinco cidades com moradores realistas e fases de nível de 1 a 100. Veja tudo no <a href="shop/">Shop</a>.</p></div><time datetime="2026-11-11">11/11/2026</time></li>
           <li><div><b>Novos reinos!</b><p>Portais nas pontas das estradas levam a Sylvaran (floresta), Vargan (gelo), Kharum (deserto) e às Ruínas dos Goblins. Missões com o Capitão Aldric (tecla E).</p></div><time datetime="2026-11-10">10/11/2026</time></li>
           <li><div><b>DRAKTHAR 1.0 no ar!</b><p>Contas na nuvem, jogadores juntos no mesmo mundo, chat, monstros, Rei Goblin, níveis, pontos (C), baú (V) e asas a partir do nível 5.</p></div><time datetime="2026-11-10">10/11/2026</time></li>
           <li><div><b>Site oficial no ar</b><p>Clima ao vivo, lista de espera e download da versão de testes.</p></div><time datetime="2026-11-10">10/11/2026</time></li>
@@ -506,12 +522,12 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
         <div class="etapa feita"><span class="n">Etapa 1 · Concluída</span><b>Fundação</b><small>Mundo 3D, câmera, clima e dia/noite</small></div>
         <div class="etapa feita"><span class="n">Etapa 2 · Concluída</span><b>Personagens</b><small>5 classes, atributos (C), nível, asas</small></div>
         <div class="etapa feita"><span class="n">Etapa 3 · Concluída</span><b>Combate</b><small>Lobos, goblins, Rei Goblin, golpe especial (Q)</small></div>
-        <div class="etapa feita"><span class="n">Etapa 4 · Parcial</span><b>Equipamentos</b><small>Baú (V), equipamento e saque. Falta: banco e pets</small></div>
+        <div class="etapa feita"><span class="n">Etapa 4 · Concluída</span><b>Equipamentos</b><small>12 espaços, 40 armas e 35 armaduras por classe, 6 níveis (Bronze a Divino), drops de monstros</small></div>
         <div class="etapa feita"><span class="n">Etapa 5 · Concluída</span><b>Mundo</b><small>Capitão Aldric e missões, taverna, moradores, animais, Ruínas dos Goblins</small></div>
         <div class="etapa feita"><span class="n">Etapa 6 · Concluída</span><b>Multiplayer</b><small>Contas na nuvem, jogadores juntos no mundo</small></div>
         <div class="etapa feita"><span class="n">Etapa 7 · Parcial</span><b>Comunidade</b><small>Chat com filtro. Falta: amigos e guildas</small></div>
         <div class="etapa feita"><span class="n">Etapa 8 · Parcial</span><b>Deuses</b><small>Zeus e GMs: clima e avisos. Falta: painel</small></div>
-        <div class="etapa feita"><span class="n">Etapa 9 · Concluída</span><b>Expansão</b><small>7 reinos, Masmorra do Abismo com o Lich, Arena PvP, conjuntos de armadura e clãs</small></div>
+        <div class="etapa feita"><span class="n">Etapa 9 · Concluída</span><b>Expansão</b><small>5 cidades com moradores realistas (Vila Inicial, Cidade Imperial, Cidade Élfica, Cidade do Deserto, Fortaleza Sombria), fases de nível 1–100, Masmorra do Abismo, Arena PvP e clãs</small></div>
         <div class="etapa feita"><span class="n">Etapa 10 · Versão 1.0</span><b>Lançamento</b><small>No ar em 10/11/2026, grátis no navegador e Windows</small></div>
       </div>
     </div>

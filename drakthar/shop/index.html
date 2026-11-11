@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta property="og:title" content="DRAKTHAR — O Domínio dos Dragões">
+<meta property="og:description" content="MMORPG medieval 3D gratuito. O destino é forjado pela espada.">
+<meta property="og:image" content="https://www.bravusmidia.com.br/drakthar/assets/simbolo.webp">
+<title>Shop — DRAKTHAR</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Shop de DRAKTHAR: armas e armaduras das 5 classes, 12 espaços de equipamento e 6 níveis de evolução.">
+<link rel="icon" href="../assets/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800;900&family=Rajdhani:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: portal de servidor de MMORPG — faixa de navegação fixa, hero com o brasão,
+   blocos em painéis escuros com bordas de brasa, grade de 12 colunas que vira 1 no celular.
+   Tema único escuro, por escolha (identidade do jogo). */
+:root {
+  color-scheme: dark;
+  --carvao: #0d0c0e;          /* fundo */
+  --painel: #151215;          /* painéis */
+  --painel-2: #1c1619;
+  --linha: #3a1c1a;           /* bordas */
+  --brasa: #e2582b;           /* acento: fogo do dragão */
+  --brasa-escura: #a8331a;
+  --vinho: #702d35;
+  --ouro: #c5a15a;
+  --ouro-claro: #e6c98a;
+  --marfim: #e8dfc9;
+  --cinza: #a39a8b;
+  --azul: #172c43;
+  --verde: #2fbf6a;
+  --f-logo: "Cinzel", "Trajan Pro", Georgia, serif;
+  --f-titulo: "Rajdhani", "Arial Narrow", system-ui, sans-serif;
+  --f-texto: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --raio: 4px;
+}
+body {
+  background: var(--carvao);
+  color: var(--marfim);
+  font-family: var(--f-texto);
+  font-size: 16px;
+  line-height: 1.55;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--carvao); }
+a { color: inherit; }
+.wrap { max-width: 1200px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+.rotulo { font-family: var(--f-titulo); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: .8rem; color: var(--cinza); }
+
+/* ---------- navegação ---------- */
+.nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: color-mix(in srgb, var(--carvao) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--linha); }
+.nav .wrap { display: flex; align-items: center; gap: 24px; min-height: 64px; }
+.marca { display: flex; align-items: center; gap: 10px; text-decoration: none; flex-shrink: 0; }
+.marca-simbolo { width: 38px; height: 38px; }
+.marca-logo { height: 26px; width: auto; }
+.menu { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin-left: auto; }
+.menu::-webkit-scrollbar { display: none; }
+.menu a { font-family: var(--f-titulo); font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: .92rem; text-decoration: none; padding: 8px 12px; border-radius: var(--raio); white-space: nowrap; color: var(--marfim); }
+.menu a:hover, .menu a:focus-visible { color: var(--brasa); background: color-mix(in srgb, var(--brasa) 10%, transparent); outline: none; }
+.menu a.shop { color: var(--carvao); background: linear-gradient(180deg, var(--ouro-claro), var(--ouro, #c5a15a)); }
+.menu a.shop:hover { color: var(--carvao); filter: brightness(1.08); }
+.menu-botao { display: none; margin-left: auto; width: 44px; height: 44px; border: 1px solid var(--linha); border-radius: var(--raio); background: transparent; color: var(--marfim); font-size: 1.4rem; cursor: pointer; }
+@media (max-width: 960px) {
+  .menu-botao { display: block; }
+  .nav .wrap { flex-wrap: wrap; gap: 12px; }
+  .menu { display: none; flex-direction: column; width: 100%; margin-left: 0; padding-bottom: 12px; overflow: visible; }
+  .nav.aberto .menu { display: flex; }
+  .menu a { padding: 12px; font-size: 1rem; border-bottom: 1px solid var(--linha); }
+}
+html, body { overflow-x: hidden; }
+table { max-width: 100%; }
+.tabela-rola { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ---------- hero ---------- */
+.hero { position: relative; overflow: hidden; border-bottom: 1px solid var(--linha); }
+.hero::before { content: ""; position: absolute; inset: 0; background:
+  radial-gradient(60% 80% at 75% 45%, color-mix(in srgb, var(--brasa) 28%, transparent), transparent 70%),
+  linear-gradient(90deg, var(--carvao) 15%, color-mix(in srgb, var(--carvao) 55%, transparent) 55%, color-mix(in srgb, var(--carvao) 70%, transparent)),
+  linear-gradient(0deg, var(--carvao), transparent 40%),
+  url("assets/hero.jpg") center / cover no-repeat; }
+.hero .wrap { position: relative; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 32px; align-items: center; padding-block: 64px 56px; }
+.eyebrow { display: flex; align-items: center; gap: 14px; font-family: var(--f-titulo); font-weight: 700; font-size: 1.15rem; letter-spacing: .1em; text-transform: uppercase; }
+.eyebrow::before, .eyebrow::after { content: ""; height: 2px; width: 56px; background: var(--brasa); }
+.logo-grande { margin-block: 14px 8px; line-height: 0; }
+.logo-grande img { width: min(620px, 100%); height: auto; filter: drop-shadow(0 8px 30px rgba(0,0,0,.7)); }
+.subtitulo { font-family: var(--f-titulo); font-weight: 700; font-size: clamp(1.4rem, 3vw, 2.2rem); text-transform: uppercase; line-height: 1.1; }
+.subtitulo em { font-style: normal; color: var(--ouro); }
+.hero p.lead { color: var(--cinza); font-size: 1.12rem; max-width: 34em; margin-block: 18px 28px; }
+.botoes { display: flex; flex-wrap: wrap; gap: 12px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 26px; border-radius: var(--raio); font-family: var(--f-titulo); font-weight: 700; font-size: 1.02rem; letter-spacing: .06em; text-transform: uppercase; text-decoration: none; border: 1px solid var(--linha); background: var(--painel); color: var(--marfim); cursor: pointer; transition: transform .15s, border-color .15s, box-shadow .15s; }
+.btn:hover { border-color: var(--brasa); transform: translateY(-1px); }
+.btn:focus-visible { outline: 2px solid var(--ouro); outline-offset: 2px; }
+.btn.primario { background: linear-gradient(180deg, var(--brasa), var(--brasa-escura)); border-color: #ff7a45; color: #fff; box-shadow: 0 8px 28px color-mix(in srgb, var(--brasa) 35%, transparent); }
+.btn.ouro { border-color: var(--ouro); color: var(--ouro-claro); }
+.hero-lado { display: grid; gap: 16px; justify-items: center; }
+.brasao { position: relative; width: min(340px, 80%); filter: drop-shadow(0 20px 50px color-mix(in srgb, var(--brasa) 40%, transparent)); animation: respira 6s ease-in-out infinite; }
+@keyframes respira { 50% { transform: translateY(-6px); filter: drop-shadow(0 26px 60px color-mix(in srgb, var(--brasa) 55%, transparent)); } }
+
+.cartao-clima { width: 100%; max-width: 420px; display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; padding: 16px 18px; background: color-mix(in srgb, var(--painel) 90%, transparent); border: 1px solid var(--linha); border-radius: 6px; }
+.icone-clima { width: 64px; height: 64px; border: 1px solid var(--linha); border-radius: var(--raio); display: grid; place-items: center; background: var(--carvao); }
+.icone-clima svg { width: 40px; height: 40px; }
+.cartao-clima .rotulo { color: var(--brasa); }
+.cartao-clima strong { display: block; font-family: var(--f-titulo); font-size: 1.7rem; line-height: 1.1; text-transform: uppercase; }
+.cartao-clima small { color: var(--cinza); font-variant-numeric: tabular-nums; }
+
+/* ---------- blocos ---------- */
+section { scroll-margin-top: 80px; }
+.bloco { margin-block: 32px; background: linear-gradient(180deg, var(--painel-2), var(--painel)); border: 1px solid var(--linha); border-radius: 6px; }
+.bloco-cab { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 22px 28px; border-bottom: 1px solid var(--linha); }
+.bloco-cab h2 { display: flex; align-items: center; gap: 14px; font-family: var(--f-titulo); font-weight: 700; font-size: 1.75rem; text-transform: uppercase; letter-spacing: .03em; }
+.bloco-cab h2::before { content: ""; width: 26px; height: 3px; background: var(--brasa); }
+.bloco-cab p { margin: 4px 0 0 40px; color: var(--cinza); }
+.bloco-corpo { padding: 28px; }
+
+/* pilares */
+.pilares { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin-top: -1px; }
+.pilar { padding: 26px 24px; border-left: 1px solid var(--linha); }
+.pilar:first-child { border-left: 0; }
+.pilar b { display: block; font-family: var(--f-titulo); font-size: 2.3rem; line-height: 1; color: var(--brasa); }
+.pilar h3 { font-family: var(--f-titulo); font-size: 1.15rem; text-transform: uppercase; margin-block: 10px 6px; }
+.pilar p { margin: 0; color: var(--cinza); font-size: .95rem; }
+
+/* clima */
+.clima-grade { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr); gap: 20px; }
+.caixa { background: var(--carvao); border: 1px solid var(--linha); border-radius: var(--raio); padding: 22px 24px; min-width: 0; }
+.caixa .grande { font-family: var(--f-titulo); font-weight: 700; font-size: clamp(1.8rem, 4vw, 2.6rem); text-transform: uppercase; line-height: 1.1; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.caixa .efeito { color: var(--brasa); font-family: var(--f-titulo); font-weight: 700; font-size: 1.05rem; margin-top: 6px; }
+.contagem { color: var(--verde) !important; }
+.proximos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 20px; }
+.proximos .caixa { padding: 14px 16px; display: grid; gap: 4px; }
+.proximos .hora { font-family: var(--f-titulo); font-weight: 700; font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+.proximos .tipo { display: flex; align-items: center; gap: 8px; color: var(--marfim); }
+.proximos svg { width: 22px; height: 22px; flex-shrink: 0; }
+.nota { color: var(--cinza); font-size: .9rem; margin: 18px 0 0; }
+
+/* painel + lista */
+.duas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-block: 32px; }
+.duas .bloco { margin: 0; }
+form { display: grid; gap: 14px; }
+label { font-family: var(--f-titulo); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; font-size: .88rem; }
+input, select { width: 100%; min-height: 48px; padding: 0 14px; border-radius: var(--raio); border: 1px solid var(--linha); background: #0a090b; color: var(--marfim); font: inherit; }
+input:focus, select:focus { outline: 2px solid var(--brasa); outline-offset: 0; border-color: transparent; }
+.campo { display: grid; gap: 6px; }
+.form-botoes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px; }
+.aviso { border: 1px solid var(--ouro); background: color-mix(in srgb, var(--ouro) 8%, transparent); color: var(--ouro-claro); border-radius: var(--raio); padding: 12px 14px; font-size: .95rem; }
+.contato { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; color: var(--cinza); font-size: .95rem; }
+.contato code { font-family: var(--f-titulo); font-weight: 700; color: var(--marfim); font-size: 1.05rem; user-select: all; }
+
+/* classes */
+.classes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.classe { background: var(--carvao); border: 1px solid var(--linha); border-radius: var(--raio); padding: 0 22px 20px; display: grid; gap: 10px; align-content: start; overflow: hidden; }
+.classe .retrato { margin: 0 -22px 6px; aspect-ratio: 4 / 3; overflow: hidden; position: relative; border-bottom: 1px solid var(--linha); }
+.classe .retrato img { width: 100%; height: 100%; object-fit: cover; object-position: center 22%; display: block; transition: transform .5s ease; }
+.classe:hover .retrato img { transform: scale(1.05); }
+.classe .retrato::after { content: ""; position: absolute; inset: auto 0 0 0; height: 40%; background: linear-gradient(transparent, var(--carvao)); }
+.classe header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.classe h3 { font-family: var(--f-titulo); font-size: 1.5rem; text-transform: uppercase; }
+.selo { font-family: var(--f-titulo); font-weight: 700; font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; padding: 3px 8px; border-radius: 3px; border: 1px solid var(--ouro); color: var(--ouro); white-space: nowrap; }
+.selo.exp { border-color: var(--cinza); color: var(--cinza); }
+.classe dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; font-size: .95rem; }
+.classe dt { color: var(--cinza); }
+.classe dd { margin: 0; }
+.classe .especial { color: var(--brasa); font-family: var(--f-titulo); font-weight: 700; }
+
+/* ranking */
+.patentes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
+.patente { background: var(--carvao); border: 1px solid var(--linha); border-radius: var(--raio); padding: 18px; display: grid; gap: 6px; justify-items: start; }
+.patente .medalha { width: 44px; height: 44px; }
+.patente h3 { font-family: var(--f-titulo); font-size: 1.2rem; text-transform: uppercase; }
+.patente small { color: var(--cinza); }
+.patente .top { color: var(--marfim); font-size: .95rem; }
+.patente .vazio { color: var(--cinza); font-style: italic; font-size: .9rem; margin-top: 6px; }
+
+.brasao img { display: block; width: 100%; height: auto; }
+/* fumaça saindo das narinas do dragão */
+.fumaca { position: absolute; left: 81.5%; top: 37%; width: 0; height: 0; pointer-events: none; }
+.fumaca i { position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(240,235,226,.9) 0%, rgba(200,192,180,.5) 42%, rgba(160,150,135,0) 72%);
+  filter: blur(1.5px); opacity: 0; animation: fumaca 3.6s ease-out infinite; }
+.fumaca i:nth-child(2) { animation-delay: .45s; } .fumaca i:nth-child(3) { animation-delay: .9s; }
+.fumaca i:nth-child(4) { animation-delay: 1.35s; } .fumaca i:nth-child(5) { animation-delay: 1.8s; }
+.fumaca i:nth-child(6) { animation-delay: 2.25s; } .fumaca i:nth-child(7) { animation-delay: 2.7s; }
+.fumaca i:nth-child(8) { animation-delay: 3.15s; }
+.fumaca::before { content: ""; position: absolute; left: -7px; top: -5px; width: 14px; height: 10px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,140,60,.55), rgba(255,90,30,0) 70%); animation: brasa-narina 1.8s ease-in-out infinite; }
+@keyframes fumaca {
+  0% { transform: translate(0, 0) scale(.35); opacity: 0; }
+  10% { opacity: 1; }
+  55% { opacity: .6; }
+  100% { transform: translate(40px, -90px) scale(4.2); opacity: 0; }
+}
+@keyframes brasa-narina { 0%, 100% { opacity: .35; } 50% { opacity: .9; } }
+
+/* panteão */
+.deuses { display: grid; grid-template-columns: repeat(auto-fill, minmax(225px, 1fr)); gap: 12px; }
+.deus { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--carvao); border: 1px solid var(--linha); border-radius: var(--raio); }
+.deus .simbolo { width: 54px; height: 54px; flex-shrink: 0; display: grid; place-items: center; border: 1px solid var(--ouro); border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--ouro) 18%, transparent), transparent 70%); color: var(--ouro); }
+.deus .simbolo svg { width: 34px; height: 34px; }
+.deus.zeus .simbolo { box-shadow: 0 0 14px color-mix(in srgb, var(--ouro) 45%, transparent); }
+.deus .letra { width: 40px; height: 40px; flex-shrink: 0; display: grid; place-items: center; border: 1px solid var(--ouro); border-radius: 50%; font-family: var(--f-logo); font-weight: 800; color: var(--ouro); }
+.deus.zeus { border-color: var(--ouro); background: color-mix(in srgb, var(--ouro) 7%, var(--carvao)); }
+.deus b { display: block; font-family: var(--f-titulo); font-size: 1.15rem; text-transform: uppercase; line-height: 1.1; }
+.deus small { color: var(--cinza); }
+.deus b { display: flex; align-items: center; gap: 0; }
+.status-dot { display: inline-block; width: 10px; height: 10px; margin-left: 8px; border-radius: 50%; background: #c8402e; box-shadow: 0 0 0 2px color-mix(in srgb, #c8402e 25%, transparent); flex-shrink: 0; }
+.status-dot.on { background: var(--verde); box-shadow: 0 0 0 2px color-mix(in srgb, var(--verde) 30%, transparent), 0 0 8px var(--verde); }
+.status-legenda { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px; color: var(--cinza); font-size: .9rem; }
+.status-legenda span { display: inline-flex; align-items: center; gap: 6px; }
+.status-legenda .status-dot { margin-left: 0; }
+.perso { display: grid; gap: 4px; padding: 12px 14px; background: var(--carvao); border: 1px solid var(--linha); border-radius: var(--raio); }
+.perso b { font-family: var(--f-titulo); font-size: 1.15rem; text-transform: uppercase; color: var(--marfim); }
+.perso small { color: var(--cinza); }
+.perso .pts { color: var(--brasa); font-weight: 600; }
+.lista-perso { display: grid; gap: 10px; }
+.conta-topo { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
+.aviso.ok { border-color: var(--verde); color: var(--verde); background: color-mix(in srgb, var(--verde) 8%, transparent); }
+.deus .cargo { display: inline-block; margin-left: 6px; padding: 1px 6px; font-family: var(--f-texto, inherit); font-size: .7rem; letter-spacing: .08em; vertical-align: middle; border: 1px solid var(--ouro); border-radius: 3px; color: var(--ouro); }
+
+/* info + notícias */
+.info { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .9fr); gap: 24px; align-items: center; }
+.tabela-info { display: grid; }
+.tabela-info div { display: flex; justify-content: space-between; gap: 12px; padding: 12px 6px; border-bottom: 1px solid var(--linha); font-family: var(--f-titulo); font-weight: 700; font-size: 1.08rem; }
+.tabela-info div span:first-child::before { content: "› "; color: var(--brasa); }
+.tabela-info div span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.info-lado { display: grid; gap: 14px; justify-items: stretch; text-align: center; }
+.info-lado img { width: 180px; margin: 0 auto; }
+.noticias { list-style: none; margin: 0; padding: 0; }
+.noticias li { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--linha); }
+.noticias li:last-child { border-bottom: 0; }
+.noticias b { font-family: var(--f-titulo); font-size: 1.12rem; text-transform: uppercase; }
+.noticias p { margin: 2px 0 0; color: var(--cinza); font-size: .95rem; }
+.noticias time { font-family: var(--f-titulo); font-weight: 700; color: var(--cinza); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* galeria */
+.galeria { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.galeria figure { margin: 0; position: relative; border: 1px solid var(--linha); border-radius: var(--raio); overflow: hidden; }
+.galeria img { display: block; width: 100%; aspect-ratio: 960 / 424; object-fit: cover; transition: transform .4s; }
+.galeria figure:hover img { transform: scale(1.04); }
+.galeria figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 12px 8px; background: linear-gradient(0deg, rgba(0,0,0,.85), transparent); font-family: var(--f-titulo); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; font-size: .9rem; }
+
+/* etapas */
+.etapas { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.etapa { padding: 14px 16px; border: 1px solid var(--linha); border-radius: var(--raio); background: var(--carvao); display: grid; gap: 4px; }
+.etapa .n { font-family: var(--f-titulo); font-weight: 700; color: var(--cinza); font-size: .85rem; letter-spacing: .08em; text-transform: uppercase; }
+.etapa b { font-family: var(--f-titulo); font-size: 1.1rem; text-transform: uppercase; }
+.etapa small { color: var(--cinza); }
+.etapa.feita { border-color: var(--verde); }
+.etapa.feita .n { color: var(--verde); }
+.etapa.agora { border-color: var(--brasa); }
+.etapa.agora .n { color: var(--brasa); }
+
+/* rodapé */
+footer { border-top: 1px solid var(--linha); margin-top: 48px; background: #09080a; }
+footer .wrap { display: grid; grid-template-columns: auto 1fr auto; gap: 24px; align-items: center; padding-block: 32px calc(32px + env(safe-area-inset-bottom, 0px)); }
+footer img { width: 56px; }
+footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
+.credito { font-family: var(--f-titulo); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; text-align: right; }
+.credito a { color: var(--ouro); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--ouro) 40%, transparent); }
+.credito a:hover { color: var(--ouro-claro); }
+
+/* WhatsApp flutuante */
+.zap { position: fixed; right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 25; display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-radius: 6px; background: linear-gradient(180deg, #2fd27a, #1ea85a); color: #fff; text-decoration: none; font-family: var(--f-titulo); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; box-shadow: 0 10px 30px rgba(30,168,90,.35); }
+.zap svg { width: 22px; height: 22px; }
+
+@media (max-width: 960px) {
+  .hero .wrap { grid-template-columns: minmax(0, 1fr); padding-block: 40px; }
+  .hero-lado { order: -1; }
+  .brasao { width: min(220px, 60%); }
+  .fumaca i { width: 12px; height: 12px; left: -6px; top: -6px; }
+  .pilares { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pilar { border-left: 0; border-top: 1px solid var(--linha); }
+  .clima-grade, .duas, .info { grid-template-columns: minmax(0, 1fr); }
+  .proximos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .classes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .patentes, .etapas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .galeria { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  footer .wrap { grid-template-columns: minmax(0, 1fr); text-align: center; justify-items: center; }
+  .credito { text-align: center; }
+}
+@media (max-width: 560px) {
+  .marca-logo { display: none; }
+  .pilares, .classes, .patentes, .etapas { grid-template-columns: minmax(0, 1fr); }
+  .bloco-cab, .bloco-corpo { padding-left: 18px; padding-right: 18px; }
+  .bloco-cab p { margin-left: 0; }
+  .form-botoes { grid-template-columns: minmax(0, 1fr); }
+  .zap span { display: none; }
+  .zap { padding: 14px; border-radius: 50%; }
+  .noticias li { flex-direction: column; gap: 4px; }
+}
+@media (prefers-reduced-motion: reduce) { .brasao, .fumaca i, .fumaca::before { animation: none; } .btn, .galeria img { transition: none; } }
+</style>
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)} body{margin:0} img{max-width:100%} [hidden]{display:none!important}</style>
+<style>
+.shop-intro { margin: 28px 0 0; color: var(--cinza); max-width: 70ch; }
+.shop-h1 { font-family: var(--f-titulo); font-weight: 700; font-size: clamp(2rem, 5vw, 3rem); text-transform: uppercase; letter-spacing: .03em; margin-top: 36px; }
+.shop-grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.cl { border: 1px solid var(--linha); border-radius: 6px; padding: 18px 20px; background: var(--painel); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 20px; }
+.cl h3 { grid-column: 1 / -1; font-family: var(--f-titulo); font-size: 1.35rem; text-transform: uppercase; letter-spacing: .04em; color: var(--ouro-claro); margin-bottom: 6px; }
+.cl h4 { font-family: var(--f-titulo); text-transform: uppercase; letter-spacing: .06em; font-size: .85rem; color: var(--brasa); margin: 4px 0 6px; }
+.cl ol, .slots { margin: 0; padding-left: 1.4em; }
+.cl li, .slots li { padding: 2px 0; }
+.slots { columns: 3; column-gap: 32px; }
+.niveis { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.niveis li { display: grid; grid-template-columns: 18px 1fr; column-gap: 10px; align-items: center; border: 1px solid var(--linha); border-radius: 6px; padding: 12px 14px; background: var(--painel); }
+.niveis i { width: 18px; height: 18px; border-radius: 3px; grid-row: span 2; box-shadow: inset 0 0 0 1px rgba(0,0,0,.4); }
+.niveis small { color: var(--cinza); }
+.resumo { display: flex; flex-wrap: wrap; gap: 10px 28px; color: var(--cinza); }
+.resumo b { color: var(--marfim); font-size: 1.4rem; font-family: var(--f-titulo); }
+@media (max-width: 960px) { .shop-grade { grid-template-columns: minmax(0, 1fr); } .slots { columns: 2; } .niveis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .cl { grid-template-columns: minmax(0, 1fr); } .slots { columns: 1; } .niveis { grid-template-columns: minmax(0, 1fr); } }
+</style>
+</head>
+<body>
+
+<nav class="nav" aria-label="Principal">
+  <div class="wrap">
+    <a class="marca" href="../#inicio" aria-label="DRAKTHAR — início"><img class="marca-simbolo" src="../assets/simbolo.webp" alt=""><img class="marca-logo" src="../assets/logo-drakthar.webp" alt="DRAKTHAR"></a>
+    <button class="menu-botao" type="button" aria-label="Abrir menu" aria-expanded="false" onclick="var n=this.closest('.nav');var a=n.classList.toggle('aberto');this.setAttribute('aria-expanded',a);this.textContent=a?'✕':'☰'">☰</button>
+    <div class="menu" onclick="if(event.target.tagName==='A'){var n=this.closest('.nav');n.classList.remove('aberto');var b=n.querySelector('.menu-botao');b.textContent='☰';b.setAttribute('aria-expanded','false')}">
+      <a href="../#inicio">Início</a>
+      <a href="../#clima">Clima</a>
+      <a href="../#conta">Conta</a>
+      <a href="../#classes">Classes</a>
+      <a href="../#ranking">Ranking</a>
+      <a href="../#deuses-sec">Deuses</a>
+      <a href="../#informacoes">Informações</a>
+      <a href="../#galeria">Galeria</a>
+      <a href="../#etapas">Etapas</a>
+      <a class="shop" href="./" aria-current="page">Shop</a>
+    </div>
+  </div>
+</nav>
+
+<main class="wrap">
+  <h1 class="shop-h1">Shop</h1>
+  <p class="shop-intro">Armas e armaduras das cinco classes. Os níveis Bronze, Ferro, Aço e Ouro são vendidos pelo Ferreiro Arkan, na Vila Inicial e na Cidade Imperial. Lendário e Divino só caem de chefes. Cada monstro derruba uma peça por vez.</p>
+
+  <section class="bloco" aria-labelledby="t-resumo">
+    <div class="bloco-cab"><h2 id="t-resumo">Estrutura inicial</h2></div>
+    <div class="bloco-corpo resumo">
+      <span><b>5</b> classes</span><span><b>40</b> armas</span><span><b>35</b> peças de armadura</span><span><b>12</b> espaços de equipamento</span><span><b>6</b> níveis de evolução</span>
+    </div>
+  </section>
+
+  <section class="bloco" aria-labelledby="t-classes-shop">
+    <div class="bloco-cab"><h2 id="t-classes-shop">Equipamentos por classe</h2></div>
+    <div class="bloco-corpo shop-grade">
+      <article class="cl"><h3><span aria-hidden="true">⚔️</span> Guerreiro</h3>
+        <div class="cl-col"><h4>Armas</h4><ol><li>Espada curta</li><li>Espada longa</li><li>Espada larga</li><li>Espadão de duas mãos</li><li>Machado de batalha</li><li>Lança de guerra</li><li>Espadas duplas</li><li>Machado pesado</li></ol></div>
+        <div class="cl-col"><h4>Armaduras</h4><ol><li>Elmo de Guerreiro</li><li>Peitoral de Guerreiro</li><li>Calças de Guerreiro</li><li>Luvas de Guerreiro</li><li>Botas de Guerreiro</li><li>Escudo de Guerreiro</li><li>Capa de Guerreiro</li></ol></div>
+      </article>
+      <article class="cl"><h3><span aria-hidden="true">🔥</span> Berserker</h3>
+        <div class="cl-col"><h4>Armas</h4><ol><li>Machado gigante</li><li>Machado duplo</li><li>Machado de duas mãos</li><li>Martelo de guerra</li><li>Maça brutal</li><li>Espadão colossal</li><li>Martelo com espinhos</li><li>Machado sangrento</li></ol></div>
+        <div class="cl-col"><h4>Armaduras</h4><ol><li>Elmo de Berserker</li><li>Peitoral de Berserker</li><li>Calças de Berserker</li><li>Luvas de Berserker</li><li>Botas de Berserker</li><li>Ombreiras de Berserker</li><li>Cinto de guerra</li></ol></div>
+      </article>
+      <article class="cl"><h3><span aria-hidden="true">🔮</span> Mago</h3>
+        <div class="cl-col"><h4>Armas</h4><ol><li>Cajado arcano</li><li>Cajado elemental</li><li>Cajado sombrio</li><li>Varinha mágica</li><li>Orbe mágico</li><li>Livro de feitiços</li><li>Cajado celestial</li><li>Cajado do dragão</li></ol></div>
+        <div class="cl-col"><h4>Armaduras</h4><ol><li>Capuz de Mago</li><li>Peitoral arcano</li><li>Calças arcanas</li><li>Luvas mágicas</li><li>Botas arcanas</li><li>Manto mágico</li><li>Cinto arcano</li></ol></div>
+      </article>
+      <article class="cl"><h3><span aria-hidden="true">🏹</span> Arqueira</h3>
+        <div class="cl-col"><h4>Armas</h4><ol><li>Arco curto</li><li>Arco longo</li><li>Arco élfico</li><li>Arco composto</li><li>Arco elemental</li><li>Besta leve</li><li>Besta pesada</li><li>Adagas duplas</li></ol></div>
+        <div class="cl-col"><h4>Armaduras</h4><ol><li>Capuz de Arqueira</li><li>Peitoral de Arqueira</li><li>Calças de Arqueira</li><li>Luvas de Arqueira</li><li>Botas de Arqueira</li><li>Ombreiras de Arqueira</li><li>Cinto de Arqueira</li></ol></div>
+      </article>
+      <article class="cl"><h3><span aria-hidden="true">🛡️</span> Paladino</h3>
+        <div class="cl-col"><h4>Armas</h4><ol><li>Espada sagrada</li><li>Espada longa celestial</li><li>Espadão divino</li><li>Martelo sagrado</li><li>Maça divina</li><li>Lança celestial</li><li>Espada e escudo</li><li>Martelo de julgamento</li></ol></div>
+        <div class="cl-col"><h4>Armaduras</h4><ol><li>Elmo de Paladino</li><li>Peitoral sagrado</li><li>Calças de Paladino</li><li>Luvas sagradas</li><li>Botas de Paladino</li><li>Ombreiras sagradas</li><li>Capa celestial</li></ol></div>
+      </article>
+    </div>
+  </section>
+
+  <section class="bloco" aria-labelledby="t-slots">
+    <div class="bloco-cab"><h2 id="t-slots">Espaços de equipamento</h2></div>
+    <div class="bloco-corpo"><ol class="slots"><li>Arma principal</li><li>Arma secundária / escudo</li><li>Elmo</li><li>Peitoral</li><li>Calças</li><li>Luvas</li><li>Botas</li><li>Ombreiras</li><li>Capa (ou cinto)</li><li>Anel 1</li><li>Anel 2</li><li>Colar</li></ol></div>
+  </section>
+
+  <section class="bloco" aria-labelledby="t-niveis">
+    <div class="bloco-cab"><div><h2 id="t-niveis">Níveis de evolução</h2><p>Preço no Ferreiro: arma / peça de armadura.</p></div></div>
+    <div class="bloco-corpo"><ul class="niveis"><li><i style="background:#B87333"></i><b>Bronze</b><small>a partir do nível 1 · 40 / 25 ouro</small></li><li><i style="background:#8A8E94"></i><b>Ferro</b><small>a partir do nível 16 · 160 / 100 ouro</small></li><li><i style="background:#C9D2DC"></i><b>Aço</b><small>a partir do nível 31 · 480 / 300 ouro</small></li><li><i style="background:#E2B84A"></i><b>Ouro</b><small>a partir do nível 51 · 1.400 / 875 ouro</small></li><li><i style="background:#C8402E"></i><b>Lendário</b><small>a partir do nível 71 · só em chefes</small></li><li><i style="background:#F4F0FF"></i><b>Divino</b><small>a partir do nível 86 · só no Dragão Ancestral</small></li></ul></div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <img src="../assets/simbolo.webp" alt="">
+    <p>DRAKTHAR — O Domínio dos Dragões · © 2026 Bravus Mídia. Todos os direitos reservados.</p>
+    <div class="credito">Desenvolvido por <a href="https://bravusmidia.com.br" target="_blank" rel="noopener">Andrade</a></div>
+  </div>
+</footer>
+
+<a class="zap" href="https://wa.me/5585991225865?text=Ol%C3%A1!%20Quero%20saber%20mais%20sobre%20o%20DRAKTHAR." target="_blank" rel="noopener" aria-label="Falar no WhatsApp">
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.9 11.9 0 0 0 4.6 4c1.7.7 2.4.8 3.2.7.5-.1 1.5-.6 1.8-1.2.2-.6.2-1.1.1-1.2l-.4-.2z"/></svg>
+  <span>Fale com a equipe</span>
+</a>
+</body>
+</html>
