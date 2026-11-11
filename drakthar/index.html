@@ -12,7 +12,8 @@
 <link rel="icon" href="assets/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800;900&family=Rajdhani:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<link rel="preload" as="image" href="assets/hero.jpg" fetchpriority="high">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800;900&family=Rajdhani:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" media="print" onload="this.media='all'">
 <style>
 /* Layout: portal de servidor de MMORPG — faixa de navegação fixa, hero com o brasão,
    blocos em painéis escuros com bordas de brasa, grade de 12 colunas que vira 1 no celular.
@@ -361,15 +362,15 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
     <div class="bloco-cab"><div><h2 id="t-classes">Classes</h2><p>Cinco classes, todas disponíveis. Nenhuma é invencível.</p></div></div>
     <div class="bloco-corpo">
       <div class="classes">
-        <article class="classe"><div class="retrato"><img src="assets/classes/guerreiro.webp" alt="Guerreiro de DRAKTHAR" loading="lazy" width="900" height="900"></div><header><h3>Guerreiro</h3><span class="selo">Lançamento</span></header>
+        <article class="classe"><div class="retrato"><img src="assets/classes/guerreiro.webp" alt="Guerreiro de DRAKTHAR" loading="lazy" width="480" height="480" decoding="async"></div><header><h3>Guerreiro</h3><span class="selo">Lançamento</span></header>
           <dl><dt>Armas</dt><dd>Espada, machado, escudo, espada de duas mãos</dd><dt>Atributos</dt><dd>Força · Vitalidade</dd><dt>Especial</dt><dd class="especial">Fúria de Batalha</dd><dt>Caminhos</dt><dd>Espadachim, Protetor, Mestre de Armas</dd></dl></article>
-        <article class="classe"><div class="retrato"><img src="assets/classes/arqueiro.webp" alt="Arqueiro de DRAKTHAR" loading="lazy" width="900" height="900"></div><header><h3>Arqueiro</h3><span class="selo">Lançamento</span></header>
+        <article class="classe"><div class="retrato"><img src="assets/classes/arqueiro.webp" alt="Arqueiro de DRAKTHAR" loading="lazy" width="480" height="480" decoding="async"></div><header><h3>Arqueiro</h3><span class="selo">Lançamento</span></header>
           <dl><dt>Armas</dt><dd>Arco longo, arco curto, besta</dd><dt>Atributos</dt><dd>Agilidade · Força</dd><dt>Especial</dt><dd class="especial">Chuva de Flechas</dd><dt>Caminhos</dt><dd>Atirador, Rastreador, Caçador</dd></dl></article>
-        <article class="classe"><div class="retrato"><img src="assets/classes/mago.webp" alt="Mago de DRAKTHAR" loading="lazy" width="900" height="900"></div><header><h3>Mago</h3><span class="selo">Lançamento</span></header>
+        <article class="classe"><div class="retrato"><img src="assets/classes/mago.webp" alt="Mago de DRAKTHAR" loading="lazy" width="480" height="480" decoding="async"></div><header><h3>Mago</h3><span class="selo">Lançamento</span></header>
           <dl><dt>Armas</dt><dd>Cajado, varinha, grimório</dd><dt>Atributos</dt><dd>Energia · Agilidade</dd><dt>Especial</dt><dd class="especial">Tempestade Arcana</dd><dt>Caminhos</dt><dd>Piromante, Criomante, Elementalista</dd></dl></article>
-        <article class="classe"><div class="retrato"><img src="assets/classes/paladino.webp" alt="Paladino de DRAKTHAR" loading="lazy" width="900" height="900"></div><header><h3>Paladino</h3><span class="selo">Lançamento</span></header>
+        <article class="classe"><div class="retrato"><img src="assets/classes/paladino.webp" alt="Paladino de DRAKTHAR" loading="lazy" width="480" height="480" decoding="async"></div><header><h3>Paladino</h3><span class="selo">Lançamento</span></header>
           <dl><dt>Armas</dt><dd>Martelo, espada, escudo</dd><dt>Atributos</dt><dd>Vitalidade · Força</dd><dt>Especial</dt><dd class="especial">Julgamento Divino</dd><dt>Caminhos</dt><dd>Templário, Justicar, Guardião Sagrado</dd></dl></article>
-        <article class="classe"><div class="retrato"><img src="assets/classes/berserker.webp" alt="Berserker de DRAKTHAR" loading="lazy" width="900" height="900"></div><header><h3>Berserker</h3><span class="selo">Lançamento</span></header>
+        <article class="classe"><div class="retrato"><img src="assets/classes/berserker.webp" alt="Berserker de DRAKTHAR" loading="lazy" width="480" height="480" decoding="async"></div><header><h3>Berserker</h3><span class="selo">Lançamento</span></header>
           <dl><dt>Armas</dt><dd>Machados</dd><dt>Atributos</dt><dd>Força · Vitalidade</dd><dt>Especial</dt><dd class="especial">Sangue Fervente</dd><dt>Caminhos</dt><dd>Devastador, Bruto, Furioso</dd></dl></article>
       </div>
     </div>
@@ -487,6 +488,7 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
       <div class="bloco-cab"><h2 id="t-noticias">Notícias</h2></div>
       <div class="bloco-corpo">
         <ul class="noticias">
+          <li><div><b>Versão 1.8: trilha sonora e chão realista</b><p>10 músicas de harpa celta e flauta (tecla N liga/desliga), vento ambiente, chão, areia, neve e rochas com textura de foto, sentar de verdade em bancos e montarias, poderes que saem ao apertar 3 a 6 e jogo abrindo mais rápido.</p></div><time datetime="2026-11-11">11/11/2026</time></li>
           <li><div><b>Versão 1.7: Shop e 5 cidades</b><p>Cada classe tem 8 armas e 7 peças de armadura em 6 níveis (Bronze a Divino), com 12 espaços de equipamento. Os monstros derrubam peças da sua classe. Cinco cidades com moradores realistas e fases de nível de 1 a 100. Veja tudo no <a href="shop/">Shop</a>.</p></div><time datetime="2026-11-11">11/11/2026</time></li>
           <li><div><b>Novos reinos!</b><p>Portais nas pontas das estradas levam a Sylvaran (floresta), Vargan (gelo), Kharum (deserto) e às Ruínas dos Goblins. Missões com o Capitão Aldric (tecla E).</p></div><time datetime="2026-11-10">10/11/2026</time></li>
           <li><div><b>DRAKTHAR 1.0 no ar!</b><p>Contas na nuvem, jogadores juntos no mesmo mundo, chat, monstros, Rei Goblin, níveis, pontos (C), baú (V) e asas a partir do nível 5.</p></div><time datetime="2026-11-10">10/11/2026</time></li>
