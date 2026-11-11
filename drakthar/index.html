@@ -138,7 +138,11 @@ input:focus, select:focus { outline: 2px solid var(--brasa); outline-offset: 0; 
 
 /* classes */
 .classes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-.classe { background: var(--carvao); border: 1px solid var(--linha); border-radius: var(--raio); padding: 20px 22px; display: grid; gap: 10px; align-content: start; }
+.classe { background: var(--carvao); border: 1px solid var(--linha); border-radius: var(--raio); padding: 0 22px 20px; display: grid; gap: 10px; align-content: start; overflow: hidden; }
+.classe .retrato { margin: 0 -22px 6px; aspect-ratio: 4 / 3; overflow: hidden; position: relative; border-bottom: 1px solid var(--linha); }
+.classe .retrato img { width: 100%; height: 100%; object-fit: cover; object-position: center 22%; display: block; transition: transform .5s ease; }
+.classe:hover .retrato img { transform: scale(1.05); }
+.classe .retrato::after { content: ""; position: absolute; inset: auto 0 0 0; height: 40%; background: linear-gradient(transparent, var(--carvao)); }
 .classe header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .classe h3 { font-family: var(--f-titulo); font-size: 1.5rem; text-transform: uppercase; }
 .selo { font-family: var(--f-titulo); font-weight: 700; font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; padding: 3px 8px; border-radius: 3px; border: 1px solid var(--ouro); color: var(--ouro); white-space: nowrap; }
@@ -418,15 +422,15 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
     <div class="bloco-cab"><div><h2 id="t-classes">Classes</h2><p>Cinco classes, todas disponíveis. Nenhuma é invencível.</p></div></div>
     <div class="bloco-corpo">
       <div class="classes">
-        <article class="classe"><header><h3>Guerreiro</h3><span class="selo">Lançamento</span></header>
+        <article class="classe"><div class="retrato"><img src="assets/classes/guerreiro.webp" alt="Guerreiro de DRAKTHAR" loading="lazy" width="900" height="900"></div><header><h3>Guerreiro</h3><span class="selo">Lançamento</span></header>
           <dl><dt>Armas</dt><dd>Espada, machado, escudo, espada de duas mãos</dd><dt>Atributos</dt><dd>Força · Vitalidade</dd><dt>Especial</dt><dd class="especial">Fúria de Batalha</dd><dt>Caminhos</dt><dd>Espadachim, Protetor, Mestre de Armas</dd></dl></article>
-        <article class="classe"><header><h3>Arqueiro</h3><span class="selo">Lançamento</span></header>
+        <article class="classe"><div class="retrato"><img src="assets/classes/arqueiro.webp" alt="Arqueiro de DRAKTHAR" loading="lazy" width="900" height="900"></div><header><h3>Arqueiro</h3><span class="selo">Lançamento</span></header>
           <dl><dt>Armas</dt><dd>Arco longo, arco curto, besta</dd><dt>Atributos</dt><dd>Agilidade · Força</dd><dt>Especial</dt><dd class="especial">Chuva de Flechas</dd><dt>Caminhos</dt><dd>Atirador, Rastreador, Caçador</dd></dl></article>
-        <article class="classe"><header><h3>Mago</h3><span class="selo">Lançamento</span></header>
+        <article class="classe"><div class="retrato"><img src="assets/classes/mago.webp" alt="Mago de DRAKTHAR" loading="lazy" width="900" height="900"></div><header><h3>Mago</h3><span class="selo">Lançamento</span></header>
           <dl><dt>Armas</dt><dd>Cajado, varinha, grimório</dd><dt>Atributos</dt><dd>Energia · Agilidade</dd><dt>Especial</dt><dd class="especial">Tempestade Arcana</dd><dt>Caminhos</dt><dd>Piromante, Criomante, Elementalista</dd></dl></article>
-        <article class="classe"><header><h3>Paladino</h3><span class="selo">Lançamento</span></header>
+        <article class="classe"><div class="retrato"><img src="assets/classes/paladino.webp" alt="Paladino de DRAKTHAR" loading="lazy" width="900" height="900"></div><header><h3>Paladino</h3><span class="selo">Lançamento</span></header>
           <dl><dt>Armas</dt><dd>Martelo, espada, escudo</dd><dt>Atributos</dt><dd>Vitalidade · Força</dd><dt>Especial</dt><dd class="especial">Julgamento Divino</dd><dt>Caminhos</dt><dd>Templário, Justicar, Guardião Sagrado</dd></dl></article>
-        <article class="classe"><header><h3>Berserker</h3><span class="selo">Lançamento</span></header>
+        <article class="classe"><div class="retrato"><img src="assets/classes/berserker.webp" alt="Berserker de DRAKTHAR" loading="lazy" width="900" height="900"></div><header><h3>Berserker</h3><span class="selo">Lançamento</span></header>
           <dl><dt>Armas</dt><dd>Machados</dd><dt>Atributos</dt><dd>Força · Vitalidade</dd><dt>Especial</dt><dd class="especial">Sangue Fervente</dd><dt>Caminhos</dt><dd>Devastador, Bruto, Furioso</dd></dl></article>
       </div>
     </div>
@@ -506,7 +510,7 @@ footer p { margin: 0; color: var(--cinza); font-size: .95rem; }
         <div class="etapa feita"><span class="n">Etapa 6 · Concluída</span><b>Multiplayer</b><small>Contas na nuvem, jogadores juntos no mundo</small></div>
         <div class="etapa feita"><span class="n">Etapa 7 · Parcial</span><b>Comunidade</b><small>Chat com filtro. Falta: amigos e guildas</small></div>
         <div class="etapa feita"><span class="n">Etapa 8 · Parcial</span><b>Deuses</b><small>Zeus e GMs: clima e avisos. Falta: painel</small></div>
-        <div class="etapa agora"><span class="n">Etapa 9 · Em andamento</span><b>Expansão</b><small>5 reinos ligados por portais. Falta: mais reinos, sets, dungeons e PvP</small></div>
+        <div class="etapa feita"><span class="n">Etapa 9 · Concluída</span><b>Expansão</b><small>7 reinos, Masmorra do Abismo com o Lich, Arena PvP, conjuntos de armadura e clãs</small></div>
         <div class="etapa feita"><span class="n">Etapa 10 · Versão 1.0</span><b>Lançamento</b><small>No ar em 10/11/2026, grátis no navegador e Windows</small></div>
       </div>
     </div>
