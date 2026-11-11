@@ -293,6 +293,9 @@ body:has(.nav.aberto) .zap { display: none; }
   .noticias li { flex-direction: column; gap: 4px; }
 }
 @media (prefers-reduced-motion: reduce) { .brasao, .fumaca i, .fumaca::before { animation: none; } .btn, .galeria img { transition: none; } }
+.creditos-3d { margin-top: 14px; color: var(--cinza); font-size: .8rem; max-width: 760px; margin-inline: auto; }
+.creditos-3d summary { cursor: pointer; }
+.creditos-3d a { color: var(--ouro-claro); }
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)} body{margin:0} img{max-width:100%} [hidden]{display:none!important}</style>
 <style>
@@ -388,6 +391,12 @@ body:has(.nav.aberto) .zap { display: none; }
   <div class="wrap">
     <img src="../assets/simbolo.webp" alt="">
     <p>DRAKTHAR — O Domínio dos Dragões · © 2026 Bravus Mídia. Todos os direitos reservados.</p>
+    <details class="creditos-3d"><summary>Créditos de modelos e texturas</summary>
+      <p>Animais (Sketchfab, licença <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>):
+      <a href="https://sketchfab.com/3d-models/realistic-animated-bear-3d-model-bffc3c87d2d148ff8533e1cc8a11c9f1" target="_blank" rel="noopener">Realistic Animated Bear</a> e
+      <a href="https://sketchfab.com/3d-models/realistic-animated-elk-3d-model-787834f9caa2474d9f1814b807c072d7" target="_blank" rel="noopener">Realistic Animated Elk</a> por WildMesh 3D.
+      Lobos, cavalos, cervos e gado: Ultimate Animated Animals por Quaternius (CC0). Texturas: Poly Haven (CC0). Personagens e animações: Adobe Mixamo.</p>
+    </details>
     <div class="credito">Desenvolvido por <a href="https://bravusmidia.com.br" target="_blank" rel="noopener">Andrade</a></div>
   </div>
 </footer>

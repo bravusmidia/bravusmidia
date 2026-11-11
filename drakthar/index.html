@@ -294,6 +294,9 @@ body:has(.nav.aberto) .zap { display: none; }
   .noticias li { flex-direction: column; gap: 4px; }
 }
 @media (prefers-reduced-motion: reduce) { .brasao, .fumaca i, .fumaca::before { animation: none; } .btn, .galeria img { transition: none; } }
+.creditos-3d { margin-top: 14px; color: var(--cinza); font-size: .8rem; max-width: 760px; margin-inline: auto; }
+.creditos-3d summary { cursor: pointer; }
+.creditos-3d a { color: var(--ouro-claro); }
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)} body{margin:0} img{max-width:100%} [hidden]{display:none!important}</style>
 </head>
@@ -489,6 +492,7 @@ body:has(.nav.aberto) .zap { display: none; }
       <div class="bloco-cab"><h2 id="t-noticias">Notícias</h2></div>
       <div class="bloco-corpo">
         <ul class="noticias">
+          <li><div><b>Versão 1.11: urso e alce realistas</b><p>Ursos (inimigos e mansos) e alces com modelo realista e animações de andar, correr, atacar, comer e morrer. Créditos dos autores no rodapé.</p></div><time datetime="2026-11-11">11/11/2026</time></li>
           <li><div><b>Versão 1.10: monstros e deuses realistas</b><p>Goblins, Rei Goblin, Esqueletos, Cavaleiro Negro e Lich com modelos e animações realistas. Lobos, cavalos, cervos, raposas e gado animados. Árvores com folhas de verdade, cada cidade com as suas paredes e telhados, deuses gregos com toga, coroa de louros e o seu símbolo, e todos os humanos na mesma altura.</p></div><time datetime="2026-11-11">11/11/2026</time></li>
           <li><div><b>Versão 1.9: 15 habilidades do Guerreiro</b><p>Barra com 9 habilidades (teclas 1 a 9), livro de habilidades (K) com evolução por pontos, sangramento, atordoar e lentidão nos monstros, barra de vida em todos os monstros, nadar no rio, câmera pelas setas e pelo mouse na borda da tela. Poções agora em H e J.</p></div><time datetime="2026-11-11">11/11/2026</time></li>
           <li><div><b>Versão 1.8: trilha sonora e chão realista</b><p>10 músicas de harpa celta e flauta (tecla N liga/desliga), vento ambiente, chão, areia, neve e rochas com textura de foto, sentar de verdade em bancos e montarias, poderes que saem ao apertar 3 a 6 e jogo abrindo mais rápido.</p></div><time datetime="2026-11-11">11/11/2026</time></li>
@@ -543,6 +547,12 @@ body:has(.nav.aberto) .zap { display: none; }
   <div class="wrap">
     <img src="assets/simbolo.webp" alt="">
     <p>DRAKTHAR — O Domínio dos Dragões · © 2026 Bravus Mídia. Todos os direitos reservados.</p>
+    <details class="creditos-3d"><summary>Créditos de modelos e texturas</summary>
+      <p>Animais (Sketchfab, licença <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>):
+      <a href="https://sketchfab.com/3d-models/realistic-animated-bear-3d-model-bffc3c87d2d148ff8533e1cc8a11c9f1" target="_blank" rel="noopener">Realistic Animated Bear</a> e
+      <a href="https://sketchfab.com/3d-models/realistic-animated-elk-3d-model-787834f9caa2474d9f1814b807c072d7" target="_blank" rel="noopener">Realistic Animated Elk</a> por WildMesh 3D.
+      Lobos, cavalos, cervos e gado: Ultimate Animated Animals por Quaternius (CC0). Texturas: Poly Haven (CC0). Personagens e animações: Adobe Mixamo.</p>
+    </details>
     <div class="credito">Desenvolvido por <a href="https://bravusmidia.com.br" target="_blank" rel="noopener">Andrade</a></div>
   </div>
 </footer>
