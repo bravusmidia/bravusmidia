@@ -318,7 +318,8 @@ body.paginas .hero { display: none; }
 body.paginas.inicio .hero { display: block; }
 body.paginas main > .bloco-pilares { display: none; }
 body.paginas.inicio main > .bloco-pilares { display: block; }
-.deus .simbolo img { width: 58px !important; height: 58px !important; }
+.deus .simbolo { width: 92px !important; height: 84px !important; }
+.deus .simbolo img { width: 92px !important; height: 84px !important; object-fit: contain; }
 .menu a.atual { color: var(--ouro-claro, #f3d27a); border-bottom: 2px solid var(--ouro, #c9a24a); }
 </style>
 <script>
@@ -733,7 +734,7 @@ document.addEventListener("DOMContentLoaded", function () {
       var st = status && status[d[0]];
       var on = !!(st && st.online);
       var onde = on ? (st.onde === "jogo" ? "Online no jogo" : "Online no site") : "Offline";
-      return '<div class="deus' + (i === 0 ? ' zeus' : '') + '"><span class="simbolo" title="Símbolo de ' + d[0] + '">' + (SIMBOLOS[d[0]] || d[0].charAt(0)) + '</span><div><b>' + d[0] +
+      return '<div class="deus' + (i === 0 ? ' zeus' : '') + '"><span class="simbolo" title="Símbolo de ' + d[0] + '">' + '<img src="assets/simbolos/' + d[0].toLowerCase() + '.webp?v=2" alt="Emblema de ' + d[0] + '" loading="lazy">' + '</span><div><b>' + d[0] +
         ' <span class="cargo">' + d[2] + '</span><i class="status-dot' + (on ? ' on' : '') + '" title="' + onde + '" aria-label="' + onde + '"></i></b><small>' + d[1] + '</small></div></div>';
     }).join("");
   }
