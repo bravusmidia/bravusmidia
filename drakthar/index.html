@@ -383,7 +383,7 @@ body:has(.nav.aberto) .zap { display: none; }
   <div class="bloco">
     <div class="pilares">
       <div class="pilar"><b>01</b><h3>Mundo 3D</h3><p>Vila, castelo, rio e florestas com luz e sombras em tempo real.</p></div>
-      <div class="pilar"><b>02</b><h3>Clima vivo</h3><p>Chuva, tempestade, neve e neblina mudam a velocidade e as magias.</p></div>
+      <div class="pilar"><b>02</b><h3>Clima vivo</h3><p>Sol, nuvens e chuva mudam com o tempo; os Deuses trazem tempestade e neve quando querem.</p></div>
       <div class="pilar"><b>03</b><h3>Progressão justa</h3><p>Do nível 1 ao 100 em cerca de 5 meses, jogando 1 hora por dia.</p></div>
       <div class="pilar"><b>04</b><h3>Comunidade</h3><p>Grupos, guildas, chat e guerras de guildas em áreas de PvP.</p></div>
       <div class="pilar"><b>05</b><h3>Proteção</h3><p>Perfil infantil com controle dos pais e chat filtrado.</p></div>
@@ -570,12 +570,12 @@ body:has(.nav.aberto) .zap { display: none; }
 (function () {
   // ---- Agenda mundial de clima: mesma regra do jogo (game/scripts/systems/weather_manager.gd)
   var CLIMAS = [
-    ["limpo", "Céu limpo", 40, "Sem efeitos no jogo"],
-    ["nublado", "Nublado", 22, "Luz mais fria, sem efeitos"],
+    ["limpo", "Céu limpo", 70, "Sem efeitos no jogo"],
+    ["nublado", "Nublado", 12, "Luz mais fria, sem efeitos"],
     ["chuva", "Chuva", 18, "Movimento −5% · Fogo −10% · Raio +10%"],
-    ["tempestade", "Tempestade", 6, "Movimento −10% · Raio +20% · Relâmpagos"],
-    ["neve", "Neve", 6, "Movimento −15% · Gelo +15%"],
-    ["neblina", "Neblina", 8, "Visão reduzida"]
+    ["tempestade", "Tempestade", 0, "Movimento −10% · Raio +20% · Relâmpagos"],
+    ["neve", "Neve", 0, "Movimento −15% · Gelo +15%"],
+    ["neblina", "Neblina", 0, "Visão reduzida"]
   ];
   var SLOT = 300;
   function h32(n) {
