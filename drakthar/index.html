@@ -308,7 +308,8 @@ body:has(.nav.aberto) .zap { display: none; }
 <style>
 .deus .simbolo { width: 64px; height: 64px; border: 0 !important; background: none !important; box-shadow: none !important; display: grid; place-items: center; }
 .deus .simbolo img { width: 64px; height: 64px; filter: drop-shadow(0 4px 10px rgba(0,0,0,.6)); }
-.patente .medalha-img { width: 72px; height: 72px; display: block; filter: drop-shadow(0 6px 12px rgba(0,0,0,.55)); margin-bottom: 6px; }
+.patente .medalha-img { width: 100%; max-width: 170px; height: auto; display: block; margin: 0 auto 10px; filter: drop-shadow(0 8px 16px rgba(0,0,0,.6)); }
+.patente { text-align: center; }
 /* cada área do site é uma página própria, aberta pelo menu */
 body.paginas main > section, body.paginas main > .duas { display: none; }
 body.paginas main > .pagina-ativa { display: block; }
@@ -708,7 +709,7 @@ document.addEventListener("DOMContentLoaded", function () {
   $("patentes").innerHTML = faixas.map(function (f, i) {
     var top = (lista || []).filter(function (p) { return p.nivel > i * 20 && p.nivel <= (i + 1) * 20; }).slice(0, 3);
     var corpo = top.length ? top.map(function (p, k) { return '<span class="top">' + (k + 1) + 'º ' + String(p.nome).replace(/[<>&"]/g, "") + ' · Nv ' + p.nivel + '</span>'; }).join("") : '<span class="vazio">Sem jogadores ainda</span>';
-    return '<div class="patente"><img class="medalha-img" src="assets/simbolos/patente_' + ["recruta", "cavaleiro", "guardiao", "soberano", "deus_guerra"][i] + '.webp" alt="" width="72" height="72"><h3>' + f[0] + '</h3><small>' + f[1] + '</small>' + corpo + '</div>';
+    return '<div class="patente"><img class="medalha-img" src="assets/simbolos/patente_' + ["recruta", "cavaleiro", "guardiao", "soberano", "deus_guerra"][i] + '.webp" alt="' + f[0] + ' — ' + f[1] + '" loading="lazy">' + corpo + '</div>';
   }).join("");
   }
   desenharPatentes([]);
