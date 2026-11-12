@@ -374,7 +374,7 @@ body:has(.nav.aberto) .zap { display: none; }
           <dl><dt>Armas</dt><dd>Cajado, varinha, grimório</dd><dt>Atributos</dt><dd>Energia · Agilidade</dd><dt>Especial</dt><dd class="especial">Tempestade Arcana</dd><dt>Caminhos</dt><dd>Piromante, Criomante, Elementalista</dd></dl></article>
         <article class="classe"><div class="retrato"><img src="assets/classes/paladino.webp" alt="Paladino de DRAKTHAR" loading="lazy" width="480" height="480" decoding="async"></div><header><h3>Paladino</h3><span class="selo">Lançamento</span></header>
           <dl><dt>Armas</dt><dd>Martelo, espada, escudo</dd><dt>Atributos</dt><dd>Vitalidade · Força</dd><dt>Especial</dt><dd class="especial">Julgamento Divino</dd><dt>Caminhos</dt><dd>Templário, Justicar, Guardião Sagrado</dd></dl></article>
-        <article class="classe"><div class="retrato"><img src="assets/classes/berserker.webp" alt="Berserker de DRAKTHAR" loading="lazy" width="480" height="480" decoding="async"></div><header><h3>Berserker</h3><span class="selo">Lançamento</span></header>
+        <article class="classe"><div class="retrato"><img src="assets/classes/berserker.webp" alt="Bárbaro de DRAKTHAR" loading="lazy" width="480" height="480" decoding="async"></div><header><h3>Bárbaro</h3><span class="selo">Lançamento</span></header>
           <dl><dt>Armas</dt><dd>Machados</dd><dt>Atributos</dt><dd>Força · Vitalidade</dd><dt>Especial</dt><dd class="especial">Sangue Fervente</dd><dt>Caminhos</dt><dd>Devastador, Bruto, Furioso</dd></dl></article>
       </div>
     </div>
@@ -545,7 +545,7 @@ body:has(.nav.aberto) .zap { display: none; }
         <div class="etapa feita"><span class="n">Etapa 6 · Concluída</span><b>Multiplayer</b><small>Contas na nuvem, jogadores juntos no mundo</small></div>
         <div class="etapa feita"><span class="n">Etapa 7 · Parcial</span><b>Comunidade</b><small>Chat com filtro. Falta: amigos e guildas</small></div>
         <div class="etapa feita"><span class="n">Etapa 8 · Parcial</span><b>Deuses</b><small>Zeus e GMs: clima e avisos. Falta: painel</small></div>
-        <div class="etapa feita"><span class="n">Etapa 9 · Concluída</span><b>Expansão</b><small>5 cidades com moradores realistas (Vila Inicial, Cidade Imperial, Cidade Élfica, Cidade do Deserto, Fortaleza Sombria), fases de nível 1–100, Masmorra do Abismo, Arena PvP e clãs</small></div>
+        <div class="etapa feita"><span class="n">Etapa 9 · Concluída</span><b>Expansão</b><small>5 cidades com moradores realistas (Vila Inicial, Andradina, Cidade Élfica, Cidade do Deserto, Fortaleza Sombria), fases de nível 1–100, Masmorra do Abismo, Arena PvP e clãs</small></div>
         <div class="etapa feita"><span class="n">Etapa 10 · Versão 1.0</span><b>Lançamento</b><small>No ar em 10/11/2026, grátis no navegador e Windows</small></div>
       </div>
     </div>
@@ -711,7 +711,7 @@ body:has(.nav.aberto) .zap { display: none; }
 
   // ---- Contas do jogo: usuário + PIN de 4 números (sem e-mail). Mesma conta no site e no jogo.
   function avisar(el, texto, ok) { el.textContent = texto; el.hidden = !texto; el.classList.toggle("ok", !!ok); }
-  var CLASSES = { guerreiro: "Guerreiro", arqueiro: "Arqueiro", mago: "Mago", paladino: "Paladino", berserker: "Berserker" };
+  var CLASSES = { guerreiro: "Guerreiro", arqueiro: "Arqueiro", mago: "Mago", paladino: "Paladino", berserker: "Bárbaro" };
   var DEUSES = ["zeus", "ares", "hades", "poseidon", "apolo"];
   var sessao = null;
   function lerSessao() { try { return JSON.parse(localStorage.getItem("drakthar_sessao2") || "null"); } catch (e) { return null; } }
