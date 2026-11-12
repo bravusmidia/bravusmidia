@@ -97,8 +97,8 @@ table { max-width: 100%; }
 .btn.primario { background: linear-gradient(180deg, var(--brasa), var(--brasa-escura)); border-color: #ff7a45; color: #fff; box-shadow: 0 8px 28px color-mix(in srgb, var(--brasa) 35%, transparent); }
 .btn.ouro { border-color: var(--ouro); color: var(--ouro-claro); }
 .hero-lado { display: grid; gap: 16px; justify-items: center; }
-.brasao { position: relative; width: min(340px, 80%); filter: drop-shadow(0 20px 50px color-mix(in srgb, var(--brasa) 40%, transparent)); animation: respira 6s ease-in-out infinite; }
-@keyframes respira { 50% { transform: translateY(-6px); filter: drop-shadow(0 26px 60px color-mix(in srgb, var(--brasa) 55%, transparent)); } }
+.brasao { position: relative; width: min(340px, 80%); filter: drop-shadow(0 20px 50px color-mix(in srgb, var(--brasa) 40%, transparent)); animation: respira 4.5s ease-in-out infinite !important; }
+@keyframes respira { 0%, 100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-18px) rotate(1.2deg); filter: drop-shadow(0 34px 60px color-mix(in srgb, var(--brasa) 60%, transparent)); } }
 
 .cartao-clima { width: 100%; max-width: 420px; box-sizing: border-box; min-width: 0; display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; padding: 16px 18px; background: color-mix(in srgb, var(--painel) 90%, transparent); border: 1px solid var(--linha); border-radius: 6px; }
 .icone-clima { width: 64px; height: 64px; border: 1px solid var(--linha); border-radius: var(--raio); display: grid; place-items: center; background: var(--carvao); }
@@ -180,7 +180,7 @@ input:focus, select:focus { outline: 2px solid var(--brasa); outline-offset: 0; 
 .fumaca { position: absolute; left: 81.5%; top: 37%; width: 0; height: 0; pointer-events: none; }
 .fumaca i { position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%;
   background: radial-gradient(circle, rgba(240,235,226,.9) 0%, rgba(200,192,180,.5) 42%, rgba(160,150,135,0) 72%);
-  filter: blur(1.5px); opacity: 0; animation: fumaca 3.6s ease-out infinite; }
+  filter: blur(1.5px); opacity: 0; animation: fumaca 3.2s ease-out infinite !important; }
 .fumaca i:nth-child(2) { animation-delay: .45s; } .fumaca i:nth-child(3) { animation-delay: .9s; }
 .fumaca i:nth-child(4) { animation-delay: 1.35s; } .fumaca i:nth-child(5) { animation-delay: 1.8s; }
 .fumaca i:nth-child(6) { animation-delay: 2.25s; } .fumaca i:nth-child(7) { animation-delay: 2.7s; }
@@ -229,7 +229,8 @@ input:focus, select:focus { outline: 2px solid var(--brasa); outline-offset: 0; 
 .tabela-info div span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
 .info-lado { display: grid; gap: 14px; justify-items: stretch; text-align: center; }
 .info-lado img { width: 180px; margin: 0 auto; }
-.noticias { list-style: none; margin: 0; padding: 0; }
+.noticias { list-style: none; margin: 0; padding: 0 10px 0 0; max-height: 420px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--ouro, #c9a24a) transparent; }
+.noticias::-webkit-scrollbar { width: 8px; } .noticias::-webkit-scrollbar-thumb { background: #8a6a2a; border-radius: 8px; }
 .noticias li { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--linha); }
 .noticias li:last-child { border-bottom: 0; }
 .noticias b { font-family: var(--f-titulo); font-size: 1.12rem; text-transform: uppercase; }
@@ -293,12 +294,47 @@ body:has(.nav.aberto) .zap { display: none; }
   .form-botoes { grid-template-columns: minmax(0, 1fr); }
   .noticias li { flex-direction: column; gap: 4px; }
 }
-@media (prefers-reduced-motion: reduce) { .brasao, .fumaca i, .fumaca::before { animation: none; } .btn, .galeria img { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .btn, .galeria img { transition: none; } }
 .creditos-3d { margin-top: 14px; color: var(--cinza); font-size: .8rem; max-width: 760px; margin-inline: auto; }
 .creditos-3d summary { cursor: pointer; }
 .creditos-3d a { color: var(--ouro-claro); }
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)} body{margin:0} img{max-width:100%} [hidden]{display:none!important}</style>
+<style>
+.deus .simbolo { width: 64px; height: 64px; border: 0 !important; background: none !important; box-shadow: none !important; display: grid; place-items: center; }
+.deus .simbolo img { width: 64px; height: 64px; filter: drop-shadow(0 4px 10px rgba(0,0,0,.6)); }
+.patente .medalha-img { width: 72px; height: 72px; display: block; filter: drop-shadow(0 6px 12px rgba(0,0,0,.55)); margin-bottom: 6px; }
+/* cada área do site é uma página própria, aberta pelo menu */
+body.paginas main > section, body.paginas main > .duas { display: none; }
+body.paginas main > .pagina-ativa { display: block; }
+body.paginas main > .duas.pagina-ativa { display: grid; }
+body.paginas .hero { display: none; }
+body.paginas.inicio .hero { display: block; }
+body.paginas main > .bloco-pilares { display: none; }
+body.paginas.inicio main > .bloco-pilares { display: block; }
+.deus .simbolo img { width: 58px !important; height: 58px !important; }
+.menu a.atual { color: var(--ouro-claro, #f3d27a); border-bottom: 2px solid var(--ouro, #c9a24a); }
+</style>
+<script>
+// navegação em páginas: o menu mostra só a área escolhida (Início mostra a capa, as informações e as notícias)
+document.addEventListener("DOMContentLoaded", function () {
+  var main = document.querySelector("main"); if (!main) return;
+  document.body.classList.add("paginas");
+  function mostrar() {
+    var id = (location.hash || "#inicio").slice(1);
+    var alvo = document.getElementById(id);
+    if (!alvo || alvo.tagName === "HEADER" || !main.contains(alvo)) id = "inicio";
+    var bloco = id === "inicio" ? null : document.getElementById(id);
+    while (bloco && bloco.parentElement !== main) bloco = bloco.parentElement;
+    Array.prototype.forEach.call(main.children, function (c) { c.classList.toggle("pagina-ativa", id === "inicio" ? c.id === "informacoes" : c === bloco); });
+    document.body.classList.toggle("inicio", id === "inicio");
+    document.querySelectorAll(".menu a").forEach(function (a) { a.classList.toggle("atual", a.getAttribute("href") === "#" + id); });
+    window.scrollTo(0, 0);
+  }
+  window.addEventListener("hashchange", mostrar);
+  mostrar();
+});
+</script>
 </head>
 <body>
 
@@ -309,7 +345,6 @@ body:has(.nav.aberto) .zap { display: none; }
     <button class="menu-botao" type="button" aria-label="Abrir menu" aria-expanded="false" onclick="var n=this.closest('.nav');var a=n.classList.toggle('aberto');this.setAttribute('aria-expanded',a);this.textContent=a?'✕':'☰'">☰</button>
     <div class="menu" onclick="if(event.target.tagName==='A'){var n=this.closest('.nav');n.classList.remove('aberto');var b=n.querySelector('.menu-botao');b.textContent='☰';b.setAttribute('aria-expanded','false')}">
       <a href="#inicio">Início</a>
-      <a href="#clima">Clima</a>
       <a href="#conta">Conta</a>
       <a href="#classes">Classes</a>
       <a href="#ranking">Ranking</a>
@@ -340,7 +375,7 @@ body:has(.nav.aberto) .zap { display: none; }
         <img src="assets/simbolo.webp" alt="Brasão de DRAKTHAR: dragão dourado sobre escudo azul">
         <div class="fumaca" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
       </div>
-      <div class="cartao-clima" aria-live="polite">
+      <div class="cartao-clima" aria-live="polite" hidden>
         <div class="icone-clima" id="hero-icone"></div>
         <div>
           <div class="rotulo">Agora em Eldoria</div>
@@ -380,7 +415,7 @@ body:has(.nav.aberto) .zap { display: none; }
     </div>
   </section>
 
-  <div class="bloco">
+  <div class="bloco bloco-pilares">
     <div class="pilares">
       <div class="pilar"><b>01</b><h3>Mundo 3D</h3><p>Vila, castelo, rio e florestas com luz e sombras em tempo real.</p></div>
       <div class="pilar"><b>02</b><h3>Clima vivo</h3><p>Sol, nuvens e chuva mudam com o tempo; os Deuses trazem tempestade e neve quando querem.</p></div>
@@ -390,7 +425,7 @@ body:has(.nav.aberto) .zap { display: none; }
     </div>
   </div>
 
-  <section class="bloco" id="clima" aria-labelledby="t-clima">
+  <section class="bloco" id="clima" aria-labelledby="t-clima" hidden>
     <div class="bloco-cab">
       <div><h2 id="t-clima">Próximas mudanças de clima</h2><p>Agenda mundial de Eldoria. O jogo usa a mesma agenda, então o céu daqui é o céu de lá.</p></div>
     </div>
@@ -662,7 +697,7 @@ body:has(.nav.aberto) .zap { display: none; }
   $("patentes").innerHTML = faixas.map(function (f, i) {
     var top = (lista || []).filter(function (p) { return p.nivel > i * 20 && p.nivel <= (i + 1) * 20; }).slice(0, 3);
     var corpo = top.length ? top.map(function (p, k) { return '<span class="top">' + (k + 1) + 'º ' + String(p.nome).replace(/[<>&"]/g, "") + ' · Nv ' + p.nivel + '</span>'; }).join("") : '<span class="vazio">Sem jogadores ainda</span>';
-    return '<div class="patente"><svg class="medalha" viewBox="0 0 44 44" aria-hidden="true"><path d="M22 3l16 7v11c0 10-7 17-16 20C13 38 6 31 6 21V10z" fill="' + tons[i] + '" opacity=".18" stroke="' + tons[i] + '" stroke-width="1.6"/><text x="22" y="27" text-anchor="middle" font-family="Cinzel, serif" font-weight="800" font-size="13" fill="' + tons[i] + '">' + "I II III IV V".split(" ")[i] + '</text></svg><h3>' + f[0] + '</h3><small>' + f[1] + '</small>' + corpo + '</div>';
+    return '<div class="patente"><img class="medalha-img" src="assets/simbolos/patente_' + ["recruta", "cavaleiro", "guardiao", "soberano", "deus_guerra"][i] + '.webp" alt="" width="72" height="72"><h3>' + f[0] + '</h3><small>' + f[1] + '</small>' + corpo + '</div>';
   }).join("");
   }
   desenharPatentes([]);

@@ -317,6 +317,25 @@ body:has(.nav.aberto) .zap { display: none; }
 @media (max-width: 960px) { .shop-grade { grid-template-columns: minmax(0, 1fr); } .slots { columns: 2; } .niveis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .cl { grid-template-columns: minmax(0, 1fr); } .slots { columns: 1; } .niveis { grid-template-columns: minmax(0, 1fr); } }
 </style>
+<style>
+.cl-col li button { all: unset; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 3px 4px; border-radius: 6px; width: 100%; }
+.cl-col li button:hover, .cl-col li button:focus-visible { background: rgba(232,184,72,.12); color: var(--ouro-claro, #f3d27a); }
+.cl-col li button img { width: 30px; height: 30px; object-fit: contain; flex: none; filter: drop-shadow(0 2px 4px rgba(0,0,0,.6)); }
+.cl-col ol { list-style: none; padding-left: 0; }
+.grade-itens { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.grade-itens button { all: unset; cursor: pointer; display: grid; justify-items: center; gap: 6px; padding: 12px 8px; border: 1px solid rgba(232,184,72,.25); border-radius: 10px; background: rgba(0,0,0,.25); text-align: center; font-size: .9rem; }
+.grade-itens button:hover { border-color: var(--ouro, #e8b848); }
+.grade-itens img { width: 64px; height: 64px; object-fit: contain; }
+.visor { position: fixed; inset: 0; background: rgba(0,0,0,.78); display: grid; place-items: center; z-index: 50; padding: 16px; }
+.visor-caixa { background: #121014; border: 1px solid var(--ouro, #e8b848); border-radius: 14px; max-width: 760px; width: 100%; padding: 20px; position: relative; max-height: 90vh; overflow: auto; }
+.visor-caixa h3 { margin: 0 0 4px; font-family: var(--f-titulo, serif); text-transform: uppercase; }
+.visor-caixa .fechar { position: absolute; top: 10px; right: 12px; background: none; border: 1px solid #555; color: #ddd; border-radius: 8px; width: 34px; height: 34px; cursor: pointer; font-size: 1.1rem; }
+.visor-niveis { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin-top: 14px; }
+.visor-niveis figure { margin: 0; text-align: center; background: rgba(255,255,255,.03); border-radius: 10px; padding: 10px 6px; border: 1px solid rgba(255,255,255,.08); }
+.visor-niveis img { width: 96px; height: 96px; object-fit: contain; }
+.visor-niveis figcaption { font-size: .85rem; } .visor-niveis figcaption b { display: block; }
+.visor-unico { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; margin-top: 10px; } .visor-unico img { width: 160px; height: 160px; object-fit: contain; }
+</style>
 </head>
 <body>
 
@@ -326,7 +345,6 @@ body:has(.nav.aberto) .zap { display: none; }
     <button class="menu-botao" type="button" aria-label="Abrir menu" aria-expanded="false" onclick="var n=this.closest('.nav');var a=n.classList.toggle('aberto');this.setAttribute('aria-expanded',a);this.textContent=a?'✕':'☰'">☰</button>
     <div class="menu" onclick="if(event.target.tagName==='A'){var n=this.closest('.nav');n.classList.remove('aberto');var b=n.querySelector('.menu-botao');b.textContent='☰';b.setAttribute('aria-expanded','false')}">
       <a href="../#inicio">Início</a>
-      <a href="../#clima">Clima</a>
       <a href="../#conta">Conta</a>
       <a href="../#classes">Classes</a>
       <a href="../#ranking">Ranking</a>
@@ -341,49 +359,33 @@ body:has(.nav.aberto) .zap { display: none; }
 
 <main class="wrap">
   <h1 class="shop-h1">Shop</h1>
-  <p class="shop-intro">Armas e armaduras das cinco classes. Os níveis Bronze, Ferro, Aço e Ouro são vendidos pelo Ferreiro Arkan, na Vila Inicial e na Cidade Imperial. Lendário e Divino só caem de chefes. Cada monstro derruba uma peça por vez.</p>
+  <p class="shop-intro">Armas e armaduras das cinco classes. Os níveis Bronze, Ferro, Aço e Ouro são vendidos pelo Ferreiro Arkan, em todas as cidades. Lendário e Divino só caem de chefes. Cada monstro derruba uma peça por vez.</p>
 
   <section class="bloco" aria-labelledby="t-resumo">
     <div class="bloco-cab"><h2 id="t-resumo">Estrutura inicial</h2></div>
     <div class="bloco-corpo resumo">
-      <span><b>5</b> classes</span><span><b>40</b> armas</span><span><b>35</b> peças de armadura</span><span><b>12</b> espaços de equipamento</span><span><b>6</b> níveis de evolução</span>
+      <span><b>5</b> classes</span><span><b>40</b> armas</span><span><b>35</b> peças de armadura</span><span><b>14</b> espaços de equipamento</span><span><b>6</b> níveis de evolução</span>
     </div>
   </section>
 
   <section class="bloco" aria-labelledby="t-classes-shop">
     <div class="bloco-cab"><h2 id="t-classes-shop">Equipamentos por classe</h2></div>
-    <div class="bloco-corpo shop-grade">
-      <article class="cl"><h3><span aria-hidden="true">⚔️</span> Guerreiro</h3>
-        <div class="cl-col"><h4>Armas</h4><ol><li>Espada curta</li><li>Espada longa</li><li>Espada larga</li><li>Espadão de duas mãos</li><li>Machado de batalha</li><li>Lança de guerra</li><li>Espadas duplas</li><li>Machado pesado</li></ol></div>
-        <div class="cl-col"><h4>Armaduras</h4><ol><li>Elmo de Guerreiro</li><li>Peitoral de Guerreiro</li><li>Calças de Guerreiro</li><li>Luvas de Guerreiro</li><li>Botas de Guerreiro</li><li>Escudo de Guerreiro</li><li>Capa de Guerreiro</li></ol></div>
-      </article>
-      <article class="cl"><h3><span aria-hidden="true">🔥</span> Berserker</h3>
-        <div class="cl-col"><h4>Armas</h4><ol><li>Machado gigante</li><li>Machado duplo</li><li>Machado de duas mãos</li><li>Martelo de guerra</li><li>Maça brutal</li><li>Espadão colossal</li><li>Martelo com espinhos</li><li>Machado sangrento</li></ol></div>
-        <div class="cl-col"><h4>Armaduras</h4><ol><li>Elmo de Berserker</li><li>Peitoral de Berserker</li><li>Calças de Berserker</li><li>Luvas de Berserker</li><li>Botas de Berserker</li><li>Ombreiras de Berserker</li><li>Cinto de guerra</li></ol></div>
-      </article>
-      <article class="cl"><h3><span aria-hidden="true">🔮</span> Mago</h3>
-        <div class="cl-col"><h4>Armas</h4><ol><li>Cajado arcano</li><li>Cajado elemental</li><li>Cajado sombrio</li><li>Varinha mágica</li><li>Orbe mágico</li><li>Livro de feitiços</li><li>Cajado celestial</li><li>Cajado do dragão</li></ol></div>
-        <div class="cl-col"><h4>Armaduras</h4><ol><li>Capuz de Mago</li><li>Peitoral arcano</li><li>Calças arcanas</li><li>Luvas mágicas</li><li>Botas arcanas</li><li>Manto mágico</li><li>Cinto arcano</li></ol></div>
-      </article>
-      <article class="cl"><h3><span aria-hidden="true">🏹</span> Arqueira</h3>
-        <div class="cl-col"><h4>Armas</h4><ol><li>Arco curto</li><li>Arco longo</li><li>Arco élfico</li><li>Arco composto</li><li>Arco elemental</li><li>Besta leve</li><li>Besta pesada</li><li>Adagas duplas</li></ol></div>
-        <div class="cl-col"><h4>Armaduras</h4><ol><li>Capuz de Arqueira</li><li>Peitoral de Arqueira</li><li>Calças de Arqueira</li><li>Luvas de Arqueira</li><li>Botas de Arqueira</li><li>Ombreiras de Arqueira</li><li>Cinto de Arqueira</li></ol></div>
-      </article>
-      <article class="cl"><h3><span aria-hidden="true">🛡️</span> Paladino</h3>
-        <div class="cl-col"><h4>Armas</h4><ol><li>Espada sagrada</li><li>Espada longa celestial</li><li>Espadão divino</li><li>Martelo sagrado</li><li>Maça divina</li><li>Lança celestial</li><li>Espada e escudo</li><li>Martelo de julgamento</li></ol></div>
-        <div class="cl-col"><h4>Armaduras</h4><ol><li>Elmo de Paladino</li><li>Peitoral sagrado</li><li>Calças de Paladino</li><li>Luvas sagradas</li><li>Botas de Paladino</li><li>Ombreiras sagradas</li><li>Capa celestial</li></ol></div>
-      </article>
-    </div>
+    <div class="bloco-corpo shop-grade" id="shop-classes"></div>
+  </section>
+
+  <section class="bloco" aria-labelledby="t-especiais">
+    <div class="bloco-cab"><div><h2 id="t-especiais">Pedras, pets e asas</h2><p>Clique em cada um para ver a foto. As pedras caem dos monstros; o filhote vem da 1ª missão do capitão; a Asa de Aprendiz é a bênção de um deus.</p></div></div>
+    <div class="bloco-corpo grade-itens" id="shop-especiais"></div>
   </section>
 
   <section class="bloco" aria-labelledby="t-slots">
     <div class="bloco-cab"><h2 id="t-slots">Espaços de equipamento</h2></div>
-    <div class="bloco-corpo"><ol class="slots"><li>Arma principal</li><li>Arma secundária / escudo</li><li>Elmo</li><li>Peitoral</li><li>Calças</li><li>Luvas</li><li>Botas</li><li>Ombreiras</li><li>Capa (ou cinto)</li><li>Anel 1</li><li>Anel 2</li><li>Colar</li></ol></div>
+    <div class="bloco-corpo"><ol class="slots"><li>Arma principal</li><li>Arma secundária / escudo</li><li>Elmo</li><li>Peitoral</li><li>Calças</li><li>Luvas</li><li>Botas</li><li>Ombreiras</li><li>Capa (ou cinto)</li><li>Anel 1</li><li>Anel 2</li><li>Colar</li><li>Asas</li><li>Pet</li></ol></div>
   </section>
 
   <section class="bloco" aria-labelledby="t-niveis">
     <div class="bloco-cab"><div><h2 id="t-niveis">Níveis de evolução</h2><p>Preço no Ferreiro: arma / peça de armadura.</p></div></div>
-    <div class="bloco-corpo"><ul class="niveis"><li><i style="background:#B87333"></i><b>Bronze</b><small>a partir do nível 1 · 40 / 25 ouro</small></li><li><i style="background:#8A8E94"></i><b>Ferro</b><small>a partir do nível 16 · 160 / 100 ouro</small></li><li><i style="background:#C9D2DC"></i><b>Aço</b><small>a partir do nível 31 · 480 / 300 ouro</small></li><li><i style="background:#E2B84A"></i><b>Ouro</b><small>a partir do nível 51 · 1.400 / 875 ouro</small></li><li><i style="background:#C8402E"></i><b>Lendário</b><small>a partir do nível 71 · só em chefes</small></li><li><i style="background:#F4F0FF"></i><b>Divino</b><small>a partir do nível 86 · só no Dragão Ancestral</small></li></ul></div>
+    <div class="bloco-corpo"><ul class="niveis"><li><i style="background:#B87333"></i><b>Bronze</b><small>a partir do nível 1 · 40 / 25 Gold</small></li><li><i style="background:#8A8E94"></i><b>Ferro</b><small>a partir do nível 16 · 160 / 100 Gold</small></li><li><i style="background:#C9D2DC"></i><b>Aço</b><small>a partir do nível 31 · 480 / 300 Gold</small></li><li><i style="background:#E2B84A"></i><b>Ouro</b><small>a partir do nível 51 · 1.400 / 875 Gold</small></li><li><i style="background:#C8402E"></i><b>Lendário</b><small>a partir do nível 71 · só em chefes</small></li><li><i style="background:#F4F0FF"></i><b>Divino</b><small>a partir do nível 86 · só no Dragão Ancestral</small></li></ul></div>
   </section>
 </main>
 
@@ -405,5 +407,46 @@ body:has(.nav.aberto) .zap { display: none; }
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.9 11.9 0 0 0 4.6 4c1.7.7 2.4.8 3.2.7.5-.1 1.5-.6 1.8-1.2.2-.6.2-1.1.1-1.2l-.4-.2z"/></svg>
   <span>Fale com a equipe</span>
 </a>
+<div class="visor" id="visor" hidden><div class="visor-caixa" role="dialog" aria-modal="true" aria-labelledby="visor-titulo"><button class="fechar" type="button" aria-label="Fechar">✕</button><div id="visor-corpo"></div></div></div>
+<script>
+(function () {
+  var NIV = [["bronze", "Bronze", "nível 1", "#B87333", 1.0], ["ferro", "Ferro", "nível 16", "#8A8E94", 1.6], ["aco", "Aço", "nível 31", "#C9D2DC", 2.4], ["ouro", "Ouro", "nível 51", "#E2B84A", 3.4], ["lendario", "Lendário", "nível 71 · chefes", "#C8402E", 4.6], ["divino", "Divino", "nível 86 · Dragão", "#F4F0FF", 6.0]];
+  var C = {
+    guerreiro: ["⚔️ Guerreiro", [["Espada Curta", "espada", 6], ["Espada Longa", "espada", 8], ["Espada Larga", "espada", 9], ["Espadão de Duas Mãos", "espada", 12], ["Machado de Batalha", "machado", 10], ["Lança de Guerra", "lanca", 10], ["Espadas Duplas", "espada", 11], ["Machado Pesado", "machado", 13]],
+      [["Elmo de Guerreiro", "capacete", 4], ["Peitoral de Guerreiro", "peitoral", 8], ["Calças de Guerreiro", "calca", 5], ["Luvas de Guerreiro", "luvas", 3], ["Botas de Guerreiro", "botas", 3], ["Escudo de Guerreiro", "escudo", 6], ["Capa de Guerreiro", "capa", 2]]],
+    berserker: ["🔥 Bárbaro", [["Machado Gigante", "machado", 12], ["Machado Duplo", "machado", 11], ["Machado de Duas Mãos", "machado", 13], ["Martelo de Guerra", "martelo", 12], ["Maça Brutal", "martelo", 11], ["Espadão Colossal", "espada", 14], ["Martelo com Espinhos", "martelo", 13], ["Machado Sangrento", "machado", 15]],
+      [["Elmo de Bárbaro", "capacete", 4], ["Peitoral de Bárbaro", "peitoral", 7], ["Calças de Bárbaro", "calca", 5], ["Luvas de Bárbaro", "luvas", 3], ["Botas de Bárbaro", "botas", 3], ["Ombreiras de Bárbaro", "ombreiras", 4], ["Cinto de Guerra", "cinto", 2]]],
+    mago: ["🔮 Mago", [["Cajado Arcano", "cajado", 6], ["Cajado Elemental", "cajado", 7], ["Cajado Sombrio", "cajado", 8], ["Varinha Mágica", "varinha", 6], ["Orbe Mágico", "orbe", 8], ["Livro de Feitiços", "livro", 9], ["Cajado Celestial", "cajado", 10], ["Cajado do Dragão", "cajado", 11]],
+      [["Capuz de Mago", "capacete", 2], ["Peitoral Arcano", "peitoral", 5], ["Calças Arcanas", "calca", 3], ["Luvas Mágicas", "luvas", 2], ["Botas Arcanas", "botas", 2], ["Manto Mágico", "capa", 3], ["Cinto Arcano", "cinto", 2]]],
+    arqueiro: ["🏹 Arqueira", [["Arco Curto", "arco", 5], ["Arco Longo", "arco", 7], ["Arco Élfico", "arco", 8], ["Arco Composto", "arco", 9], ["Arco Elemental", "arco", 10], ["Besta Leve", "besta", 9], ["Besta Pesada", "besta", 12], ["Adagas Duplas", "espada", 8]],
+      [["Capuz de Arqueira", "capacete", 3], ["Peitoral de Arqueira", "peitoral", 6], ["Calças de Arqueira", "calca", 4], ["Luvas de Arqueira", "luvas", 2], ["Botas de Arqueira", "botas", 3], ["Ombreiras de Arqueira", "ombreiras", 3], ["Cinto de Arqueira", "cinto", 2]]],
+    paladino: ["🛡️ Paladino", [["Espada Sagrada", "espada", 7], ["Espada Longa Celestial", "espada", 9], ["Espadão Divino", "espada", 12], ["Martelo Sagrado", "martelo", 10], ["Maça Divina", "martelo", 10], ["Lança Celestial", "lanca", 10], ["Espada e Escudo", "espada", 9], ["Martelo de Julgamento", "martelo", 13]],
+      [["Elmo de Paladino", "capacete", 5], ["Peitoral Sagrado", "peitoral", 9], ["Calças de Paladino", "calca", 6], ["Luvas Sagradas", "luvas", 3], ["Botas de Paladino", "botas", 3], ["Ombreiras Sagradas", "ombreiras", 4], ["Capa Celestial", "capa", 2]]]
+  };
+  var ESP = [["pedra_ascensao", "Pedra de Ascensão", "Aprimora equipamentos."], ["pedra_alma", "Pedra da Alma", "Melhora atributos."], ["pedra_caos", "Pedra do Caos", "Combina e cria itens."], ["pedra_vitalidade", "Pedra da Vitalidade", "Adiciona vida e defesa."],
+    ["pedra_criacao", "Pedra da Criação", "Cria equipamentos especiais."], ["pedra_purificacao", "Pedra da Purificação", "Remove penalidades."], ["pedra_despertar", "Pedra do Despertar", "Desbloqueia o potencial dos equipamentos."], ["pedra_ancestral", "Pedra Ancestral", "Evolui equipamentos avançados."],
+    ["gold", "Gold", "Moeda principal do jogo, com o emblema do dragão de Drakthar. Cai dos monstros conforme o nível e a dificuldade."],
+    ["pet_leao", "Filhote de Leão", "Pet: segue você e ajuda na luta (+3 de dano)."], ["pet_lobo", "Filhote de Lobo", "Pet: +2 de dano e +1 de defesa."], ["pet_cachorro", "Filhote de Cachorro", "Pet: fiel companheiro (+3 de defesa)."], ["pet_aguia", "Filhote de Águia", "Pet: voa ao seu redor (+2 de dano)."],
+    ["asa_aprendiz", "Asa de Aprendiz (nível 1)", "Bênção de um deus ao completar a Saga do Herói (10 missões). +6 de dano e +6 de defesa."]];
+  function esc(t) { return String(t).replace(/[<>&"]/g, ""); }
+  var visor = document.getElementById("visor"), corpo = document.getElementById("visor-corpo");
+  function abrir(html) { corpo.innerHTML = html; visor.hidden = false; visor.querySelector(".fechar").focus(); }
+  function fechar() { visor.hidden = true; }
+  visor.addEventListener("click", function (e) { if (e.target === visor || e.target.classList.contains("fechar")) fechar(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !visor.hidden) fechar(); });
+  window.verEquip = function (nome, icone, base, arma) {
+    abrir('<h3 id="visor-titulo">' + esc(nome) + '</h3><p>' + (arma ? "Arma" : "Armadura") + ' · os 6 níveis de evolução (clique fora ou Esc para fechar)</p><div class="visor-niveis">' + NIV.map(function (n) {
+      return '<figure><img src="img/' + icone + '_' + n[0] + '.webp" alt="' + esc(nome) + ' de ' + n[1] + '" loading="lazy"><figcaption><b style="color:' + n[3] + '">' + n[1] + '</b>' + (arma ? "Dano " : "Defesa ") + Math.round(base * n[4]) + '<br><small>' + n[2] + '</small></figcaption></figure>';
+    }).join("") + '</div>');
+  };
+  window.verEsp = function (i) { var e = ESP[i]; abrir('<h3 id="visor-titulo">' + e[1] + '</h3><div class="visor-unico"><img src="img/' + e[0] + '.webp" alt="' + e[1] + '"><p>' + e[2] + '</p></div>'); };
+  function li(it, arma) { return '<li><button type="button" onclick="verEquip(\'' + esc(it[0]) + '\',\'' + it[1] + '\',' + it[2] + ',' + arma + ')"><img src="img/' + it[1] + '_ferro.webp" alt="" loading="lazy">' + esc(it[0]) + '</button></li>'; }
+  document.getElementById("shop-classes").innerHTML = Object.keys(C).map(function (k) {
+    var c = C[k];
+    return '<article class="cl"><h3>' + c[0] + '</h3><div class="cl-col"><h4>Armas</h4><ol>' + c[1].map(function (a) { return li(a, true); }).join("") + '</ol></div><div class="cl-col"><h4>Armaduras</h4><ol>' + c[2].map(function (a) { return li(a, false); }).join("") + '</ol></div></article>';
+  }).join("");
+  document.getElementById("shop-especiais").innerHTML = ESP.map(function (e, i) { return '<button type="button" onclick="verEsp(' + i + ')"><img src="img/' + e[0] + '.webp" alt="" loading="lazy">' + e[1] + '</button>'; }).join("");
+})();
+</script>
 </body>
 </html>
