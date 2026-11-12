@@ -326,6 +326,14 @@ body:has(.nav.aberto) .zap { display: none; }
 .grade-itens button { all: unset; cursor: pointer; display: grid; justify-items: center; gap: 6px; padding: 12px 8px; border: 1px solid rgba(232,184,72,.25); border-radius: 10px; background: rgba(0,0,0,.25); text-align: center; font-size: .9rem; }
 .grade-itens button:hover { border-color: var(--ouro, #e8b848); }
 .grade-itens img { width: 64px; height: 64px; object-fit: contain; }
+.sets-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; }
+.set-card { border: 1px solid rgba(232,184,72,.3); border-radius: 12px; padding: 14px; background: linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.15)); }
+.set-card h3 { margin: 0 0 2px; font-size: 1.15rem; }
+.set-card small { opacity: .75; }
+.set-pecas { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 10px 0 8px; }
+.set-pecas figure { margin: 0; text-align: center; font-size: .72rem; opacity: .9; }
+.set-pecas img { width: 100%; max-width: 64px; aspect-ratio: 1; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,.6)); }
+.set-card p { margin: 0; font-size: .85rem; }
 .visor { position: fixed; inset: 0; background: rgba(0,0,0,.78); display: grid; place-items: center; z-index: 50; padding: 16px; }
 .visor-caixa { background: #121014; border: 1px solid var(--ouro, #e8b848); border-radius: 14px; max-width: 760px; width: 100%; padding: 20px; position: relative; max-height: 90vh; overflow: auto; }
 .visor-caixa h3 { margin: 0 0 4px; font-family: var(--f-titulo, serif); text-transform: uppercase; }
@@ -371,6 +379,11 @@ body:has(.nav.aberto) .zap { display: none; }
   <section class="bloco" aria-labelledby="t-classes-shop">
     <div class="bloco-cab"><h2 id="t-classes-shop">Equipamentos por classe</h2></div>
     <div class="bloco-corpo shop-grade" id="shop-classes"></div>
+  </section>
+
+  <section class="bloco" aria-labelledby="t-sets">
+    <div class="bloco-cab"><div><h2 id="t-sets">Conjuntos (sets) estilo MU</h2><p>Cada conjunto tem 5 peças: elmo, armadura, luvas, calça e botas. Com 3 peças: +10% de dano. Com as 5: +20% de dano e +15% de defesa. Caem dos monstros e chefes.</p></div></div>
+    <div class="bloco-corpo sets-grade" id="shop-sets"></div>
   </section>
 
   <section class="bloco" aria-labelledby="t-especiais">
@@ -423,11 +436,15 @@ body:has(.nav.aberto) .zap { display: none; }
     paladino: ["🛡️ Paladino", [["Espada Sagrada", "espada", 7], ["Espada Longa Celestial", "espada", 9], ["Espadão Divino", "espada", 12], ["Martelo Sagrado", "martelo", 10], ["Maça Divina", "martelo", 10], ["Lança Celestial", "lanca", 10], ["Espada e Escudo", "espada", 9], ["Martelo de Julgamento", "martelo", 13]],
       [["Elmo de Paladino", "capacete", 5], ["Peitoral Sagrado", "peitoral", 9], ["Calças de Paladino", "calca", 6], ["Luvas Sagradas", "luvas", 3], ["Botas de Paladino", "botas", 3], ["Ombreiras Sagradas", "ombreiras", 4], ["Capa Celestial", "capa", 2]]]
   };
-  var ESP = [["pedra_ascensao", "Pedra de Ascensão", "Aprimora equipamentos."], ["pedra_alma", "Pedra da Alma", "Melhora atributos."], ["pedra_caos", "Pedra do Caos", "Combina e cria itens."], ["pedra_vitalidade", "Pedra da Vitalidade", "Adiciona vida e defesa."],
-    ["pedra_criacao", "Pedra da Criação", "Cria equipamentos especiais."], ["pedra_purificacao", "Pedra da Purificação", "Remove penalidades."], ["pedra_despertar", "Pedra do Despertar", "Desbloqueia o potencial dos equipamentos."], ["pedra_ancestral", "Pedra Ancestral", "Evolui equipamentos avançados."],
+  var ESP = [["pedra_ascensao", "Pedra de Ascensão", "Forja: +1 no item, até +6. Sempre dá certo."], ["pedra_alma", "Pedra da Alma", "Forja: +1 acima de +6, até +15. Pode falhar."], ["pedra_caos", "Pedra do Caos", "Forja: 50% de chance de evoluir o material (Bronze → Ouro)."], ["pedra_vitalidade", "Pedra da Vitalidade", "Forja: +8 de vida e +2 de defesa (até 5 vezes)."],
+    ["pedra_criacao", "Pedra da Criação", "Forja: deixa o item EXCELENTE (+10% dano e defesa)."], ["pedra_purificacao", "Pedra da Purificação", "Forja: protege a próxima falha da Pedra da Alma."], ["pedra_despertar", "Pedra do Despertar", "Forja: desperta o item (+5 dano e +5 defesa)."], ["pedra_ancestral", "Pedra Ancestral", "Evolui equipamentos avançados."],
     ["gold", "Gold", "Moeda principal do jogo, com o emblema do dragão de Drakthar. Cai dos monstros conforme o nível e a dificuldade."],
     ["pet_leao", "Filhote de Leão", "Pet: segue você e ajuda na luta (+3 de dano)."], ["pet_lobo", "Filhote de Lobo", "Pet: +2 de dano e +1 de defesa."], ["pet_cachorro", "Filhote de Cachorro", "Pet: fiel companheiro (+3 de defesa)."], ["pet_aguia", "Filhote de Águia", "Pet: voa ao seu redor (+2 de dano)."],
     ["asa_aprendiz", "Asa de Aprendiz (nível 1)", "Bênção de um deus ao completar a Saga do Herói (10 missões). +6 de dano e +6 de defesa."]];
+  var SETS = [["dragao_negro", "Dragão Negro", "nível 20 · Épico", "#9A7BFF", "Armadura negra com chifres de dragão."], ["dragao_fogo", "Dragão de Fogo", "nível 20 · Épico", "#FF7A2E", "Forjada no fogo do dragão, com chifres dourados."],
+    ["guardiao", "Guardião Celeste", "nível 20 · Épico", "#9CC8FF", "Prata celeste com asas no elmo e no peito."], ["elfico", "Élfico", "nível 10 · Raro", "#6FD36A", "Leve, verde e adornado com folhas douradas."],
+    ["arcano", "Arcano", "nível 10 · Raro", "#B57BFF", "Dos magos: runas e cristais violeta."], ["ancestral", "Ancestral", "nível 60 · Ancestral", "#FFC94A", "O mais forte: coroa de espinhos e gema solar."]];
+  var PEC = [["elmo", "Elmo"], ["peitoral", "Armadura"], ["luvas", "Luvas"], ["calca", "Calça"], ["botas", "Botas"]];
   function esc(t) { return String(t).replace(/[<>&"]/g, ""); }
   var visor = document.getElementById("visor"), corpo = document.getElementById("visor-corpo");
   function abrir(html) { corpo.innerHTML = html; visor.hidden = false; visor.querySelector(".fechar").focus(); }
@@ -444,6 +461,11 @@ body:has(.nav.aberto) .zap { display: none; }
   document.getElementById("shop-classes").innerHTML = Object.keys(C).map(function (k) {
     var c = C[k];
     return '<article class="cl"><h3>' + c[0] + '</h3><div class="cl-col"><h4>Armas</h4><ol>' + c[1].map(function (a) { return li(a, true); }).join("") + '</ol></div><div class="cl-col"><h4>Armaduras</h4><ol>' + c[2].map(function (a) { return li(a, false); }).join("") + '</ol></div></article>';
+  }).join("");
+  document.getElementById("shop-sets").innerHTML = SETS.map(function (st) {
+    return '<article class="set-card"><h3 style="color:' + st[3] + '">' + st[1] + '</h3><small>' + st[2] + '</small><div class="set-pecas">' + PEC.map(function (p) {
+      return '<figure><img src="img/set_' + st[0] + '_' + p[0] + '.webp" alt="' + p[1] + ' ' + st[1] + '" loading="lazy"><figcaption>' + p[1] + '</figcaption></figure>';
+    }).join("") + '</div><p>' + st[4] + '</p></article>';
   }).join("");
   document.getElementById("shop-especiais").innerHTML = ESP.map(function (e, i) { return '<button type="button" onclick="verEsp(' + i + ')"><img src="img/' + e[0] + '.webp" alt="" loading="lazy">' + e[1] + '</button>'; }).join("");
 })();
