@@ -776,7 +776,7 @@ body:has(.nav.aberto) .zap { display: none; }
     var args = { p_usuario: u, p_pin: pin }; if (chave) args.p_chave = chave;
     $("btn-criar").disabled = true; avisar($("criar-aviso"), "Criando conta…", true);
     chamar("drakthar_criar_conta", args).then(entrouCom)
-      .then(function () { avisar($("criar-aviso"), "Conta criada! Já pode jogar com o mesmo usuário e PIN.", true); })
+      .then(function () { $("criar-aviso").innerHTML = 'Conta criada! <a href="jogar/" style="color:#e8b848;font-weight:700">▶ Jogar agora</a> (você já entra logado) ou baixe para Windows e use o mesmo usuário e PIN.'; $("criar-aviso").hidden = false; })
       .catch(function (err) { avisar($("criar-aviso"), traduzir(err.message)); })
       .then(function () { $("btn-criar").disabled = false; });
   });
