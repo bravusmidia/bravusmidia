@@ -2,6 +2,6 @@ User-agent: *
 Allow: /
 Disallow: /crm/
 Disallow: /work/
-Disallow: /missaook/
+Disallow: /tafeito/
 
 Sitemap: https://www.bravusmidia.com.br/sitemap.xml

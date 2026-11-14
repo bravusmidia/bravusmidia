@@ -76,7 +76,7 @@ class LocalStore {
       { id: 'lorenzo', nome: 'Lorenzo', ordem: 2, horas_pc: 1, horas_cel: 1, premio_extra: '', exigir_aprovacao: false, criado_em: agoraISO() }] };
     const s = sementes('henrique');
     db.tarefas = s.tarefas; db.missoes = s.missoes;
-    db.mensagens = [{ id: uid(), filho_id: 'henrique', autor: 'pai', texto: 'Bem-vindo ao Missão OK! Faça suas missões e libere o computador. 💪', lido: false, criado_em: agoraISO() }];
+    db.mensagens = [{ id: uid(), filho_id: 'henrique', autor: 'pai', texto: 'Bem-vindo ao TáFeito! Faça suas missões e libere o computador. 💪', lido: false, criado_em: agoraISO() }];
     this._save(db);
   }
   async listar(t) { const d = this._load()[t] || []; return t === 'filhos' ? d.sort((a, b) => a.ordem - b.ordem) : d; }
@@ -292,7 +292,7 @@ function telaErro(t, m) {
 
 function telaBoasVindas() {
   $('#app').innerHTML = `<div class="login">
-    ${logoImg('logo')}<h1>Missão OK</h1>
+    ${logoImg('logo')}<h1>TáFeito</h1>
     <p class="centro mut">Tarefas da família com foto, missões e prêmios.</p>
     <div class="card" style="margin-top:18px">
       <h3>👨 Sou o pai: conectar o app</h3>
@@ -325,7 +325,7 @@ async function telaLogin() {
   }
   S.ini = ini;
   if (!ini.tem_pai) {
-    return $('#app').innerHTML = `<div class="login">${logoImg('logo')}<h1>Missão OK</h1>
+    return $('#app').innerHTML = `<div class="login">${logoImg('logo')}<h1>TáFeito</h1>
       <div class="card"><h3>👨 Criar a conta do Pai</h3><p class="mut peq">Só o pai controla tudo: tarefas, prêmios e permissões.</p>
       <form data-form="criarPai">
         <label class="campo"><span>Seu nome</span><input name="nome" value="Pai" required></label>
@@ -339,14 +339,14 @@ async function telaLogin() {
     .concat(ini.filhos.map((f, i) => `<button class="pessoa" data-act="loginFilho" data-id="${esc(f.id)}" data-nome="${esc(f.nome)}">
       <div class="av" style="background:${CORES[(i + 1) % CORES.length]}">${esc(f.nome[0] || '?')}</div>
       <div><b>${esc(f.nome)}</b><span class="mut peq">${ini.com_acesso.includes(f.id) ? 'Entrar com PIN' : 'Acesso ainda não criado'}</span></div></button>`));
-  $('#app').innerHTML = `<div class="login">${logoImg('logo')}<h1>Missão OK</h1><p class="centro mut">Quem vai entrar?</p>
+  $('#app').innerHTML = `<div class="login">${logoImg('logo')}<h1>TáFeito</h1><p class="centro mut">Quem vai entrar?</p>
     <div class="pessoas">${pessoas.join('')}</div><p class="rodape">Desenvolvido por Andrade · v${VERSAO}</p></div>`;
 }
 
 function telaLoginDemo() {
   const filhos = [{ id: 'henrique', nome: 'Henrique' }, { id: 'lorenzo', nome: 'Lorenzo' }];
   const salvos = lsGet('mok_demo_db', {}).filhos || filhos;
-  $('#app').innerHTML = `<div class="login">${logoImg('logo')}<h1>Missão OK</h1>
+  $('#app').innerHTML = `<div class="login">${logoImg('logo')}<h1>TáFeito</h1>
     <p class="centro mut">Quem vai entrar? <span class="tag warn">modo demonstração</span></p>
     <div class="pessoas">
       <button class="pessoa" data-act="demoPai"><div class="av" style="background:linear-gradient(135deg,#4f7cff,#7b5cff)">👨</div><div><b>Pai</b><span class="mut peq">${lsGet('mok_demo_pin') ? 'Entrar com PIN' : 'Criar PIN do pai'}</span></div></button>
@@ -367,7 +367,7 @@ async function entrarComSessao(user) {
       ({ data: perfil } = await DB.sb.from('mok_perfis').select('*').eq('id', user.id).maybeSingle());
     }
     if (!perfil) {
-      return $('#app').innerHTML = `<div class="login"><div class="card"><h2>Conta sem perfil</h2><p class="mut">Esta conta não está cadastrada no Missão OK.</p><button class="btn pri" data-act="sair">Voltar</button></div></div>`;
+      return $('#app').innerHTML = `<div class="login"><div class="card"><h2>Conta sem perfil</h2><p class="mut">Esta conta não está cadastrada no TáFeito.</p><button class="btn pri" data-act="sair">Voltar</button></div></div>`;
     }
     S.papel = perfil.papel; S.eu = perfil.papel === 'pai' ? 'pai' : perfil.filho_id;
     await abrirApp();
@@ -471,7 +471,7 @@ function topo() {
     pres = `<span class="presenca"><span class="dot ${on ? 'on' : ''}"></span>Pai ${on ? 'online' : (pai && pai.visto_em ? 'visto ' + hora(pai.visto_em) : 'offline')}</span>`;
   }
   const sub = S.papel === 'pai' ? 'Painel do Pai' : `Olá, ${esc(filhoAtual().nome)}!`;
-  return `<header class="topo"><div class="marca">${logoImg()}<div>Missão OK<small>${sub}</small></div></div><div class="esp"></div>
+  return `<header class="topo"><div class="marca">${logoImg()}<div>TáFeito<small>${sub}</small></div></div><div class="esp"></div>
     ${promptInstalar ? `<button class="icone-btn" data-act="instalar" title="Instalar">⬇️</button>` : ''}${pres}</header>`;
 }
 
@@ -635,7 +635,7 @@ function telaMaisFilho() {
       <button class="btn ghost" data-act="agenda">📅 Pôr lembretes na agenda / despertador</button><div style="height:8px"></div>
       <button class="btn ghost" data-act="instalar">⬇️ Instalar o app</button><div style="height:8px"></div>
       <button class="btn bad" data-act="sair">Sair</button></div>
-    <p class="rodape">Missão OK v${VERSAO} · Desenvolvido por Andrade</p>`;
+    <p class="rodape">TáFeito v${VERSAO} · Desenvolvido por Andrade</p>`;
 }
 
 function tagPedido(p) {
@@ -740,7 +740,7 @@ function telaMaisPai() {
       <button class="btn ghost" data-act="instalar">⬇️ Instalar o app</button><div style="height:8px"></div>
       <button class="btn ghost" data-act="ajudaBloqueio">🔒 Como bloquear o PC/celular de verdade</button><div style="height:8px"></div>
       <button class="btn bad" data-act="sair">Sair</button></div>
-    <p class="rodape">Missão OK v${VERSAO} · Desenvolvido por Andrade</p>`;
+    <p class="rodape">TáFeito v${VERSAO} · Desenvolvido por Andrade</p>`;
 }
 
 /* ===================================================================
@@ -982,12 +982,12 @@ const acoes = {
   ativarNotif: async () => {
     if (!('Notification' in window)) return toast('Este navegador não tem notificações. Instale o app pelo Chrome.', 'bad');
     const p = await Notification.requestPermission();
-    if (p === 'granted') { notificar('🔔 Notificações ativadas!', 'Você vai receber os avisos do Missão OK.', 'teste'); render(); }
+    if (p === 'granted') { notificar('🔔 Notificações ativadas!', 'Você vai receber os avisos do TáFeito.', 'teste'); render(); }
     else toast('Notificações bloqueadas. Libere nas configurações do navegador.', 'bad');
   },
   instalar: async () => {
     if (promptInstalar) { promptInstalar.prompt(); await promptInstalar.userChoice.catch(() => { }); promptInstalar = null; render(); return; }
-    modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>⬇️ Instalar o Missão OK</h2>
+    modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>⬇️ Instalar o TáFeito</h2>
       <p><b>Android (Chrome):</b> menu ⋮ → <b>Instalar app</b> (ou "Adicionar à tela inicial").</p>
       <p><b>iPhone (Safari):</b> botão Compartilhar → <b>Adicionar à Tela de Início</b>.</p>
       <p><b>Computador (Chrome/Edge):</b> clique no ícone de instalar ⊕ na barra de endereço.</p>
@@ -998,7 +998,7 @@ const acoes = {
   baixarIcs: () => baixarIcs(),
   compartilhar: () => {
     const link = linkConvite();
-    const txt = `Instala o app *Missão OK* 📲✅\n\n1) Abra este link no Chrome:\n${link}\n\n2) Toque em ⋮ → *Instalar app* (no computador, no ícone de instalar na barra de endereço)\n3) Toque no seu nome e entre com o seu PIN.\n\nSuas tarefas, missões e prêmios estão lá. Bora! 💪`;
+    const txt = `Instala o app *TáFeito* 📲✅\n\n1) Abra este link no Chrome:\n${link}\n\n2) Toque em ⋮ → *Instalar app* (no computador, no ícone de instalar na barra de endereço)\n3) Toque no seu nome e entre com o seu PIN.\n\nSuas tarefas, missões e prêmios estão lá. Bora! 💪`;
     modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>📲 Link do app</h2>
       <p class="mut peq">O link já leva a conexão do app. Mande só para a família.</p><p><code>${esc(link)}</code></p>
       <a class="btn zap" href="https://wa.me/?text=${encodeURIComponent(txt)}" target="_blank" rel="noopener">Enviar pelo WhatsApp</a><div style="height:8px"></div>
@@ -1006,11 +1006,11 @@ const acoes = {
   },
   copiar: async d => { try { await navigator.clipboard.writeText(d.txt); toast('Copiado!', 'ok'); } catch { prompt('Copie:', d.txt); } },
   ajudaBloqueio: () => modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>🔒 Bloqueio de verdade</h2>
-    <p>O Missão OK mostra na tela se está <b>LIBERADO</b> ou <b>BLOQUEADO</b> e te avisa quando tudo foi feito. Um app de navegador não tem permissão para travar o Windows ou o Android sozinho.</p>
+    <p>O TáFeito mostra na tela se está <b>LIBERADO</b> ou <b>BLOQUEADO</b> e te avisa quando tudo foi feito. Um app de navegador não tem permissão para travar o Windows ou o Android sozinho.</p>
     <p>Para travar de verdade, use junto (grátis):</p>
     <p>📱 <b>Google Family Link</b> no celular do filho: você bloqueia e libera pelo seu celular, com limite de horas.</p>
     <p>💻 <b>Microsoft Family Safety</b> no computador com Windows: limite de tempo e bloqueio por conta.</p>
-    <p class="mut peq">Rotina: quando o Missão OK avisar "Tudo feito", você libera no Family Link/Family Safety pelas horas do prêmio.</p>
+    <p class="mut peq">Rotina: quando o TáFeito avisar "Tudo feito", você libera no Family Link/Family Safety pelas horas do prêmio.</p>
     <button class="btn pri" data-act="fechar">Entendi</button>`)
 };
 
@@ -1264,25 +1264,25 @@ function datasEvento(t) {
 }
 function linkGoogle(t) {
   const { ini, fim } = datasEvento(t);
-  let u = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('✅ ' + t.titulo + ' (Missão OK)')}&dates=${ini}/${fim}&ctz=${encodeURIComponent(tz())}&details=${encodeURIComponent((t.descricao || '') + '\nAbra o Missão OK e tire a foto ANTES e DEPOIS.')}`;
+  let u = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('✅ ' + t.titulo + ' (TáFeito)')}&dates=${ini}/${fim}&ctz=${encodeURIComponent(tz())}&details=${encodeURIComponent((t.descricao || '') + '\nAbra o TáFeito e tire a foto ANTES e DEPOIS.')}`;
   if (t.recorrencia !== 'unica') u += '&recur=' + encodeURIComponent(rrule(t));
   return u;
 }
 function baixarIcs() {
   const tars = deFilho('tarefas').filter(t => t.ativa !== false && t.horario);
-  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Missao OK//PT-BR', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:Missão OK'];
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//TaFeito//PT-BR', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:TáFeito'];
   const stamp = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
   const escI = s => String(s || '').replace(/\\/g, '\\\\').replace(/[,;]/g, m => '\\' + m).replace(/\n/g, '\\n');
   for (const t of tars) {
     const { ini, fim } = datasEvento(t);
     L.push('BEGIN:VEVENT', `UID:${t.id}@missaook`, `DTSTAMP:${stamp}`, `DTSTART;TZID=${tz()}:${ini}`, `DTEND;TZID=${tz()}:${fim}`);
     if (t.recorrencia !== 'unica') L.push(rrule(t));
-    L.push(`SUMMARY:${escI('✅ ' + t.titulo)}`, `DESCRIPTION:${escI((t.descricao || '') + ' — Abra o Missão OK e tire as fotos.')}`,
+    L.push(`SUMMARY:${escI('✅ ' + t.titulo)}`, `DESCRIPTION:${escI((t.descricao || '') + ' — Abra o TáFeito e tire as fotos.')}`,
       'BEGIN:VALARM', 'ACTION:DISPLAY', 'TRIGGER:PT0M', `DESCRIPTION:${escI('Hora de: ' + t.titulo)}`, 'END:VALARM', 'END:VEVENT');
   }
   L.push('END:VCALENDAR');
   const blob = new Blob([L.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `missao-ok-${fid()}.ics`; document.body.appendChild(a); a.click(); a.remove();
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `tafeito-${fid()}.ics`; document.body.appendChild(a); a.click(); a.remove();
   toast(`${tars.length} lembretes gerados 📅`, 'ok');
 }
 function modalAgenda() {

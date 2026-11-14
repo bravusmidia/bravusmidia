@@ -1,16 +1,16 @@
-# Missão OK: como colocar para funcionar (uns 10 minutos)
+# TáFeito: como colocar para funcionar (uns 10 minutos)
 
 App de tarefas da família: fotos de ANTES e DEPOIS, missões com patentes e XP, prêmios (horas de PC/celular e dinheiro), Work, pedidos de permissão, chat e status online/offline.
 
-**Endereço do app:** https://www.bravusmidia.com.br/missaook/
+**Endereço do app:** https://www.bravusmidia.com.br/tafeito/
 
 Se quiser só olhar antes, abra o endereço e toque em **"Abrir modo demonstração"**. Nesse modo os dados ficam só no aparelho.
 
 ---
 
 ## 1. Criar o banco grátis (Supabase)
-1. Entre em https://supabase.com e clique em **New project**. Nome: `missaook`. Crie uma senha do banco e escolha a região (pode ser *South America (São Paulo)*).
-   - Use um projeto **só para o Missão OK**. Não use o do Bravus Work: o filho vai ter login, e os dados da agência têm que ficar separados.
+1. Entre em https://supabase.com e clique em **New project**. Nome: `tafeito`. Crie uma senha do banco e escolha a região (pode ser *South America (São Paulo)*).
+   - Use um projeto **só para o TáFeito**. Não use o do Bravus Work: o filho vai ter login, e os dados da agência têm que ficar separados.
    - Se o Supabase avisar que você chegou ao limite de projetos grátis, pause um projeto que não usa ou crie com outro e-mail.
 2. No menu da esquerda, abra **SQL Editor** e clique em **New query**. Cole **todo** o conteúdo do arquivo `supabase.sql` e clique em **RUN**. Tem que aparecer "Success".
 3. Vá em **Authentication → Sign In / Providers → Email**, **desligue "Confirm email"** e salve. Sem isso, o login do filho por PIN não funciona.
@@ -19,7 +19,7 @@ Se quiser só olhar antes, abra o endereço e toque em **"Abrir modo demonstraç
    - Chave **anon public**
 
 ## 2. Entrar como Pai
-1. No seu celular, abra **https://www.bravusmidia.com.br/missaook/**
+1. No seu celular, abra **https://www.bravusmidia.com.br/tafeito/**
 2. Cole a URL e a chave e toque em **Conectar**.
 3. Toque em **Criar conta do Pai** e informe nome, e-mail e senha.
 4. As tarefas do Henrique já vêm cadastradas: quarto, guarda-roupa, mesa, afastar a cama, varrer, pano, louça, lixo, banheiro (sábado), estudo e dever. Também vêm 2 trabalhos de exemplo e 5 missões. Edite tudo do seu jeito. O Lorenzo aparece só com o nome, sem tarefas.
@@ -44,7 +44,7 @@ Se quiser só olhar antes, abra o endereço e toque em **"Abrir modo demonstraç
 - **Chat e online:** bolinha verde quando o outro está com o app aberto e cinza quando está offline (com o horário em que foi visto pela última vez).
 
 ## Limites (para não ter surpresa)
-- **Bloqueio de verdade do PC/celular:** um app de navegador não consegue travar o Windows ou o Android. O Missão OK mostra BLOQUEADO/LIBERADO e te avisa. Para travar de fato, use junto o **Google Family Link** (celular) e o **Microsoft Family Safety** (PC), ambos grátis, e libere por lá quando chegar o aviso. No app, veja **Mais → Como bloquear o PC/celular de verdade**.
+- **Bloqueio de verdade do PC/celular:** um app de navegador não consegue travar o Windows ou o Android. O TáFeito mostra BLOQUEADO/LIBERADO e te avisa. Para travar de fato, use junto o **Google Family Link** (celular) e o **Microsoft Family Safety** (PC), ambos grátis, e libere por lá quando chegar o aviso. No app, veja **Mais → Como bloquear o PC/celular de verdade**.
 - **Notificações:** chegam com o app aberto ou em segundo plano. Para tocar mesmo com tudo fechado, use **Lembretes na agenda**, que cria um evento com alerta para cada tarefa no horário dela. Para tocar como despertador, crie alarmes no app Relógio com os mesmos horários.
 - **Trocar o PIN depois:** ⚙️ do filho → Trocar PIN.
 

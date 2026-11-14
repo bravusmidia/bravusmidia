@@ -1,5 +1,5 @@
-// Missão OK — service worker (funciona offline e mostra notificações)
-const CACHE = 'missaook-v1';
+// TáFeito — service worker (funciona offline e mostra notificações)
+const CACHE = 'tafeito-v1';
 const ARQUIVOS = ['./', './index.html', './styles.css', './app.js', './config.js', './manifest.webmanifest',
   './lib/supabase.js', './icons/icon-192.png', './icons/icon-512.png'];
 
