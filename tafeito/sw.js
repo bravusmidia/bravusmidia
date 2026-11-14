@@ -1,5 +1,5 @@
 // TáFeito — service worker (funciona offline e mostra notificações)
-const CACHE = 'tafeito-v3';
+const CACHE = 'tafeito-v4';
 const ARQUIVOS = ['./', './index.html', './styles.css', './app.js', './config.js', './manifest.webmanifest',
   './lib/supabase.js', './icons/icon-192.png', './icons/icon-512.png'];
 
@@ -21,7 +21,7 @@ self.addEventListener('fetch', e => {
   const cdn = url.hostname === 'cdn.jsdelivr.net';
   if (!mesmoSite && !cdn) return;
   e.respondWith(
-    fetch(e.request).then(r => {
+    fetch(e.request, { cache: 'no-cache' }).then(r => {
       const copia = r.clone();
       caches.open(CACHE).then(c => c.put(e.request, copia));
       return r;
