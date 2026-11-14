@@ -1022,14 +1022,14 @@ const forms = {
   },
   criarPai: async f => {
     carregando(true, 'Criando conta…');
+    const email = f.email.value.trim().toLowerCase();
     try {
-      localStorage.setItem('mok_novo_pai', f.nome.value.trim());
-      lsSet('mok_email_pai', f.email.value.trim());
-      const { data, error } = await DB.sb.auth.signUp({ email: f.email.value.trim(), password: f.senha.value });
+      lsSet('mok_email_pai', email);
+      try { await DB.rpc('mok_criar_pai', { p_nome: f.nome.value.trim(), p_email: email, p_senha: f.senha.value }); }
+      catch (e) { if (/mok_criar_pai|function|schema cache/i.test(msgErro(e)) && !/pai cadastrado|inválid|senha/i.test(msgErro(e))) throw new Error('Atualize o banco: abra bravusmidia.com.br/tafeito/sql.html, copie e rode no SQL Editor do Supabase.'); throw e; }
+      const { data, error } = await DB.sb.auth.signInWithPassword({ email, password: f.senha.value });
       if (error) throw error;
-      carregando(false);
-      if (!data.session) return modal(`<h2>Quase lá</h2><p>O Supabase está pedindo confirmação de e-mail. No painel do Supabase vá em <b>Authentication → Sign In / Providers → Email</b> e <b>desligue "Confirm email"</b>. Depois confirme o e-mail recebido (ou apague o usuário e crie de novo).</p><button class="btn pri" onclick="location.reload()">Ok</button>`, 'alerta');
-      fecharModais(); await entrarComSessao(data.user);
+      carregando(false); fecharModais(); await entrarComSessao(data.user);
     } catch (e) { carregando(false); toast(msgErro(e), 'bad'); }
   },
   loginPai: async f => {
@@ -1093,27 +1093,17 @@ const forms = {
   },
   criarAcesso: async f => {
     const filho = f.dataset.id; const pin = f.pin.value.trim();
-    if (!/^\d{6,}$/.test(pin)) return toast('Use pelo menos 6 números.', 'bad');
+    if (!/^\d{6,12}$/.test(pin)) return toast('Use de 6 a 12 números.', 'bad');
     carregando(true, 'Criando acesso…');
     try {
-      const temp = window.supabase.createClient(DB.c.u, DB.c.k, { auth: { persistSession: false, autoRefreshToken: false, storageKey: 'mok-tmp' } });
-      let userId;
-      const { data, error } = await temp.auth.signUp({ email: emailFilho(filho), password: pin });
-      if (error && /registered|exists/i.test(error.message)) {
-        const r = await temp.auth.signInWithPassword({ email: emailFilho(filho), password: pin });
-        if (r.error) throw new Error('Já existe um acesso antigo para esse filho com outro PIN.');
-        userId = r.data.user.id;
-      } else if (error) throw error; else userId = data.user && data.user.id;
-      if (!userId) throw new Error('Não consegui criar o usuário.');
-      if (!data || !data.session) { const r = await temp.auth.signInWithPassword({ email: emailFilho(filho), password: pin }); if (r.error) throw r.error; }
-      await DB.rpc('mok_vincular_filho', { p_user: userId, p_filho: filho });
+      await DB.rpc('mok_criar_acesso_filho', { p_filho: filho, p_pin: pin });
       await carregarTudo(); carregando(false); fecharModais(); render();
       modal(`<div class="grande">🔑</div><h2>Acesso criado!</h2><p>${esc(nomeFilho(filho))} entra tocando no nome dele e digitando o PIN <b>${esc(pin)}</b>.</p><button class="btn zap" data-act="compartilhar">Mandar o link pelo WhatsApp</button><div style="height:8px"></div><button class="btn ghost" data-act="fechar">Fechar</button>`, 'alerta');
     } catch (e) { carregando(false); toast(msgErro(e), 'bad'); }
   },
   trocarPin: async f => {
     const pin = f.pin.value.trim(); if (!/^\d{6,}$/.test(pin)) return toast('Use pelo menos 6 números.', 'bad');
-    try { await DB.rpc('mok_trocar_pin', { p_filho: f.dataset.id, p_pin: pin }); fecharModais(); toast('PIN trocado ✅', 'ok'); } catch (e) { toast(msgErro(e), 'bad'); }
+    try { await DB.rpc('mok_criar_acesso_filho', { p_filho: f.dataset.id, p_pin: pin }); fecharModais(); toast('PIN trocado ✅', 'ok'); } catch (e) { toast(msgErro(e), 'bad'); }
   },
   reprovar: async f => {
     const r = S.dados.registros.find(x => x.id === f.dataset.reg); if (!r) return;

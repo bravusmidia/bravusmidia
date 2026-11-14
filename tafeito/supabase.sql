@@ -412,4 +412,62 @@ begin
   end loop;
 end $$;
 
+-- ---------- CONTAS SEM CONFIGURAR NADA NO SUPABASE ----------
+-- Cria usuário já confirmado (não precisa de e-mail de confirmação nem mexer em Authentication)
+create or replace function public.mok_criar_usuario(p_email text, p_senha text) returns uuid
+language plpgsql security definer set search_path = public, extensions, auth as $$
+declare v uuid;
+begin
+  select id into v from auth.users where email = lower(p_email) limit 1;
+  if v is not null then
+    update auth.users set encrypted_password = extensions.crypt(p_senha, extensions.gen_salt('bf')),
+      email_confirmed_at = coalesce(email_confirmed_at, now()), updated_at = now() where id = v;
+    return v;
+  end if;
+  v := gen_random_uuid();
+  insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+    raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+    confirmation_token, email_change, email_change_token_new, recovery_token)
+  values ('00000000-0000-0000-0000-000000000000', v, 'authenticated', 'authenticated', lower(p_email),
+    extensions.crypt(p_senha, extensions.gen_salt('bf')), now(),
+    '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now(), '', '', '', '');
+  insert into auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+  values (gen_random_uuid(), v, v::text,
+    jsonb_build_object('sub', v::text, 'email', lower(p_email), 'email_verified', true), 'email', now(), now(), now());
+  return v;
+end $$;
+revoke all on function public.mok_criar_usuario(text, text) from public, anon, authenticated;
+
+-- Conta do Pai: só funciona enquanto ainda não existe um pai cadastrado
+create or replace function public.mok_criar_pai(p_nome text, p_email text, p_senha text) returns void
+language plpgsql security definer set search_path = public as $$
+declare v uuid;
+begin
+  if exists (select 1 from mok_perfis where papel = 'pai') then raise exception 'Já existe um pai cadastrado neste app.'; end if;
+  if p_email !~* '^[^@\s]+@[^@\s]+\.[^@\s]+$' then raise exception 'E-mail inválido.'; end if;
+  if char_length(p_senha) < 6 then raise exception 'A senha precisa ter pelo menos 6 caracteres.'; end if;
+  v := mok_criar_usuario(p_email, p_senha);
+  insert into mok_perfis (id, papel, nome) values (v, 'pai', coalesce(nullif(p_nome, ''), 'Pai'))
+  on conflict (id) do update set papel = 'pai', filho_id = null, nome = excluded.nome;
+end $$;
+revoke all on function public.mok_criar_pai(text, text, text) from public;
+grant execute on function public.mok_criar_pai(text, text, text) to anon, authenticated;
+
+-- Acesso do filho com PIN (só o pai)
+create or replace function public.mok_criar_acesso_filho(p_filho text, p_pin text) returns void
+language plpgsql security definer set search_path = public as $$
+declare v uuid; fam text;
+begin
+  if not mok_is_pai() then raise exception 'Somente o pai pode criar acessos.'; end if;
+  if p_pin !~ '^[0-9]{6,12}$' then raise exception 'O PIN precisa ter de 6 a 12 números.'; end if;
+  if not exists (select 1 from mok_filhos where id = p_filho) then raise exception 'Filho não encontrado.'; end if;
+  select familia into fam from mok_config where id = 1;
+  v := mok_criar_usuario(p_filho || '.' || fam || '@missaook.app', p_pin);
+  delete from mok_perfis where filho_id = p_filho and id <> v;
+  insert into mok_perfis (id, papel, filho_id, nome) values (v, 'filho', p_filho, (select nome from mok_filhos where id = p_filho))
+  on conflict (id) do update set papel = 'filho', filho_id = excluded.filho_id, nome = excluded.nome;
+end $$;
+revoke all on function public.mok_criar_acesso_filho(text, text) from public, anon;
+grant execute on function public.mok_criar_acesso_filho(text, text) to authenticated;
+
 -- Pronto! Agora abra o app e crie a conta do Pai.

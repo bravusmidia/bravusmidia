@@ -12,9 +12,8 @@ Se quiser só olhar antes, abra o endereço e toque em **"Abrir modo demonstraç
 1. Entre em https://supabase.com e clique em **New project**. Nome: `tafeito`. Crie uma senha do banco e escolha a região (pode ser *South America (São Paulo)*).
    - Use um projeto **só para o TáFeito**. Não use o do Bravus Work: o filho vai ter login, e os dados da agência têm que ficar separados.
    - Se o Supabase avisar que você chegou ao limite de projetos grátis, pause um projeto que não usa ou crie com outro e-mail.
-2. No menu da esquerda, abra **SQL Editor** e clique em **New query**. Cole **todo** o conteúdo do arquivo `supabase.sql` e clique em **RUN**. Tem que aparecer "Success".
-3. Vá em **Authentication → Sign In / Providers → Email**, **desligue "Confirm email"** e salve. Sem isso, o login do filho por PIN não funciona.
-4. Vá em **Project Settings → API** (ou *Data API / API Keys*) e copie:
+2. Abra https://www.bravusmidia.com.br/tafeito/sql.html, clique em **Copiar tudo**. No Supabase, abra **SQL Editor** → **New query**, cole e clique em **RUN**. Tem que aparecer "Success". (Não precisa mexer em Authentication: as contas já são criadas confirmadas.)
+3. Vá em **Project Settings → API** (ou *Data API / API Keys*) e copie:
    - **Project URL** (`https://xxxx.supabase.co`)
    - Chave **anon public**
 

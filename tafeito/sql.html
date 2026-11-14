@@ -1,6 +1,6 @@
 <!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>TáFeito – SQL do banco</title>
 <style>body{background:#0b1020;color:#eef1fb;font-family:system-ui,sans-serif;margin:0;padding:16px}button{background:linear-gradient(135deg,#4f7cff,#7b5cff);color:#fff;border:0;border-radius:12px;padding:14px 22px;font-size:1.1rem;font-weight:700;cursor:pointer;position:sticky;top:10px}pre{background:#151d38;border:1px solid #26315a;border-radius:12px;padding:12px;white-space:pre-wrap;font-size:12px}</style></head>
-<body><h2>TáFeito: SQL do banco</h2><p>1) Clique em <b>Copiar tudo</b>. 2) No Supabase: SQL Editor → New query → cole (Ctrl+V) → Run.</p>
+<body><h2>TáFeito: SQL do banco</h2><p>1) Clique em <b>Copiar tudo</b>. 2) No Supabase: SQL Editor → New query → cole (Ctrl+V) → Run. Pode rodar de novo sem problema.</p>
 <button id="b">📋 Copiar tudo</button><pre id="s">-- =====================================================================
 -- MISSÃO OK — Banco de dados (Supabase)
 -- Cole TUDO no Supabase &gt; SQL Editor &gt; New query e clique em RUN.
@@ -414,6 +414,64 @@ begin
     end;
   end loop;
 end $$;
+
+-- ---------- CONTAS SEM CONFIGURAR NADA NO SUPABASE ----------
+-- Cria usuário já confirmado (não precisa de e-mail de confirmação nem mexer em Authentication)
+create or replace function public.mok_criar_usuario(p_email text, p_senha text) returns uuid
+language plpgsql security definer set search_path = public, extensions, auth as $$
+declare v uuid;
+begin
+  select id into v from auth.users where email = lower(p_email) limit 1;
+  if v is not null then
+    update auth.users set encrypted_password = extensions.crypt(p_senha, extensions.gen_salt(&#x27;bf&#x27;)),
+      email_confirmed_at = coalesce(email_confirmed_at, now()), updated_at = now() where id = v;
+    return v;
+  end if;
+  v := gen_random_uuid();
+  insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+    raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+    confirmation_token, email_change, email_change_token_new, recovery_token)
+  values (&#x27;00000000-0000-0000-0000-000000000000&#x27;, v, &#x27;authenticated&#x27;, &#x27;authenticated&#x27;, lower(p_email),
+    extensions.crypt(p_senha, extensions.gen_salt(&#x27;bf&#x27;)), now(),
+    &#x27;{&quot;provider&quot;:&quot;email&quot;,&quot;providers&quot;:[&quot;email&quot;]}&#x27;::jsonb, &#x27;{}&#x27;::jsonb, now(), now(), &#x27;&#x27;, &#x27;&#x27;, &#x27;&#x27;, &#x27;&#x27;);
+  insert into auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+  values (gen_random_uuid(), v, v::text,
+    jsonb_build_object(&#x27;sub&#x27;, v::text, &#x27;email&#x27;, lower(p_email), &#x27;email_verified&#x27;, true), &#x27;email&#x27;, now(), now(), now());
+  return v;
+end $$;
+revoke all on function public.mok_criar_usuario(text, text) from public, anon, authenticated;
+
+-- Conta do Pai: só funciona enquanto ainda não existe um pai cadastrado
+create or replace function public.mok_criar_pai(p_nome text, p_email text, p_senha text) returns void
+language plpgsql security definer set search_path = public as $$
+declare v uuid;
+begin
+  if exists (select 1 from mok_perfis where papel = &#x27;pai&#x27;) then raise exception &#x27;Já existe um pai cadastrado neste app.&#x27;; end if;
+  if p_email !~* &#x27;^[^@\s]+@[^@\s]+\.[^@\s]+$&#x27; then raise exception &#x27;E-mail inválido.&#x27;; end if;
+  if char_length(p_senha) &lt; 6 then raise exception &#x27;A senha precisa ter pelo menos 6 caracteres.&#x27;; end if;
+  v := mok_criar_usuario(p_email, p_senha);
+  insert into mok_perfis (id, papel, nome) values (v, &#x27;pai&#x27;, coalesce(nullif(p_nome, &#x27;&#x27;), &#x27;Pai&#x27;))
+  on conflict (id) do update set papel = &#x27;pai&#x27;, filho_id = null, nome = excluded.nome;
+end $$;
+revoke all on function public.mok_criar_pai(text, text, text) from public;
+grant execute on function public.mok_criar_pai(text, text, text) to anon, authenticated;
+
+-- Acesso do filho com PIN (só o pai)
+create or replace function public.mok_criar_acesso_filho(p_filho text, p_pin text) returns void
+language plpgsql security definer set search_path = public as $$
+declare v uuid; fam text;
+begin
+  if not mok_is_pai() then raise exception &#x27;Somente o pai pode criar acessos.&#x27;; end if;
+  if p_pin !~ &#x27;^[0-9]{6,12}$&#x27; then raise exception &#x27;O PIN precisa ter de 6 a 12 números.&#x27;; end if;
+  if not exists (select 1 from mok_filhos where id = p_filho) then raise exception &#x27;Filho não encontrado.&#x27;; end if;
+  select familia into fam from mok_config where id = 1;
+  v := mok_criar_usuario(p_filho || &#x27;.&#x27; || fam || &#x27;@missaook.app&#x27;, p_pin);
+  delete from mok_perfis where filho_id = p_filho and id &lt;&gt; v;
+  insert into mok_perfis (id, papel, filho_id, nome) values (v, &#x27;filho&#x27;, p_filho, (select nome from mok_filhos where id = p_filho))
+  on conflict (id) do update set papel = &#x27;filho&#x27;, filho_id = excluded.filho_id, nome = excluded.nome;
+end $$;
+revoke all on function public.mok_criar_acesso_filho(text, text) from public, anon;
+grant execute on function public.mok_criar_acesso_filho(text, text) to authenticated;
 
 -- Pronto! Agora abra o app e crie a conta do Pai.
 </pre>
