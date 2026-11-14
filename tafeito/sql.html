@@ -1,0 +1,420 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>TáFeito – SQL do banco</title>
+<style>body{background:#0b1020;color:#eef1fb;font-family:system-ui,sans-serif;margin:0;padding:16px}button{background:linear-gradient(135deg,#4f7cff,#7b5cff);color:#fff;border:0;border-radius:12px;padding:14px 22px;font-size:1.1rem;font-weight:700;cursor:pointer;position:sticky;top:10px}pre{background:#151d38;border:1px solid #26315a;border-radius:12px;padding:12px;white-space:pre-wrap;font-size:12px}</style></head>
+<body><h2>TáFeito: SQL do banco</h2><p>1) Clique em <b>Copiar tudo</b>. 2) No Supabase: SQL Editor → New query → cole (Ctrl+V) → Run.</p>
+<button id="b">📋 Copiar tudo</button><pre id="s">-- =====================================================================
+-- MISSÃO OK — Banco de dados (Supabase)
+-- Cole TUDO no Supabase &gt; SQL Editor &gt; New query e clique em RUN.
+-- Pode rodar de novo sem problema (não apaga nada).
+-- =====================================================================
+create extension if not exists pgcrypto with schema extensions;
+
+-- ---------- TABELAS ----------
+create table if not exists public.mok_config (
+  id int primary key default 1 check (id = 1),
+  familia text not null default substr(md5(random()::text), 1, 8),
+  semeado boolean not null default false
+);
+insert into public.mok_config (id) values (1) on conflict (id) do nothing;
+
+create table if not exists public.mok_filhos (
+  id text primary key,
+  nome text not null,
+  ordem int not null default 1,
+  horas_pc numeric not null default 2,
+  horas_cel numeric not null default 2,
+  premio_extra text not null default &#x27;&#x27;,
+  exigir_aprovacao boolean not null default false,
+  criado_em timestamptz not null default now()
+);
+insert into public.mok_filhos (id, nome, ordem) values
+  (&#x27;henrique&#x27;, &#x27;Henrique&#x27;, 1),
+  (&#x27;lorenzo&#x27;,  &#x27;Lorenzo&#x27;,  2)
+on conflict (id) do nothing;
+
+create table if not exists public.mok_perfis (
+  id uuid primary key references auth.users(id) on delete cascade,
+  papel text not null check (papel in (&#x27;pai&#x27;,&#x27;filho&#x27;)),
+  filho_id text references public.mok_filhos(id) on delete cascade,
+  nome text not null default &#x27;&#x27;,
+  visto_em timestamptz
+);
+
+create table if not exists public.mok_tarefas (
+  id text primary key,
+  filho_id text not null references public.mok_filhos(id) on delete cascade,
+  titulo text not null,
+  icone text not null default &#x27;&#x27;,
+  categoria text not null default &#x27;casa&#x27; check (categoria in (&#x27;casa&#x27;,&#x27;estudo&#x27;,&#x27;trabalho&#x27;)),
+  descricao text not null default &#x27;&#x27;,
+  recorrencia text not null default &#x27;diaria&#x27; check (recorrencia in (&#x27;diaria&#x27;,&#x27;unica&#x27;)),
+  dias jsonb not null default &#x27;[]&#x27;::jsonb,
+  data_unica date,
+  horario text not null default &#x27;&#x27;,
+  foto boolean not null default true,
+  obrigatoria boolean not null default true,
+  xp int not null default 10,
+  valor numeric(10,2) not null default 0,
+  ativa boolean not null default true,
+  criado_em timestamptz not null default now()
+);
+
+create table if not exists public.mok_registros (
+  id text primary key,
+  filho_id text not null references public.mok_filhos(id) on delete cascade,
+  tarefa_id text not null,
+  data date not null,
+  categoria text not null default &#x27;casa&#x27;,
+  foto_antes text, foto_antes_em timestamptz,
+  foto_depois text, foto_depois_em timestamptz,
+  status text not null default &#x27;pendente&#x27; check (status in (&#x27;pendente&#x27;,&#x27;feita&#x27;,&#x27;aprovada&#x27;,&#x27;reprovada&#x27;)),
+  feito_em timestamptz,
+  obs text not null default &#x27;&#x27;,
+  xp int not null default 0,
+  valor numeric(10,2) not null default 0,
+  atualizado_em timestamptz not null default now()
+);
+
+create table if not exists public.mok_pedidos (
+  id text primary key,
+  filho_id text not null references public.mok_filhos(id) on delete cascade,
+  area text not null,
+  mensagem text not null default &#x27;&#x27;,
+  status text not null default &#x27;pendente&#x27; check (status in (&#x27;pendente&#x27;,&#x27;aprovado&#x27;,&#x27;negado&#x27;)),
+  criado_em timestamptz not null default now(),
+  respondido_em timestamptz,
+  expira_em timestamptz
+);
+
+create table if not exists public.mok_missoes (
+  id text primary key,
+  filho_id text not null references public.mok_filhos(id) on delete cascade,
+  titulo text not null,
+  descricao text not null default &#x27;&#x27;,
+  icone text not null default &#x27;🏆&#x27;,
+  tipo text not null default &#x27;total&#x27; check (tipo in (&#x27;total&#x27;,&#x27;categoria&#x27;,&#x27;sequencia&#x27;,&#x27;dias&#x27;)),
+  meta int not null default 10,
+  categoria text not null default &#x27;&#x27;,
+  premio text not null default &#x27;&#x27;,
+  valor numeric(10,2) not null default 0,
+  xp int not null default 50,
+  ativa boolean not null default true,
+  criado_em timestamptz not null default now()
+);
+
+create table if not exists public.mok_resgates (
+  id text primary key,
+  filho_id text not null references public.mok_filhos(id) on delete cascade,
+  missao_id text not null,
+  titulo text not null default &#x27;&#x27;,
+  premio text not null default &#x27;&#x27;,
+  valor numeric(10,2) not null default 0,
+  xp int not null default 0,
+  criado_em timestamptz not null default now()
+);
+
+create table if not exists public.mok_pagamentos (
+  id text primary key,
+  filho_id text not null references public.mok_filhos(id) on delete cascade,
+  valor numeric(10,2) not null default 0,
+  obs text not null default &#x27;&#x27;,
+  criado_em timestamptz not null default now()
+);
+
+create table if not exists public.mok_mensagens (
+  id text primary key,
+  filho_id text not null references public.mok_filhos(id) on delete cascade,
+  autor text not null,
+  texto text not null check (char_length(texto) between 1 and 1000),
+  lido boolean not null default false,
+  criado_em timestamptz not null default now()
+);
+
+-- ---------- FUNÇÕES DE SEGURANÇA ----------
+create or replace function public.mok_is_pai() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from mok_perfis where id = auth.uid() and papel = &#x27;pai&#x27;);
+$$;
+
+create or replace function public.mok_meu_filho() returns text
+language sql stable security definer set search_path = public as $$
+  select filho_id from mok_perfis where id = auth.uid() and papel = &#x27;filho&#x27; limit 1;
+$$;
+
+create or replace function public.mok_is_membro() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from mok_perfis where id = auth.uid());
+$$;
+
+create or replace function public.mok_pode_ver(fid text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select mok_is_pai() or (fid is not null and fid = mok_meu_filho());
+$$;
+
+-- o filho só edita uma área quando o pai autorizou (e ainda não expirou)
+create or replace function public.mok_tem_permissao(a text, fid text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from mok_pedidos
+    where area = a and filho_id = fid and status = &#x27;aprovado&#x27; and expira_em &gt; now());
+$$;
+
+-- tela de login (antes de entrar): nomes dos filhos e código da família
+create or replace function public.mok_inicio() returns json
+language sql stable security definer set search_path = public as $$
+  select json_build_object(
+    &#x27;tem_pai&#x27;, exists (select 1 from mok_perfis where papel = &#x27;pai&#x27;),
+    &#x27;familia&#x27;, (select familia from mok_config where id = 1),
+    &#x27;filhos&#x27;, coalesce((select json_agg(json_build_object(&#x27;id&#x27;, id, &#x27;nome&#x27;, nome) order by ordem) from mok_filhos), &#x27;[]&#x27;::json),
+    &#x27;com_acesso&#x27;, coalesce((select json_agg(filho_id) from mok_perfis where papel = &#x27;filho&#x27;), &#x27;[]&#x27;::json)
+  );
+$$;
+
+create or replace function public.mok_registrar_pai(p_nome text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then raise exception &#x27;Faça login primeiro.&#x27;; end if;
+  if exists (select 1 from mok_perfis where papel = &#x27;pai&#x27; and id &lt;&gt; auth.uid()) then
+    raise exception &#x27;Já existe um pai cadastrado neste app.&#x27;;
+  end if;
+  insert into mok_perfis (id, papel, nome) values (auth.uid(), &#x27;pai&#x27;, coalesce(nullif(p_nome,&#x27;&#x27;), &#x27;Pai&#x27;))
+  on conflict (id) do update set papel = &#x27;pai&#x27;, filho_id = null, nome = excluded.nome;
+end $$;
+
+create or replace function public.mok_vincular_filho(p_user uuid, p_filho text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not mok_is_pai() then raise exception &#x27;Somente o pai pode criar acessos.&#x27;; end if;
+  delete from mok_perfis where filho_id = p_filho and id &lt;&gt; p_user;
+  insert into mok_perfis (id, papel, filho_id, nome)
+  values (p_user, &#x27;filho&#x27;, p_filho, (select nome from mok_filhos where id = p_filho))
+  on conflict (id) do update set papel = &#x27;filho&#x27;, filho_id = excluded.filho_id, nome = excluded.nome;
+end $$;
+
+create or replace function public.mok_trocar_pin(p_filho text, p_pin text) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare v uuid;
+begin
+  if not mok_is_pai() then raise exception &#x27;Somente o pai pode trocar o PIN.&#x27;; end if;
+  if char_length(p_pin) &lt; 6 then raise exception &#x27;O PIN precisa ter pelo menos 6 dígitos.&#x27;; end if;
+  select id into v from mok_perfis where filho_id = p_filho limit 1;
+  if v is null then raise exception &#x27;Esse filho ainda não tem acesso criado.&#x27;; end if;
+  update auth.users set encrypted_password = extensions.crypt(p_pin, extensions.gen_salt(&#x27;bf&#x27;)) where id = v;
+end $$;
+
+create or replace function public.mok_ping() returns void
+language sql security definer set search_path = public as $$
+  update mok_perfis set visto_em = now() where id = auth.uid();
+$$;
+
+revoke all on function public.mok_inicio() from public;
+grant execute on function public.mok_inicio() to anon, authenticated;
+grant execute on function public.mok_registrar_pai(text), public.mok_vincular_filho(uuid, text),
+  public.mok_trocar_pin(text, text), public.mok_ping() to authenticated;
+
+-- ---------- REGRAS (o filho não consegue burlar) ----------
+create or replace function public.mok_reg_guarda() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare t mok_tarefas%rowtype;
+begin
+  select * into t from mok_tarefas where id = new.tarefa_id;
+  if t.id is null then raise exception &#x27;Tarefa não encontrada.&#x27;; end if;
+  new.filho_id := t.filho_id;
+  new.categoria := t.categoria;
+  if not mok_is_pai() then
+    if new.filho_id is distinct from mok_meu_filho() then raise exception &#x27;Essa tarefa é de outra pessoa.&#x27;; end if;
+    new.xp := t.xp; new.valor := t.valor;
+    if new.status = &#x27;aprovada&#x27; then raise exception &#x27;Só o pai pode aprovar.&#x27;; end if;
+    if tg_op = &#x27;UPDATE&#x27; then
+      if old.status = &#x27;aprovada&#x27; then raise exception &#x27;Tarefa já aprovada pelo pai.&#x27;; end if;
+      if new.status = &#x27;reprovada&#x27; and old.status &lt;&gt; &#x27;reprovada&#x27; then raise exception &#x27;Só o pai pode reprovar.&#x27;; end if;
+    elsif new.status = &#x27;reprovada&#x27; then raise exception &#x27;Só o pai pode reprovar.&#x27;;
+    end if;
+    if new.status = &#x27;feita&#x27; and t.foto and (new.foto_antes is null or new.foto_depois is null) then
+      raise exception &#x27;Precisa da foto ANTES e da foto DEPOIS.&#x27;;
+    end if;
+  end if;
+  new.atualizado_em := now();
+  return new;
+end $$;
+drop trigger if exists mok_reg_guarda on public.mok_registros;
+create trigger mok_reg_guarda before insert or update on public.mok_registros
+  for each row execute function public.mok_reg_guarda();
+
+create or replace function public.mok_resgate_guarda() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare m mok_missoes%rowtype;
+begin
+  select * into m from mok_missoes where id = new.missao_id;
+  if m.id is null then raise exception &#x27;Missão não encontrada.&#x27;; end if;
+  new.filho_id := m.filho_id;
+  if not mok_is_pai() then
+    if m.filho_id is distinct from mok_meu_filho() then raise exception &#x27;Missão de outra pessoa.&#x27;; end if;
+    new.valor := m.valor; new.xp := m.xp; new.titulo := m.titulo; new.premio := m.premio;
+    if exists (select 1 from mok_resgates where missao_id = new.missao_id) then
+      raise exception &#x27;Essa missão já foi resgatada.&#x27;;
+    end if;
+  end if;
+  return new;
+end $$;
+drop trigger if exists mok_resgate_guarda on public.mok_resgates;
+create trigger mok_resgate_guarda before insert on public.mok_resgates
+  for each row execute function public.mok_resgate_guarda();
+
+create or replace function public.mok_msg_guarda() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if mok_is_pai() then
+    if tg_op = &#x27;INSERT&#x27; then new.autor := &#x27;pai&#x27;; end if;
+  else
+    if tg_op = &#x27;INSERT&#x27; then
+      new.filho_id := mok_meu_filho(); new.autor := mok_meu_filho();
+    else
+      new.texto := old.texto; new.autor := old.autor; new.filho_id := old.filho_id;
+    end if;
+  end if;
+  return new;
+end $$;
+drop trigger if exists mok_msg_guarda on public.mok_mensagens;
+create trigger mok_msg_guarda before insert or update on public.mok_mensagens
+  for each row execute function public.mok_msg_guarda();
+
+-- ---------- PERMISSÕES DA API ----------
+grant select, insert, update, delete on
+  public.mok_config, public.mok_filhos, public.mok_perfis, public.mok_tarefas, public.mok_registros,
+  public.mok_pedidos, public.mok_missoes, public.mok_resgates, public.mok_pagamentos, public.mok_mensagens
+to authenticated;
+
+-- ---------- RLS ----------
+alter table public.mok_config     enable row level security;
+alter table public.mok_filhos     enable row level security;
+alter table public.mok_perfis     enable row level security;
+alter table public.mok_tarefas    enable row level security;
+alter table public.mok_registros  enable row level security;
+alter table public.mok_pedidos    enable row level security;
+alter table public.mok_missoes    enable row level security;
+alter table public.mok_resgates   enable row level security;
+alter table public.mok_pagamentos enable row level security;
+alter table public.mok_mensagens  enable row level security;
+
+-- config
+drop policy if exists mok_config_ler on public.mok_config;
+create policy mok_config_ler on public.mok_config for select to authenticated using (mok_is_membro());
+drop policy if exists mok_config_upd on public.mok_config;
+create policy mok_config_upd on public.mok_config for update to authenticated using (mok_is_pai()) with check (mok_is_pai());
+drop policy if exists mok_config_ins on public.mok_config;
+create policy mok_config_ins on public.mok_config for insert to authenticated with check (mok_is_pai());
+
+-- filhos
+drop policy if exists mok_filhos_ler on public.mok_filhos;
+create policy mok_filhos_ler on public.mok_filhos for select to authenticated using (mok_is_membro());
+drop policy if exists mok_filhos_ins on public.mok_filhos;
+create policy mok_filhos_ins on public.mok_filhos for insert to authenticated with check (mok_is_pai());
+drop policy if exists mok_filhos_upd on public.mok_filhos;
+create policy mok_filhos_upd on public.mok_filhos for update to authenticated
+  using (mok_is_pai() or (id = mok_meu_filho() and (mok_tem_permissao(&#x27;premios&#x27;, id) or mok_tem_permissao(&#x27;perfil&#x27;, id))))
+  with check (mok_is_pai() or (id = mok_meu_filho() and (mok_tem_permissao(&#x27;premios&#x27;, id) or mok_tem_permissao(&#x27;perfil&#x27;, id))));
+drop policy if exists mok_filhos_del on public.mok_filhos;
+create policy mok_filhos_del on public.mok_filhos for delete to authenticated using (mok_is_pai());
+
+-- perfis (só leitura; mudanças via funções)
+drop policy if exists mok_perfis_ler on public.mok_perfis;
+create policy mok_perfis_ler on public.mok_perfis for select to authenticated using (mok_is_membro());
+
+-- tarefas
+drop policy if exists mok_tarefas_ler on public.mok_tarefas;
+create policy mok_tarefas_ler on public.mok_tarefas for select to authenticated using (mok_pode_ver(filho_id));
+drop policy if exists mok_tarefas_ins on public.mok_tarefas;
+create policy mok_tarefas_ins on public.mok_tarefas for insert to authenticated
+  with check (mok_is_pai() or (filho_id = mok_meu_filho() and mok_tem_permissao(&#x27;tarefas&#x27;, filho_id)));
+drop policy if exists mok_tarefas_upd on public.mok_tarefas;
+create policy mok_tarefas_upd on public.mok_tarefas for update to authenticated
+  using (mok_is_pai() or (filho_id = mok_meu_filho() and mok_tem_permissao(&#x27;tarefas&#x27;, filho_id)))
+  with check (mok_is_pai() or (filho_id = mok_meu_filho() and mok_tem_permissao(&#x27;tarefas&#x27;, filho_id)));
+drop policy if exists mok_tarefas_del on public.mok_tarefas;
+create policy mok_tarefas_del on public.mok_tarefas for delete to authenticated using (mok_is_pai());
+
+-- registros (fotos/conclusão)
+drop policy if exists mok_reg_ler on public.mok_registros;
+create policy mok_reg_ler on public.mok_registros for select to authenticated using (mok_pode_ver(filho_id));
+drop policy if exists mok_reg_ins on public.mok_registros;
+create policy mok_reg_ins on public.mok_registros for insert to authenticated with check (mok_pode_ver(filho_id));
+drop policy if exists mok_reg_upd on public.mok_registros;
+create policy mok_reg_upd on public.mok_registros for update to authenticated using (mok_pode_ver(filho_id)) with check (mok_pode_ver(filho_id));
+drop policy if exists mok_reg_del on public.mok_registros;
+create policy mok_reg_del on public.mok_registros for delete to authenticated using (mok_is_pai());
+
+-- pedidos de permissão
+drop policy if exists mok_ped_ler on public.mok_pedidos;
+create policy mok_ped_ler on public.mok_pedidos for select to authenticated using (mok_pode_ver(filho_id));
+drop policy if exists mok_ped_ins on public.mok_pedidos;
+create policy mok_ped_ins on public.mok_pedidos for insert to authenticated
+  with check (mok_is_pai() or (filho_id = mok_meu_filho() and status = &#x27;pendente&#x27;));
+drop policy if exists mok_ped_upd on public.mok_pedidos;
+create policy mok_ped_upd on public.mok_pedidos for update to authenticated using (mok_is_pai()) with check (mok_is_pai());
+drop policy if exists mok_ped_del on public.mok_pedidos;
+create policy mok_ped_del on public.mok_pedidos for delete to authenticated using (mok_is_pai());
+
+-- missões
+drop policy if exists mok_mis_ler on public.mok_missoes;
+create policy mok_mis_ler on public.mok_missoes for select to authenticated using (mok_pode_ver(filho_id));
+drop policy if exists mok_mis_ins on public.mok_missoes;
+create policy mok_mis_ins on public.mok_missoes for insert to authenticated
+  with check (mok_is_pai() or (filho_id = mok_meu_filho() and mok_tem_permissao(&#x27;missoes&#x27;, filho_id)));
+drop policy if exists mok_mis_upd on public.mok_missoes;
+create policy mok_mis_upd on public.mok_missoes for update to authenticated
+  using (mok_is_pai() or (filho_id = mok_meu_filho() and mok_tem_permissao(&#x27;missoes&#x27;, filho_id)))
+  with check (mok_is_pai() or (filho_id = mok_meu_filho() and mok_tem_permissao(&#x27;missoes&#x27;, filho_id)));
+drop policy if exists mok_mis_del on public.mok_missoes;
+create policy mok_mis_del on public.mok_missoes for delete to authenticated using (mok_is_pai());
+
+-- resgates de prêmios
+drop policy if exists mok_res_ler on public.mok_resgates;
+create policy mok_res_ler on public.mok_resgates for select to authenticated using (mok_pode_ver(filho_id));
+drop policy if exists mok_res_ins on public.mok_resgates;
+create policy mok_res_ins on public.mok_resgates for insert to authenticated with check (mok_pode_ver(filho_id));
+drop policy if exists mok_res_del on public.mok_resgates;
+create policy mok_res_del on public.mok_resgates for delete to authenticated using (mok_is_pai());
+
+-- pagamentos (só o pai)
+drop policy if exists mok_pag_ler on public.mok_pagamentos;
+create policy mok_pag_ler on public.mok_pagamentos for select to authenticated using (mok_pode_ver(filho_id));
+drop policy if exists mok_pag_esc on public.mok_pagamentos;
+create policy mok_pag_esc on public.mok_pagamentos for all to authenticated using (mok_is_pai()) with check (mok_is_pai());
+
+-- chat
+drop policy if exists mok_msg_ler on public.mok_mensagens;
+create policy mok_msg_ler on public.mok_mensagens for select to authenticated using (mok_pode_ver(filho_id));
+drop policy if exists mok_msg_ins on public.mok_mensagens;
+create policy mok_msg_ins on public.mok_mensagens for insert to authenticated with check (mok_is_membro());
+drop policy if exists mok_msg_upd on public.mok_mensagens;
+create policy mok_msg_upd on public.mok_mensagens for update to authenticated using (mok_pode_ver(filho_id)) with check (mok_pode_ver(filho_id));
+drop policy if exists mok_msg_del on public.mok_mensagens;
+create policy mok_msg_del on public.mok_mensagens for delete to authenticated using (mok_is_pai());
+
+-- ---------- FOTOS (Storage) ----------
+insert into storage.buckets (id, name, public) values (&#x27;mok-fotos&#x27;, &#x27;mok-fotos&#x27;, true)
+on conflict (id) do nothing;
+drop policy if exists &quot;mok fotos enviar&quot; on storage.objects;
+create policy &quot;mok fotos enviar&quot; on storage.objects for insert to authenticated
+  with check (bucket_id = &#x27;mok-fotos&#x27; and public.mok_is_membro());
+drop policy if exists &quot;mok fotos ler&quot; on storage.objects;
+create policy &quot;mok fotos ler&quot; on storage.objects for select using (bucket_id = &#x27;mok-fotos&#x27;);
+drop policy if exists &quot;mok fotos apagar&quot; on storage.objects;
+create policy &quot;mok fotos apagar&quot; on storage.objects for delete to authenticated
+  using (bucket_id = &#x27;mok-fotos&#x27; and public.mok_is_pai());
+
+-- ---------- TEMPO REAL ----------
+do $$
+declare t text;
+begin
+  foreach t in array array[&#x27;mok_filhos&#x27;,&#x27;mok_tarefas&#x27;,&#x27;mok_registros&#x27;,&#x27;mok_pedidos&#x27;,&#x27;mok_missoes&#x27;,&#x27;mok_resgates&#x27;,&#x27;mok_pagamentos&#x27;,&#x27;mok_mensagens&#x27;,&#x27;mok_config&#x27;]
+  loop
+    begin
+      execute format(&#x27;alter publication supabase_realtime add table public.%I&#x27;, t);
+    exception when duplicate_object then null;
+    end;
+  end loop;
+end $$;
+
+-- Pronto! Agora abra o app e crie a conta do Pai.
+</pre>
+<script>document.getElementById('b').onclick=async()=>{const t=document.getElementById('s').textContent;try{await navigator.clipboard.writeText(t)}catch(e){const r=document.createRange();r.selectNodeContents(document.getElementById('s'));const s=getSelection();s.removeAllRanges();s.addRange(r);document.execCommand('copy')}document.getElementById('b').textContent='✅ Copiado! Agora cole no SQL Editor'}</script></body></html>
