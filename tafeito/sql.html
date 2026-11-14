@@ -579,6 +579,67 @@ create trigger mok_push_ped after insert or update on public.mok_pedidos for eac
 drop trigger if exists mok_push_tar on public.mok_tarefas;
 create trigger mok_push_tar after insert on public.mok_tarefas for each row execute function public.mok_push_gatilho();
 
+-- ---------- v1.2: LEMBRETE DA TAREFA NO CELULAR DO FILHO (mesmo com o app fechado) ----------
+-- A cada minuto o banco olha as tarefas com horário. Na hora certa manda "⏰ Hora de..." para o filho.
+-- Se 30 minutos depois ainda não estiver feita, manda "⚠️ Ainda falta..." para o filho e avisa o pai.
+create extension if not exists pg_cron;
+
+create table if not exists public.mok_push_lembrete_log (
+  chave text primary key,
+  criado_em timestamptz not null default now()
+);
+alter table public.mok_push_lembrete_log enable row level security;
+revoke all on public.mok_push_lembrete_log from anon, authenticated;
+
+create or replace function public.mok_push_lembretes() returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare
+  agora timestamp := now() at time zone 'America/Fortaleza';
+  dia date := (now() at time zone 'America/Fortaleza')::date;
+  dsem int := extract(dow from (now() at time zone 'America/Fortaleza'))::int;
+  t record; rid text; hora timestamp; nome text;
+begin
+  for t in
+    select * from mok_tarefas
+    where ativa and horario ~ '^\d{2}:\d{2}$'
+      and (
+        (recorrencia = 'diaria' and (criado_em at time zone 'America/Fortaleza')::date &lt;= dia
+          and (jsonb_array_length(dias) = 0 or dias @&gt; to_jsonb(dsem)))
+        or (recorrencia = 'unica' and coalesce(data_unica, (criado_em at time zone 'America/Fortaleza')::date) &lt;= dia)
+      )
+  loop
+    rid := case when t.recorrencia = 'unica' then t.id || '_u' else t.id || '_' || to_char(dia, 'YYYY-MM-DD') end;
+    if exists (select 1 from mok_registros where id = rid and status in ('feita', 'aprovada')) then continue; end if;
+    hora := dia + t.horario::time;
+
+    -- na hora (aceita até 10 min de atraso do relógio do servidor)
+    if agora &gt;= hora and agora &lt; hora + interval '10 minutes' then
+      insert into mok_push_lembrete_log (chave) values (rid || '@' || dia || '@hora') on conflict do nothing;
+      if found then
+        perform mok_push_enviar(t.filho_id, '⏰ Hora de: ' || t.titulo,
+          case when t.foto then 'Tire a foto ANTES, faça e tire a foto DEPOIS.' else 'Faça e marque como feita.' end, 'lembrete');
+      end if;
+    end if;
+
+    -- 30 minutos depois, se ainda não fez
+    if agora &gt;= hora + interval '30 minutes' and agora &lt; hora + interval '40 minutes' then
+      insert into mok_push_lembrete_log (chave) values (rid || '@' || dia || '@atraso') on conflict do nothing;
+      if found then
+        select f.nome into nome from mok_filhos f where f.id = t.filho_id;
+        perform mok_push_enviar(t.filho_id, '⚠️ Ainda falta: ' || t.titulo, 'Era para as ' || t.horario || '. Faça agora e marque no TáFeito.', 'lembrete');
+        perform mok_push_enviar('pai', '⚠️ ' || coalesce(nome, 'Filho') || ' ainda não fez', t.titulo || ' (era ' || t.horario || ')', 'atraso');
+      end if;
+    end if;
+  end loop;
+  delete from mok_push_lembrete_log where criado_em &lt; now() - interval '3 days';
+end $$;
+revoke all on function public.mok_push_lembretes() from public, anon, authenticated;
+
+do $$ begin
+  if exists (select 1 from cron.job where jobname = 'tafeito-lembretes') then perform cron.unschedule('tafeito-lembretes'); end if;
+  perform cron.schedule('tafeito-lembretes', '* * * * *', 'select public.mok_push_lembretes()');
+end $$;
+
 -- Pronto! Agora abra o app e crie a conta do Pai.
 </pre>
 <script>document.getElementById('b').onclick=async()=>{const t=document.getElementById('s').textContent;try{await navigator.clipboard.writeText(t)}catch(e){const r=document.createRange();r.selectNodeContents(document.getElementById('s'));const s=getSelection();s.removeAllRanges();s.addRange(r);document.execCommand('copy')}document.getElementById('b').textContent='✅ Copiado! Agora cole no SQL Editor'}</script></body></html>

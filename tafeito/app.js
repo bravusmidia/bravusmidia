@@ -1267,7 +1267,7 @@ async function notificar(titulo, corpo, tag) {
   beep(); if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
   if (document.visibilityState === 'visible') { const c = corpo || ''; toast(`${titulo}${c ? ' — ' + (c.length > 70 ? c.slice(0, 70) + '…' : c) : ''}`); }
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  if (lsGet('mok_push_ok') && ['msg', 'ped', 'reg', 'tar'].includes(tag)) return; // o push do servidor já mostra
+  if (lsGet('mok_push_ok') && ['msg', 'ped', 'reg', 'tar', 'lembrete'].includes(tag)) return; // o push do servidor já mostra
   const op = { body: corpo || '', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: tag ? tag + '-' + Date.now() : undefined, vibrate: [200, 100, 200], requireInteraction: true };
   try { const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (reg) await reg.showNotification(titulo, op); else new Notification(titulo, op); }
   catch { try { new Notification(titulo, op); } catch { } }
