@@ -1,5 +1,5 @@
 // TáFeito — service worker (funciona offline e mostra notificações)
-const CACHE = 'tafeito-v4';
+const CACHE = 'tafeito-v5';
 const ARQUIVOS = ['./', './index.html', './styles.css', './app.js', './config.js', './manifest.webmanifest',
   './lib/supabase.js', './icons/icon-192.png', './icons/icon-512.png'];
 
@@ -34,5 +34,15 @@ self.addEventListener('notificationclick', e => {
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cs => {
     for (const c of cs) { if ('focus' in c) return c.focus(); }
     return self.clients.openWindow('./');
+  }));
+});
+
+// push do servidor: chega mesmo com o app fechado
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { titulo: 'TáFeito', corpo: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.titulo || 'TáFeito', {
+    body: d.corpo || '', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png',
+    tag: (d.tag || 'tafeito') + '-' + Date.now(), vibrate: [200, 100, 200], data: { url: './' }
   }));
 });

@@ -1,5 +1,5 @@
 -- =====================================================================
--- MISSÃO OK — Banco de dados (Supabase)
+-- TáFeito — Banco de dados (Supabase)
 -- Cole TUDO no Supabase > SQL Editor > New query e clique em RUN.
 -- Pode rodar de novo sem problema (não apaga nada).
 -- =====================================================================
@@ -126,6 +126,14 @@ create table if not exists public.mok_mensagens (
   criado_em timestamptz not null default now()
 );
 
+-- ---------- v1.1: ITENS PARA MARCAR UM POR UM (ex.: 3 lixeiras) ----------
+alter table public.mok_tarefas   add column if not exists itens jsonb not null default '[]'::jsonb;
+alter table public.mok_registros add column if not exists itens_feitos jsonb not null default '[]'::jsonb;
+update public.mok_tarefas
+   set itens = '["Lixeira da cozinha","Lixeira do banheiro","Lixeira do quarto"]'::jsonb,
+       descricao = 'Esvaziar as 3 lixeiras e colocar saco novo. Marque cada uma.'
+ where titulo ilike '%lixo%' and itens = '[]'::jsonb;
+
 -- ---------- FUNÇÕES DE SEGURANÇA ----------
 create or replace function public.mok_is_pai() returns boolean
 language sql stable security definer set search_path = public as $$
@@ -227,6 +235,11 @@ begin
     end if;
     if new.status = 'feita' and t.foto and (new.foto_antes is null or new.foto_depois is null) then
       raise exception 'Precisa da foto ANTES e da foto DEPOIS.';
+    end if;
+    if new.status = 'feita' and jsonb_array_length(coalesce(t.itens, '[]'::jsonb)) > 0
+       and (select count(distinct x) from jsonb_array_elements_text(coalesce(new.itens_feitos, '[]'::jsonb)) x)
+           < jsonb_array_length(t.itens) then
+      raise exception 'Marque todos os itens antes de concluir.';
     end if;
   end if;
   new.atualizado_em := now();
@@ -469,5 +482,98 @@ begin
 end $$;
 revoke all on function public.mok_criar_acesso_filho(text, text) from public, anon;
 grant execute on function public.mok_criar_acesso_filho(text, text) to authenticated;
+
+-- ---------- v1.1: NOTIFICAÇÃO PUSH (chega com o app fechado) ----------
+create extension if not exists pg_net with schema extensions;
+
+create table if not exists public.mok_push_cfg (
+  id int primary key default 1 check (id = 1),
+  base text,
+  segredo text not null default encode(extensions.gen_random_bytes(24), 'hex'),
+  vapid_pub text,
+  vapid_priv text
+);
+insert into public.mok_push_cfg (id) values (1) on conflict (id) do nothing;
+alter table public.mok_push_cfg enable row level security;
+revoke all on public.mok_push_cfg from anon, authenticated;
+
+create table if not exists public.mok_push (
+  endpoint text primary key,
+  perfil uuid references auth.users(id) on delete cascade,
+  alvo text not null,
+  p256dh text not null,
+  auth text not null,
+  criado_em timestamptz not null default now()
+);
+alter table public.mok_push enable row level security;
+revoke all on public.mok_push from anon, authenticated;
+
+-- o app salva o aparelho de quem ativou as notificações
+create or replace function public.mok_push_salvar(p_endpoint text, p_p256dh text, p_auth text, p_base text) returns void
+language plpgsql security definer set search_path = public as $$
+declare a text;
+begin
+  select case when papel = 'pai' then 'pai' else filho_id end into a from mok_perfis where id = auth.uid();
+  if a is null then raise exception 'Perfil não encontrado.'; end if;
+  insert into mok_push (endpoint, perfil, alvo, p256dh, auth) values (p_endpoint, auth.uid(), a, p_p256dh, p_auth)
+  on conflict (endpoint) do update set perfil = excluded.perfil, alvo = excluded.alvo, p256dh = excluded.p256dh, auth = excluded.auth;
+  if p_base ~ '^https://[a-z0-9]+\.supabase\.co$' then update mok_push_cfg set base = p_base where id = 1; end if;
+end $$;
+revoke all on function public.mok_push_salvar(text, text, text, text) from public, anon;
+grant execute on function public.mok_push_salvar(text, text, text, text) to authenticated;
+
+create or replace function public.mok_push_enviar(p_alvo text, p_titulo text, p_corpo text, p_tag text) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare c mok_push_cfg%rowtype;
+begin
+  select * into c from mok_push_cfg where id = 1;
+  if c.base is null or not exists (select 1 from mok_push where alvo = p_alvo) then return; end if;
+  perform net.http_post(
+    url := c.base || '/functions/v1/tafeito-push',
+    body := jsonb_build_object('alvo', p_alvo, 'titulo', p_titulo, 'corpo', coalesce(p_corpo, ''), 'tag', p_tag),
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-tafeito-segredo', c.segredo));
+exception when others then null; -- aviso nunca trava o app
+end $$;
+revoke all on function public.mok_push_enviar(text, text, text, text) from public, anon, authenticated;
+
+create or replace function public.mok_push_gatilho() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare nome text; tit text;
+begin
+  if tg_table_name = 'mok_registros' then
+    select titulo into tit from mok_tarefas where id = new.tarefa_id;
+    select f.nome into nome from mok_filhos f where f.id = new.filho_id;
+    if tg_op = 'UPDATE' and old.status = new.status then return null; end if;
+    if new.status = 'feita' then perform mok_push_enviar('pai', '✅ ' || coalesce(nome, 'Filho') || ' concluiu', coalesce(tit, 'tarefa'), 'reg');
+    elsif new.status = 'aprovada' then perform mok_push_enviar(new.filho_id, '⭐ Tarefa aprovada pelo pai', coalesce(tit, 'tarefa'), 'reg');
+    elsif new.status = 'reprovada' then perform mok_push_enviar(new.filho_id, '🔁 O pai pediu para refazer', coalesce(tit, 'tarefa') || case when new.obs <> '' then ': ' || new.obs else '' end, 'reg');
+    end if;
+  elsif tg_table_name = 'mok_mensagens' then
+    if new.autor = 'pai' then perform mok_push_enviar(new.filho_id, '💬 Pai', new.texto, 'msg');
+    else
+      select f.nome into nome from mok_filhos f where f.id = new.filho_id;
+      perform mok_push_enviar('pai', '💬 ' || coalesce(nome, 'Filho'), new.texto, 'msg');
+    end if;
+  elsif tg_table_name = 'mok_pedidos' then
+    select f.nome into nome from mok_filhos f where f.id = new.filho_id;
+    if tg_op = 'INSERT' and new.status = 'pendente' then
+      perform mok_push_enviar('pai', '🔐 Pedido de ' || coalesce(nome, 'filho'), coalesce(nullif(new.mensagem, ''), 'Quer permissão para ajustar algo'), 'ped');
+    elsif tg_op = 'UPDATE' and old.status = 'pendente' and new.status <> 'pendente' then
+      perform mok_push_enviar(new.filho_id, case when new.status = 'aprovado' then '✅ Pedido aprovado!' else '❌ Pedido negado' end, 'Abra o TáFeito', 'ped');
+    end if;
+  elsif tg_table_name = 'mok_tarefas' then
+    if tg_op = 'INSERT' and new.ativa then perform mok_push_enviar(new.filho_id, '📋 Nova tarefa: ' || new.titulo, case when new.horario <> '' then 'Horário: ' || new.horario else 'Veja no app' end, 'tar'); end if;
+  end if;
+  return null;
+end $$;
+
+drop trigger if exists mok_push_reg on public.mok_registros;
+create trigger mok_push_reg after insert or update on public.mok_registros for each row execute function public.mok_push_gatilho();
+drop trigger if exists mok_push_msg on public.mok_mensagens;
+create trigger mok_push_msg after insert on public.mok_mensagens for each row execute function public.mok_push_gatilho();
+drop trigger if exists mok_push_ped on public.mok_pedidos;
+create trigger mok_push_ped after insert or update on public.mok_pedidos for each row execute function public.mok_push_gatilho();
+drop trigger if exists mok_push_tar on public.mok_tarefas;
+create trigger mok_push_tar after insert on public.mok_tarefas for each row execute function public.mok_push_gatilho();
 
 -- Pronto! Agora abra o app e crie a conta do Pai.

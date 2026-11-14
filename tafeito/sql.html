@@ -2,7 +2,7 @@
 <style>body{background:#0b1020;color:#eef1fb;font-family:system-ui,sans-serif;margin:0;padding:16px}button{background:linear-gradient(135deg,#4f7cff,#7b5cff);color:#fff;border:0;border-radius:12px;padding:14px 22px;font-size:1.1rem;font-weight:700;cursor:pointer;position:sticky;top:10px}pre{background:#151d38;border:1px solid #26315a;border-radius:12px;padding:12px;white-space:pre-wrap;font-size:12px}</style></head>
 <body><h2>TáFeito: SQL do banco</h2><p>1) Clique em <b>Copiar tudo</b>. 2) No Supabase: SQL Editor → New query → cole (Ctrl+V) → Run. Pode rodar de novo sem problema.</p>
 <button id="b">📋 Copiar tudo</button><pre id="s">-- =====================================================================
--- MISSÃO OK — Banco de dados (Supabase)
+-- TáFeito — Banco de dados (Supabase)
 -- Cole TUDO no Supabase &gt; SQL Editor &gt; New query e clique em RUN.
 -- Pode rodar de novo sem problema (não apaga nada).
 -- =====================================================================
@@ -22,20 +22,20 @@ create table if not exists public.mok_filhos (
   ordem int not null default 1,
   horas_pc numeric not null default 2,
   horas_cel numeric not null default 2,
-  premio_extra text not null default &#x27;&#x27;,
+  premio_extra text not null default '',
   exigir_aprovacao boolean not null default false,
   criado_em timestamptz not null default now()
 );
 insert into public.mok_filhos (id, nome, ordem) values
-  (&#x27;henrique&#x27;, &#x27;Henrique&#x27;, 1),
-  (&#x27;lorenzo&#x27;,  &#x27;Lorenzo&#x27;,  2)
+  ('henrique', 'Henrique', 1),
+  ('lorenzo',  'Lorenzo',  2)
 on conflict (id) do nothing;
 
 create table if not exists public.mok_perfis (
   id uuid primary key references auth.users(id) on delete cascade,
-  papel text not null check (papel in (&#x27;pai&#x27;,&#x27;filho&#x27;)),
+  papel text not null check (papel in ('pai','filho')),
   filho_id text references public.mok_filhos(id) on delete cascade,
-  nome text not null default &#x27;&#x27;,
+  nome text not null default '',
   visto_em timestamptz
 );
 
@@ -43,13 +43,13 @@ create table if not exists public.mok_tarefas (
   id text primary key,
   filho_id text not null references public.mok_filhos(id) on delete cascade,
   titulo text not null,
-  icone text not null default &#x27;&#x27;,
-  categoria text not null default &#x27;casa&#x27; check (categoria in (&#x27;casa&#x27;,&#x27;estudo&#x27;,&#x27;trabalho&#x27;)),
-  descricao text not null default &#x27;&#x27;,
-  recorrencia text not null default &#x27;diaria&#x27; check (recorrencia in (&#x27;diaria&#x27;,&#x27;unica&#x27;)),
-  dias jsonb not null default &#x27;[]&#x27;::jsonb,
+  icone text not null default '',
+  categoria text not null default 'casa' check (categoria in ('casa','estudo','trabalho')),
+  descricao text not null default '',
+  recorrencia text not null default 'diaria' check (recorrencia in ('diaria','unica')),
+  dias jsonb not null default '[]'::jsonb,
   data_unica date,
-  horario text not null default &#x27;&#x27;,
+  horario text not null default '',
   foto boolean not null default true,
   obrigatoria boolean not null default true,
   xp int not null default 10,
@@ -63,12 +63,12 @@ create table if not exists public.mok_registros (
   filho_id text not null references public.mok_filhos(id) on delete cascade,
   tarefa_id text not null,
   data date not null,
-  categoria text not null default &#x27;casa&#x27;,
+  categoria text not null default 'casa',
   foto_antes text, foto_antes_em timestamptz,
   foto_depois text, foto_depois_em timestamptz,
-  status text not null default &#x27;pendente&#x27; check (status in (&#x27;pendente&#x27;,&#x27;feita&#x27;,&#x27;aprovada&#x27;,&#x27;reprovada&#x27;)),
+  status text not null default 'pendente' check (status in ('pendente','feita','aprovada','reprovada')),
   feito_em timestamptz,
-  obs text not null default &#x27;&#x27;,
+  obs text not null default '',
   xp int not null default 0,
   valor numeric(10,2) not null default 0,
   atualizado_em timestamptz not null default now()
@@ -78,8 +78,8 @@ create table if not exists public.mok_pedidos (
   id text primary key,
   filho_id text not null references public.mok_filhos(id) on delete cascade,
   area text not null,
-  mensagem text not null default &#x27;&#x27;,
-  status text not null default &#x27;pendente&#x27; check (status in (&#x27;pendente&#x27;,&#x27;aprovado&#x27;,&#x27;negado&#x27;)),
+  mensagem text not null default '',
+  status text not null default 'pendente' check (status in ('pendente','aprovado','negado')),
   criado_em timestamptz not null default now(),
   respondido_em timestamptz,
   expira_em timestamptz
@@ -89,12 +89,12 @@ create table if not exists public.mok_missoes (
   id text primary key,
   filho_id text not null references public.mok_filhos(id) on delete cascade,
   titulo text not null,
-  descricao text not null default &#x27;&#x27;,
-  icone text not null default &#x27;🏆&#x27;,
-  tipo text not null default &#x27;total&#x27; check (tipo in (&#x27;total&#x27;,&#x27;categoria&#x27;,&#x27;sequencia&#x27;,&#x27;dias&#x27;)),
+  descricao text not null default '',
+  icone text not null default '🏆',
+  tipo text not null default 'total' check (tipo in ('total','categoria','sequencia','dias')),
   meta int not null default 10,
-  categoria text not null default &#x27;&#x27;,
-  premio text not null default &#x27;&#x27;,
+  categoria text not null default '',
+  premio text not null default '',
   valor numeric(10,2) not null default 0,
   xp int not null default 50,
   ativa boolean not null default true,
@@ -105,8 +105,8 @@ create table if not exists public.mok_resgates (
   id text primary key,
   filho_id text not null references public.mok_filhos(id) on delete cascade,
   missao_id text not null,
-  titulo text not null default &#x27;&#x27;,
-  premio text not null default &#x27;&#x27;,
+  titulo text not null default '',
+  premio text not null default '',
   valor numeric(10,2) not null default 0,
   xp int not null default 0,
   criado_em timestamptz not null default now()
@@ -116,7 +116,7 @@ create table if not exists public.mok_pagamentos (
   id text primary key,
   filho_id text not null references public.mok_filhos(id) on delete cascade,
   valor numeric(10,2) not null default 0,
-  obs text not null default &#x27;&#x27;,
+  obs text not null default '',
   criado_em timestamptz not null default now()
 );
 
@@ -129,15 +129,23 @@ create table if not exists public.mok_mensagens (
   criado_em timestamptz not null default now()
 );
 
+-- ---------- v1.1: ITENS PARA MARCAR UM POR UM (ex.: 3 lixeiras) ----------
+alter table public.mok_tarefas   add column if not exists itens jsonb not null default '[]'::jsonb;
+alter table public.mok_registros add column if not exists itens_feitos jsonb not null default '[]'::jsonb;
+update public.mok_tarefas
+   set itens = '["Lixeira da cozinha","Lixeira do banheiro","Lixeira do quarto"]'::jsonb,
+       descricao = 'Esvaziar as 3 lixeiras e colocar saco novo. Marque cada uma.'
+ where titulo ilike '%lixo%' and itens = '[]'::jsonb;
+
 -- ---------- FUNÇÕES DE SEGURANÇA ----------
 create or replace function public.mok_is_pai() returns boolean
 language sql stable security definer set search_path = public as $$
-  select exists (select 1 from mok_perfis where id = auth.uid() and papel = &#x27;pai&#x27;);
+  select exists (select 1 from mok_perfis where id = auth.uid() and papel = 'pai');
 $$;
 
 create or replace function public.mok_meu_filho() returns text
 language sql stable security definer set search_path = public as $$
-  select filho_id from mok_perfis where id = auth.uid() and papel = &#x27;filho&#x27; limit 1;
+  select filho_id from mok_perfis where id = auth.uid() and papel = 'filho' limit 1;
 $$;
 
 create or replace function public.mok_is_membro() returns boolean
@@ -154,50 +162,50 @@ $$;
 create or replace function public.mok_tem_permissao(a text, fid text) returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (select 1 from mok_pedidos
-    where area = a and filho_id = fid and status = &#x27;aprovado&#x27; and expira_em &gt; now());
+    where area = a and filho_id = fid and status = 'aprovado' and expira_em &gt; now());
 $$;
 
 -- tela de login (antes de entrar): nomes dos filhos e código da família
 create or replace function public.mok_inicio() returns json
 language sql stable security definer set search_path = public as $$
   select json_build_object(
-    &#x27;tem_pai&#x27;, exists (select 1 from mok_perfis where papel = &#x27;pai&#x27;),
-    &#x27;familia&#x27;, (select familia from mok_config where id = 1),
-    &#x27;filhos&#x27;, coalesce((select json_agg(json_build_object(&#x27;id&#x27;, id, &#x27;nome&#x27;, nome) order by ordem) from mok_filhos), &#x27;[]&#x27;::json),
-    &#x27;com_acesso&#x27;, coalesce((select json_agg(filho_id) from mok_perfis where papel = &#x27;filho&#x27;), &#x27;[]&#x27;::json)
+    'tem_pai', exists (select 1 from mok_perfis where papel = 'pai'),
+    'familia', (select familia from mok_config where id = 1),
+    'filhos', coalesce((select json_agg(json_build_object('id', id, 'nome', nome) order by ordem) from mok_filhos), '[]'::json),
+    'com_acesso', coalesce((select json_agg(filho_id) from mok_perfis where papel = 'filho'), '[]'::json)
   );
 $$;
 
 create or replace function public.mok_registrar_pai(p_nome text) returns void
 language plpgsql security definer set search_path = public as $$
 begin
-  if auth.uid() is null then raise exception &#x27;Faça login primeiro.&#x27;; end if;
-  if exists (select 1 from mok_perfis where papel = &#x27;pai&#x27; and id &lt;&gt; auth.uid()) then
-    raise exception &#x27;Já existe um pai cadastrado neste app.&#x27;;
+  if auth.uid() is null then raise exception 'Faça login primeiro.'; end if;
+  if exists (select 1 from mok_perfis where papel = 'pai' and id &lt;&gt; auth.uid()) then
+    raise exception 'Já existe um pai cadastrado neste app.';
   end if;
-  insert into mok_perfis (id, papel, nome) values (auth.uid(), &#x27;pai&#x27;, coalesce(nullif(p_nome,&#x27;&#x27;), &#x27;Pai&#x27;))
-  on conflict (id) do update set papel = &#x27;pai&#x27;, filho_id = null, nome = excluded.nome;
+  insert into mok_perfis (id, papel, nome) values (auth.uid(), 'pai', coalesce(nullif(p_nome,''), 'Pai'))
+  on conflict (id) do update set papel = 'pai', filho_id = null, nome = excluded.nome;
 end $$;
 
 create or replace function public.mok_vincular_filho(p_user uuid, p_filho text) returns void
 language plpgsql security definer set search_path = public as $$
 begin
-  if not mok_is_pai() then raise exception &#x27;Somente o pai pode criar acessos.&#x27;; end if;
+  if not mok_is_pai() then raise exception 'Somente o pai pode criar acessos.'; end if;
   delete from mok_perfis where filho_id = p_filho and id &lt;&gt; p_user;
   insert into mok_perfis (id, papel, filho_id, nome)
-  values (p_user, &#x27;filho&#x27;, p_filho, (select nome from mok_filhos where id = p_filho))
-  on conflict (id) do update set papel = &#x27;filho&#x27;, filho_id = excluded.filho_id, nome = excluded.nome;
+  values (p_user, 'filho', p_filho, (select nome from mok_filhos where id = p_filho))
+  on conflict (id) do update set papel = 'filho', filho_id = excluded.filho_id, nome = excluded.nome;
 end $$;
 
 create or replace function public.mok_trocar_pin(p_filho text, p_pin text) returns void
 language plpgsql security definer set search_path = public, extensions as $$
 declare v uuid;
 begin
-  if not mok_is_pai() then raise exception &#x27;Somente o pai pode trocar o PIN.&#x27;; end if;
-  if char_length(p_pin) &lt; 6 then raise exception &#x27;O PIN precisa ter pelo menos 6 dígitos.&#x27;; end if;
+  if not mok_is_pai() then raise exception 'Somente o pai pode trocar o PIN.'; end if;
+  if char_length(p_pin) &lt; 6 then raise exception 'O PIN precisa ter pelo menos 6 dígitos.'; end if;
   select id into v from mok_perfis where filho_id = p_filho limit 1;
-  if v is null then raise exception &#x27;Esse filho ainda não tem acesso criado.&#x27;; end if;
-  update auth.users set encrypted_password = extensions.crypt(p_pin, extensions.gen_salt(&#x27;bf&#x27;)) where id = v;
+  if v is null then raise exception 'Esse filho ainda não tem acesso criado.'; end if;
+  update auth.users set encrypted_password = extensions.crypt(p_pin, extensions.gen_salt('bf')) where id = v;
 end $$;
 
 create or replace function public.mok_ping() returns void
@@ -216,20 +224,25 @@ language plpgsql security definer set search_path = public as $$
 declare t mok_tarefas%rowtype;
 begin
   select * into t from mok_tarefas where id = new.tarefa_id;
-  if t.id is null then raise exception &#x27;Tarefa não encontrada.&#x27;; end if;
+  if t.id is null then raise exception 'Tarefa não encontrada.'; end if;
   new.filho_id := t.filho_id;
   new.categoria := t.categoria;
   if not mok_is_pai() then
-    if new.filho_id is distinct from mok_meu_filho() then raise exception &#x27;Essa tarefa é de outra pessoa.&#x27;; end if;
+    if new.filho_id is distinct from mok_meu_filho() then raise exception 'Essa tarefa é de outra pessoa.'; end if;
     new.xp := t.xp; new.valor := t.valor;
-    if new.status = &#x27;aprovada&#x27; then raise exception &#x27;Só o pai pode aprovar.&#x27;; end if;
-    if tg_op = &#x27;UPDATE&#x27; then
-      if old.status = &#x27;aprovada&#x27; then raise exception &#x27;Tarefa já aprovada pelo pai.&#x27;; end if;
-      if new.status = &#x27;reprovada&#x27; and old.status &lt;&gt; &#x27;reprovada&#x27; then raise exception &#x27;Só o pai pode reprovar.&#x27;; end if;
-    elsif new.status = &#x27;reprovada&#x27; then raise exception &#x27;Só o pai pode reprovar.&#x27;;
+    if new.status = 'aprovada' then raise exception 'Só o pai pode aprovar.'; end if;
+    if tg_op = 'UPDATE' then
+      if old.status = 'aprovada' then raise exception 'Tarefa já aprovada pelo pai.'; end if;
+      if new.status = 'reprovada' and old.status &lt;&gt; 'reprovada' then raise exception 'Só o pai pode reprovar.'; end if;
+    elsif new.status = 'reprovada' then raise exception 'Só o pai pode reprovar.';
     end if;
-    if new.status = &#x27;feita&#x27; and t.foto and (new.foto_antes is null or new.foto_depois is null) then
-      raise exception &#x27;Precisa da foto ANTES e da foto DEPOIS.&#x27;;
+    if new.status = 'feita' and t.foto and (new.foto_antes is null or new.foto_depois is null) then
+      raise exception 'Precisa da foto ANTES e da foto DEPOIS.';
+    end if;
+    if new.status = 'feita' and jsonb_array_length(coalesce(t.itens, '[]'::jsonb)) &gt; 0
+       and (select count(distinct x) from jsonb_array_elements_text(coalesce(new.itens_feitos, '[]'::jsonb)) x)
+           &lt; jsonb_array_length(t.itens) then
+      raise exception 'Marque todos os itens antes de concluir.';
     end if;
   end if;
   new.atualizado_em := now();
@@ -244,13 +257,13 @@ language plpgsql security definer set search_path = public as $$
 declare m mok_missoes%rowtype;
 begin
   select * into m from mok_missoes where id = new.missao_id;
-  if m.id is null then raise exception &#x27;Missão não encontrada.&#x27;; end if;
+  if m.id is null then raise exception 'Missão não encontrada.'; end if;
   new.filho_id := m.filho_id;
   if not mok_is_pai() then
-    if m.filho_id is distinct from mok_meu_filho() then raise exception &#x27;Missão de outra pessoa.&#x27;; end if;
+    if m.filho_id is distinct from mok_meu_filho() then raise exception 'Missão de outra pessoa.'; end if;
     new.valor := m.valor; new.xp := m.xp; new.titulo := m.titulo; new.premio := m.premio;
     if exists (select 1 from mok_resgates where missao_id = new.missao_id) then
-      raise exception &#x27;Essa missão já foi resgatada.&#x27;;
+      raise exception 'Essa missão já foi resgatada.';
     end if;
   end if;
   return new;
@@ -263,9 +276,9 @@ create or replace function public.mok_msg_guarda() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
   if mok_is_pai() then
-    if tg_op = &#x27;INSERT&#x27; then new.autor := &#x27;pai&#x27;; end if;
+    if tg_op = 'INSERT' then new.autor := 'pai'; end if;
   else
-    if tg_op = &#x27;INSERT&#x27; then
+    if tg_op = 'INSERT' then
       new.filho_id := mok_meu_filho(); new.autor := mok_meu_filho();
     else
       new.texto := old.texto; new.autor := old.autor; new.filho_id := old.filho_id;
@@ -310,8 +323,8 @@ drop policy if exists mok_filhos_ins on public.mok_filhos;
 create policy mok_filhos_ins on public.mok_filhos for insert to authenticated with check (mok_is_pai());
 drop policy if exists mok_filhos_upd on public.mok_filhos;
 create policy mok_filhos_upd on public.mok_filhos for update to authenticated
-  using (mok_is_pai() or (id = mok_meu_filho() and (mok_tem_permissao(&#x27;premios&#x27;, id) or mok_tem_permissao(&#x27;perfil&#x27;, id))))
-  with check (mok_is_pai() or (id = mok_meu_filho() and (mok_tem_permissao(&#x27;premios&#x27;, id) or mok_tem_permissao(&#x27;perfil&#x27;, id))));
+  using (mok_is_pai() or (id = mok_meu_filho() and (mok_tem_permissao('premios', id) or mok_tem_permissao('perfil', id))))
+  with check (mok_is_pai() or (id = mok_meu_filho() and (mok_tem_permissao('premios', id) or mok_tem_permissao('perfil', id))));
 drop policy if exists mok_filhos_del on public.mok_filhos;
 create policy mok_filhos_del on public.mok_filhos for delete to authenticated using (mok_is_pai());
 
@@ -324,11 +337,11 @@ drop policy if exists mok_tarefas_ler on public.mok_tarefas;
 create policy mok_tarefas_ler on public.mok_tarefas for select to authenticated using (mok_pode_ver(filho_id));
 drop policy if exists mok_tarefas_ins on public.mok_tarefas;
 create policy mok_tarefas_ins on public.mok_tarefas for insert to authenticated
-  with check (mok_is_pai() or (filho_id = mok_meu_filho() and mok_tem_permissao(&#x27;tarefas&#x27;, filho_id)));
+  with check (mok_is_pai() or (filho_id = mok_meu_filho() and mok_tem_permissao('tarefas', filho_id)));
 drop policy if exists mok_tarefas_upd on public.mok_tarefas;
 create policy mok_tarefas_upd on public.mok_tarefas for update to authenticated
-  using (mok_is_pai() or (filho_id = mok_meu_filho() and mok_tem_permissao(&#x27;tarefas&#x27;, filho_id)))
-  with check (mok_is_pai() or (filho_id = mok_meu_filho() and mok_tem_permissao(&#x27;tarefas&#x27;, filho_id)));
+  using (mok_is_pai() or (filho_id = mok_meu_filho() and mok_tem_permissao('tarefas', filho_id)))
+  with check (mok_is_pai() or (filho_id = mok_meu_filho() and mok_tem_permissao('tarefas', filho_id)));
 drop policy if exists mok_tarefas_del on public.mok_tarefas;
 create policy mok_tarefas_del on public.mok_tarefas for delete to authenticated using (mok_is_pai());
 
@@ -347,7 +360,7 @@ drop policy if exists mok_ped_ler on public.mok_pedidos;
 create policy mok_ped_ler on public.mok_pedidos for select to authenticated using (mok_pode_ver(filho_id));
 drop policy if exists mok_ped_ins on public.mok_pedidos;
 create policy mok_ped_ins on public.mok_pedidos for insert to authenticated
-  with check (mok_is_pai() or (filho_id = mok_meu_filho() and status = &#x27;pendente&#x27;));
+  with check (mok_is_pai() or (filho_id = mok_meu_filho() and status = 'pendente'));
 drop policy if exists mok_ped_upd on public.mok_pedidos;
 create policy mok_ped_upd on public.mok_pedidos for update to authenticated using (mok_is_pai()) with check (mok_is_pai());
 drop policy if exists mok_ped_del on public.mok_pedidos;
@@ -358,11 +371,11 @@ drop policy if exists mok_mis_ler on public.mok_missoes;
 create policy mok_mis_ler on public.mok_missoes for select to authenticated using (mok_pode_ver(filho_id));
 drop policy if exists mok_mis_ins on public.mok_missoes;
 create policy mok_mis_ins on public.mok_missoes for insert to authenticated
-  with check (mok_is_pai() or (filho_id = mok_meu_filho() and mok_tem_permissao(&#x27;missoes&#x27;, filho_id)));
+  with check (mok_is_pai() or (filho_id = mok_meu_filho() and mok_tem_permissao('missoes', filho_id)));
 drop policy if exists mok_mis_upd on public.mok_missoes;
 create policy mok_mis_upd on public.mok_missoes for update to authenticated
-  using (mok_is_pai() or (filho_id = mok_meu_filho() and mok_tem_permissao(&#x27;missoes&#x27;, filho_id)))
-  with check (mok_is_pai() or (filho_id = mok_meu_filho() and mok_tem_permissao(&#x27;missoes&#x27;, filho_id)));
+  using (mok_is_pai() or (filho_id = mok_meu_filho() and mok_tem_permissao('missoes', filho_id)))
+  with check (mok_is_pai() or (filho_id = mok_meu_filho() and mok_tem_permissao('missoes', filho_id)));
 drop policy if exists mok_mis_del on public.mok_missoes;
 create policy mok_mis_del on public.mok_missoes for delete to authenticated using (mok_is_pai());
 
@@ -391,25 +404,25 @@ drop policy if exists mok_msg_del on public.mok_mensagens;
 create policy mok_msg_del on public.mok_mensagens for delete to authenticated using (mok_is_pai());
 
 -- ---------- FOTOS (Storage) ----------
-insert into storage.buckets (id, name, public) values (&#x27;mok-fotos&#x27;, &#x27;mok-fotos&#x27;, true)
+insert into storage.buckets (id, name, public) values ('mok-fotos', 'mok-fotos', true)
 on conflict (id) do nothing;
-drop policy if exists &quot;mok fotos enviar&quot; on storage.objects;
-create policy &quot;mok fotos enviar&quot; on storage.objects for insert to authenticated
-  with check (bucket_id = &#x27;mok-fotos&#x27; and public.mok_is_membro());
-drop policy if exists &quot;mok fotos ler&quot; on storage.objects;
-create policy &quot;mok fotos ler&quot; on storage.objects for select using (bucket_id = &#x27;mok-fotos&#x27;);
-drop policy if exists &quot;mok fotos apagar&quot; on storage.objects;
-create policy &quot;mok fotos apagar&quot; on storage.objects for delete to authenticated
-  using (bucket_id = &#x27;mok-fotos&#x27; and public.mok_is_pai());
+drop policy if exists "mok fotos enviar" on storage.objects;
+create policy "mok fotos enviar" on storage.objects for insert to authenticated
+  with check (bucket_id = 'mok-fotos' and public.mok_is_membro());
+drop policy if exists "mok fotos ler" on storage.objects;
+create policy "mok fotos ler" on storage.objects for select using (bucket_id = 'mok-fotos');
+drop policy if exists "mok fotos apagar" on storage.objects;
+create policy "mok fotos apagar" on storage.objects for delete to authenticated
+  using (bucket_id = 'mok-fotos' and public.mok_is_pai());
 
 -- ---------- TEMPO REAL ----------
 do $$
 declare t text;
 begin
-  foreach t in array array[&#x27;mok_filhos&#x27;,&#x27;mok_tarefas&#x27;,&#x27;mok_registros&#x27;,&#x27;mok_pedidos&#x27;,&#x27;mok_missoes&#x27;,&#x27;mok_resgates&#x27;,&#x27;mok_pagamentos&#x27;,&#x27;mok_mensagens&#x27;,&#x27;mok_config&#x27;]
+  foreach t in array array['mok_filhos','mok_tarefas','mok_registros','mok_pedidos','mok_missoes','mok_resgates','mok_pagamentos','mok_mensagens','mok_config']
   loop
     begin
-      execute format(&#x27;alter publication supabase_realtime add table public.%I&#x27;, t);
+      execute format('alter publication supabase_realtime add table public.%I', t);
     exception when duplicate_object then null;
     end;
   end loop;
@@ -423,7 +436,7 @@ declare v uuid;
 begin
   select id into v from auth.users where email = lower(p_email) limit 1;
   if v is not null then
-    update auth.users set encrypted_password = extensions.crypt(p_senha, extensions.gen_salt(&#x27;bf&#x27;)),
+    update auth.users set encrypted_password = extensions.crypt(p_senha, extensions.gen_salt('bf')),
       email_confirmed_at = coalesce(email_confirmed_at, now()), updated_at = now() where id = v;
     return v;
   end if;
@@ -431,12 +444,12 @@ begin
   insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
     confirmation_token, email_change, email_change_token_new, recovery_token)
-  values (&#x27;00000000-0000-0000-0000-000000000000&#x27;, v, &#x27;authenticated&#x27;, &#x27;authenticated&#x27;, lower(p_email),
-    extensions.crypt(p_senha, extensions.gen_salt(&#x27;bf&#x27;)), now(),
-    &#x27;{&quot;provider&quot;:&quot;email&quot;,&quot;providers&quot;:[&quot;email&quot;]}&#x27;::jsonb, &#x27;{}&#x27;::jsonb, now(), now(), &#x27;&#x27;, &#x27;&#x27;, &#x27;&#x27;, &#x27;&#x27;);
+  values ('00000000-0000-0000-0000-000000000000', v, 'authenticated', 'authenticated', lower(p_email),
+    extensions.crypt(p_senha, extensions.gen_salt('bf')), now(),
+    '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now(), '', '', '', '');
   insert into auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
   values (gen_random_uuid(), v, v::text,
-    jsonb_build_object(&#x27;sub&#x27;, v::text, &#x27;email&#x27;, lower(p_email), &#x27;email_verified&#x27;, true), &#x27;email&#x27;, now(), now(), now());
+    jsonb_build_object('sub', v::text, 'email', lower(p_email), 'email_verified', true), 'email', now(), now(), now());
   return v;
 end $$;
 revoke all on function public.mok_criar_usuario(text, text) from public, anon, authenticated;
@@ -446,12 +459,12 @@ create or replace function public.mok_criar_pai(p_nome text, p_email text, p_sen
 language plpgsql security definer set search_path = public as $$
 declare v uuid;
 begin
-  if exists (select 1 from mok_perfis where papel = &#x27;pai&#x27;) then raise exception &#x27;Já existe um pai cadastrado neste app.&#x27;; end if;
-  if p_email !~* &#x27;^[^@\s]+@[^@\s]+\.[^@\s]+$&#x27; then raise exception &#x27;E-mail inválido.&#x27;; end if;
-  if char_length(p_senha) &lt; 6 then raise exception &#x27;A senha precisa ter pelo menos 6 caracteres.&#x27;; end if;
+  if exists (select 1 from mok_perfis where papel = 'pai') then raise exception 'Já existe um pai cadastrado neste app.'; end if;
+  if p_email !~* '^[^@\s]+@[^@\s]+\.[^@\s]+$' then raise exception 'E-mail inválido.'; end if;
+  if char_length(p_senha) &lt; 6 then raise exception 'A senha precisa ter pelo menos 6 caracteres.'; end if;
   v := mok_criar_usuario(p_email, p_senha);
-  insert into mok_perfis (id, papel, nome) values (v, &#x27;pai&#x27;, coalesce(nullif(p_nome, &#x27;&#x27;), &#x27;Pai&#x27;))
-  on conflict (id) do update set papel = &#x27;pai&#x27;, filho_id = null, nome = excluded.nome;
+  insert into mok_perfis (id, papel, nome) values (v, 'pai', coalesce(nullif(p_nome, ''), 'Pai'))
+  on conflict (id) do update set papel = 'pai', filho_id = null, nome = excluded.nome;
 end $$;
 revoke all on function public.mok_criar_pai(text, text, text) from public;
 grant execute on function public.mok_criar_pai(text, text, text) to anon, authenticated;
@@ -461,17 +474,110 @@ create or replace function public.mok_criar_acesso_filho(p_filho text, p_pin tex
 language plpgsql security definer set search_path = public as $$
 declare v uuid; fam text;
 begin
-  if not mok_is_pai() then raise exception &#x27;Somente o pai pode criar acessos.&#x27;; end if;
-  if p_pin !~ &#x27;^[0-9]{6,12}$&#x27; then raise exception &#x27;O PIN precisa ter de 6 a 12 números.&#x27;; end if;
-  if not exists (select 1 from mok_filhos where id = p_filho) then raise exception &#x27;Filho não encontrado.&#x27;; end if;
+  if not mok_is_pai() then raise exception 'Somente o pai pode criar acessos.'; end if;
+  if p_pin !~ '^[0-9]{6,12}$' then raise exception 'O PIN precisa ter de 6 a 12 números.'; end if;
+  if not exists (select 1 from mok_filhos where id = p_filho) then raise exception 'Filho não encontrado.'; end if;
   select familia into fam from mok_config where id = 1;
-  v := mok_criar_usuario(p_filho || &#x27;.&#x27; || fam || &#x27;@missaook.app&#x27;, p_pin);
+  v := mok_criar_usuario(p_filho || '.' || fam || '@missaook.app', p_pin);
   delete from mok_perfis where filho_id = p_filho and id &lt;&gt; v;
-  insert into mok_perfis (id, papel, filho_id, nome) values (v, &#x27;filho&#x27;, p_filho, (select nome from mok_filhos where id = p_filho))
-  on conflict (id) do update set papel = &#x27;filho&#x27;, filho_id = excluded.filho_id, nome = excluded.nome;
+  insert into mok_perfis (id, papel, filho_id, nome) values (v, 'filho', p_filho, (select nome from mok_filhos where id = p_filho))
+  on conflict (id) do update set papel = 'filho', filho_id = excluded.filho_id, nome = excluded.nome;
 end $$;
 revoke all on function public.mok_criar_acesso_filho(text, text) from public, anon;
 grant execute on function public.mok_criar_acesso_filho(text, text) to authenticated;
+
+-- ---------- v1.1: NOTIFICAÇÃO PUSH (chega com o app fechado) ----------
+create extension if not exists pg_net with schema extensions;
+
+create table if not exists public.mok_push_cfg (
+  id int primary key default 1 check (id = 1),
+  base text,
+  segredo text not null default encode(extensions.gen_random_bytes(24), 'hex'),
+  vapid_pub text,
+  vapid_priv text
+);
+insert into public.mok_push_cfg (id) values (1) on conflict (id) do nothing;
+alter table public.mok_push_cfg enable row level security;
+revoke all on public.mok_push_cfg from anon, authenticated;
+
+create table if not exists public.mok_push (
+  endpoint text primary key,
+  perfil uuid references auth.users(id) on delete cascade,
+  alvo text not null,
+  p256dh text not null,
+  auth text not null,
+  criado_em timestamptz not null default now()
+);
+alter table public.mok_push enable row level security;
+revoke all on public.mok_push from anon, authenticated;
+
+-- o app salva o aparelho de quem ativou as notificações
+create or replace function public.mok_push_salvar(p_endpoint text, p_p256dh text, p_auth text, p_base text) returns void
+language plpgsql security definer set search_path = public as $$
+declare a text;
+begin
+  select case when papel = 'pai' then 'pai' else filho_id end into a from mok_perfis where id = auth.uid();
+  if a is null then raise exception 'Perfil não encontrado.'; end if;
+  insert into mok_push (endpoint, perfil, alvo, p256dh, auth) values (p_endpoint, auth.uid(), a, p_p256dh, p_auth)
+  on conflict (endpoint) do update set perfil = excluded.perfil, alvo = excluded.alvo, p256dh = excluded.p256dh, auth = excluded.auth;
+  if p_base ~ '^https://[a-z0-9]+\.supabase\.co$' then update mok_push_cfg set base = p_base where id = 1; end if;
+end $$;
+revoke all on function public.mok_push_salvar(text, text, text, text) from public, anon;
+grant execute on function public.mok_push_salvar(text, text, text, text) to authenticated;
+
+create or replace function public.mok_push_enviar(p_alvo text, p_titulo text, p_corpo text, p_tag text) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare c mok_push_cfg%rowtype;
+begin
+  select * into c from mok_push_cfg where id = 1;
+  if c.base is null or not exists (select 1 from mok_push where alvo = p_alvo) then return; end if;
+  perform net.http_post(
+    url := c.base || '/functions/v1/tafeito-push',
+    body := jsonb_build_object('alvo', p_alvo, 'titulo', p_titulo, 'corpo', coalesce(p_corpo, ''), 'tag', p_tag),
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-tafeito-segredo', c.segredo));
+exception when others then null; -- aviso nunca trava o app
+end $$;
+revoke all on function public.mok_push_enviar(text, text, text, text) from public, anon, authenticated;
+
+create or replace function public.mok_push_gatilho() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare nome text; tit text;
+begin
+  if tg_table_name = 'mok_registros' then
+    select titulo into tit from mok_tarefas where id = new.tarefa_id;
+    select f.nome into nome from mok_filhos f where f.id = new.filho_id;
+    if tg_op = 'UPDATE' and old.status = new.status then return null; end if;
+    if new.status = 'feita' then perform mok_push_enviar('pai', '✅ ' || coalesce(nome, 'Filho') || ' concluiu', coalesce(tit, 'tarefa'), 'reg');
+    elsif new.status = 'aprovada' then perform mok_push_enviar(new.filho_id, '⭐ Tarefa aprovada pelo pai', coalesce(tit, 'tarefa'), 'reg');
+    elsif new.status = 'reprovada' then perform mok_push_enviar(new.filho_id, '🔁 O pai pediu para refazer', coalesce(tit, 'tarefa') || case when new.obs &lt;&gt; '' then ': ' || new.obs else '' end, 'reg');
+    end if;
+  elsif tg_table_name = 'mok_mensagens' then
+    if new.autor = 'pai' then perform mok_push_enviar(new.filho_id, '💬 Pai', new.texto, 'msg');
+    else
+      select f.nome into nome from mok_filhos f where f.id = new.filho_id;
+      perform mok_push_enviar('pai', '💬 ' || coalesce(nome, 'Filho'), new.texto, 'msg');
+    end if;
+  elsif tg_table_name = 'mok_pedidos' then
+    select f.nome into nome from mok_filhos f where f.id = new.filho_id;
+    if tg_op = 'INSERT' and new.status = 'pendente' then
+      perform mok_push_enviar('pai', '🔐 Pedido de ' || coalesce(nome, 'filho'), coalesce(nullif(new.mensagem, ''), 'Quer permissão para ajustar algo'), 'ped');
+    elsif tg_op = 'UPDATE' and old.status = 'pendente' and new.status &lt;&gt; 'pendente' then
+      perform mok_push_enviar(new.filho_id, case when new.status = 'aprovado' then '✅ Pedido aprovado!' else '❌ Pedido negado' end, 'Abra o TáFeito', 'ped');
+    end if;
+  elsif tg_table_name = 'mok_tarefas' then
+    if tg_op = 'INSERT' and new.ativa then perform mok_push_enviar(new.filho_id, '📋 Nova tarefa: ' || new.titulo, case when new.horario &lt;&gt; '' then 'Horário: ' || new.horario else 'Veja no app' end, 'tar'); end if;
+  end if;
+  return null;
+end $$;
+
+drop trigger if exists mok_push_reg on public.mok_registros;
+create trigger mok_push_reg after insert or update on public.mok_registros for each row execute function public.mok_push_gatilho();
+drop trigger if exists mok_push_msg on public.mok_mensagens;
+create trigger mok_push_msg after insert on public.mok_mensagens for each row execute function public.mok_push_gatilho();
+drop trigger if exists mok_push_ped on public.mok_pedidos;
+create trigger mok_push_ped after insert or update on public.mok_pedidos for each row execute function public.mok_push_gatilho();
+drop trigger if exists mok_push_tar on public.mok_tarefas;
+create trigger mok_push_tar after insert on public.mok_tarefas for each row execute function public.mok_push_gatilho();
 
 -- Pronto! Agora abra o app e crie a conta do Pai.
 </pre>

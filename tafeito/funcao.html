@@ -1,0 +1,67 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>TáFeito – Função de notificação</title>
+<style>body{background:#0b1020;color:#eef1fb;font-family:system-ui,sans-serif;margin:0;padding:16px}button{background:linear-gradient(135deg,#4f7cff,#7b5cff);color:#fff;border:0;border-radius:12px;padding:14px 22px;font-size:1.1rem;font-weight:700;cursor:pointer;position:sticky;top:10px}pre{background:#151d38;border:1px solid #26315a;border-radius:12px;padding:12px;white-space:pre-wrap;font-size:12px}</style></head>
+<body><h2>TáFeito: função de notificação (push)</h2>
+<p>No Supabase: <b>Edge Functions</b> → <b>Deploy a new function</b> → <b>Via Editor</b>. Nome: <b>tafeito-push</b>. Apague o que vier escrito, cole este código e clique em <b>Deploy</b>. Depois, em <b>Details</b> da função, desligue <b>Verify JWT</b> e salve.</p>
+<button id="b">📋 Copiar código</button><pre id="s">// TáFeito — Edge Function "tafeito-push" (Supabase)
+// Manda a notificação para o celular/PC mesmo com o app fechado.
+// GET  ?chave=1  -&gt; devolve a chave pública (gera as chaves na primeira vez)
+// POST (chamado pelo banco) -&gt; { alvo, titulo, corpo, tag }
+import webpush from "npm:web-push@3.6.7";
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+const cors = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "apikey, authorization, content-type, x-client-info, x-tafeito-segredo",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+};
+const json = (o: unknown, status = 200) =&gt;
+  new Response(JSON.stringify(o), { status, headers: { ...cors, "Content-Type": "application/json" } });
+
+const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+  auth: { persistSession: false },
+});
+
+async function config() {
+  const { data, error } = await sb.from("mok_push_cfg").select("*").eq("id", 1).single();
+  if (error) throw error;
+  if (data.vapid_pub &amp;&amp; data.vapid_priv) return data;
+  const k = webpush.generateVAPIDKeys();
+  await sb.from("mok_push_cfg").update({ vapid_pub: k.publicKey, vapid_priv: k.privateKey }).eq("id", 1).is("vapid_pub", null);
+  const r = await sb.from("mok_push_cfg").select("*").eq("id", 1).single();
+  if (r.error) throw r.error;
+  return r.data;
+}
+
+Deno.serve(async (req) =&gt; {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  try {
+    const c = await config();
+    if (req.method === "GET") return json({ chave: c.vapid_pub });
+    if (!c.segredo || req.headers.get("x-tafeito-segredo") !== c.segredo) return json({ erro: "não autorizado" }, 401);
+
+    const { alvo, titulo, corpo, tag } = await req.json();
+    if (!alvo) return json({ erro: "sem alvo" }, 400);
+    webpush.setVapidDetails("https://www.bravusmidia.com.br/tafeito/", c.vapid_pub, c.vapid_priv);
+
+    const { data: subs, error } = await sb.from("mok_push").select("*").eq("alvo", alvo);
+    if (error) throw error;
+    const payload = JSON.stringify({ titulo, corpo, tag });
+    let enviados = 0;
+    await Promise.all((subs ?? []).map(async (s) =&gt; {
+      try {
+        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 86400, urgency: "high" });
+        enviados++;
+      } catch (e) {
+        const st = (e as { statusCode?: number }).statusCode;
+        if (st === 404 || st === 410) await sb.from("mok_push").delete().eq("endpoint", s.endpoint);
+        else console.error("push falhou", st, (e as { body?: string }).body ?? String(e));
+      }
+    }));
+    return json({ enviados, total: subs?.length ?? 0 });
+  } catch (e) {
+    console.error(e);
+    return json({ erro: String((e as Error).message ?? e) }, 500);
+  }
+});
+</pre>
+<script>document.getElementById('b').onclick=async()=>{const t=document.getElementById('s').textContent;try{await navigator.clipboard.writeText(t)}catch(e){const r=document.createRange();r.selectNodeContents(document.getElementById('s'));const s=getSelection();s.removeAllRanges();s.addRange(r);document.execCommand('copy')}document.getElementById('b').textContent='✅ Copiado! Agora cole no editor do Supabase'}</script></body></html>

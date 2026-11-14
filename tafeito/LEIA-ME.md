@@ -44,7 +44,7 @@ Se quiser só olhar antes, abra o endereço e toque em **"Abrir modo demonstraç
 
 ## Limites (para não ter surpresa)
 - **Bloqueio de verdade do PC/celular:** um app de navegador não consegue travar o Windows ou o Android. O TáFeito mostra BLOQUEADO/LIBERADO e te avisa. Para travar de fato, use junto o **Google Family Link** (celular) e o **Microsoft Family Safety** (PC), ambos grátis, e libere por lá quando chegar o aviso. No app, veja **Mais → Como bloquear o PC/celular de verdade**.
-- **Notificações:** chegam com o app aberto ou em segundo plano. Para tocar mesmo com tudo fechado, use **Lembretes na agenda**, que cria um evento com alerta para cada tarefa no horário dela. Para tocar como despertador, crie alarmes no app Relógio com os mesmos horários.
+- **Notificações:** desde a versão 1.1 chegam mesmo com o app fechado (push), no Android, no PC e no iPhone com o app instalado na Tela de Início (iOS 16.4 ou mais novo). Cada pessoa precisa tocar uma vez em **Ativar notificações** no aparelho dela. Para isso o banco precisa ter o SQL novo (sql.html) e a função **tafeito-push** (funcao.html) criada no Supabase.
 - **Trocar o PIN depois:** ⚙️ do filho → Trocar PIN.
 
 Desenvolvido por Andrade

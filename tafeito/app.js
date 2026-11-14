@@ -3,7 +3,8 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '1.0.0';
+const VERSAO = '1.1.0';
+const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
 const CATS = { casa: { nome: 'Casa', icone: '🏠' }, estudo: { nome: 'Estudo', icone: '📚' }, trabalho: { nome: 'Work', icone: '💼' } };
@@ -157,7 +158,7 @@ function sementes(filhoId) {
     T('🧹', 'Varrer o chão (tudo)', 'casa', '09:00', { descricao: 'Varrer o quarto todo, inclusive embaixo da cama.' }),
     T('🧽', 'Passar pano', 'casa', '09:15', { descricao: 'Pano no chão depois de varrer.' }),
     T('🍽️', 'Lavar a louça', 'casa', '13:00', { descricao: 'Louça lavada, escorrida e pia limpa.' }),
-    T('🗑️', 'Tirar o lixo', 'casa', '19:00', { descricao: 'Lixeira vazia e saco novo.' }),
+    T('🗑️', 'Tirar o lixo', 'casa', '19:00', { descricao: 'Esvaziar as 3 lixeiras e colocar saco novo. Marque cada uma.', itens: LIXEIRAS.slice() }),
     T('🚿', 'Lavar o banheiro', 'casa', '10:00', { dias: [6], descricao: 'Vaso, pia, box e chão. (Sábado)', xp: 30 }),
     T('📖', 'Estudar 1 hora', 'estudo', '15:00', { dias: [1, 2, 3, 4, 5], descricao: 'Foto do caderno antes e depois do estudo.', xp: 15 }),
     T('✏️', 'Dever de casa', 'estudo', '16:00', { dias: [1, 2, 3, 4, 5], descricao: 'Foto do dever antes e depois de feito.', xp: 15 }),
@@ -398,6 +399,7 @@ async function abrirApp() {
   setInterval(() => { if (S.diaVer !== hojeISO() && S.tela !== 'painel') S.diaVer = hojeISO(); render(); }, 60000);
   render();
   verificarPedidosPai();
+  inscreverPush(false);
 }
 
 async function carregarTudo() {
@@ -549,19 +551,24 @@ function cardTarefaFilho(t, dia) {
   const f = filhoAtual(); const feita = ehFeita(r);
   const cls = st === 'reprovada' ? 'bad' : feita ? ((f.exigir_aprovacao && st !== 'aprovada') ? 'espera' : 'ok') : '';
   const fotos = t.foto ? `<div class="fotos">${slotFoto(t, r, 'antes', feita)}${slotFoto(t, r, 'depois', feita)}</div>` : '';
+  const its = itensDe(t), marcados = itensMarcados(r);
+  const lista = its.length ? `<div class="itens">${its.map((nome, i) => { const ok = marcados.includes(i); return `<button class="item ${ok ? 'ok' : ''}" ${feita ? 'disabled' : `data-act="marcarItem" data-id="${esc(t.id)}" data-i="${i}"`}><span class="cx">${ok ? '✓' : ''}</span>${esc(nome)}</button>`; }).join('')}<div class="mut peq">${marcados.length}/${its.length} marcadas</div></div>` : '';
   let botao;
   if (st === 'reprovada') botao = `<div class="aviso bad">❌ O pai pediu para refazer${r.obs ? ': <b>' + esc(r.obs) + '</b>' : ''}</div><button class="btn" data-act="refazer" data-id="${esc(t.id)}">🔁 Refazer tarefa</button>`;
   else if (feita) botao = `<button class="btn ok" disabled>✅ ${st === 'aprovada' ? 'Aprovada pelo pai' : (f.exigir_aprovacao ? 'Feita · aguardando o pai' : 'Concluída')} <span class="peq">${hora(r.feito_em)}</span></button>`;
   else {
-    const pronto = !t.foto || (r && r.foto_antes && r.foto_depois);
-    botao = `<button class="btn ${pronto ? 'pri' : ''}" data-act="concluir" data-id="${esc(t.id)}" ${pronto ? '' : 'disabled'}>${pronto ? '✔ Marcar como feita' : '📷 Tire a foto ANTES e DEPOIS para concluir'}</button>`;
+    const fotosOk = !t.foto || (r && r.foto_antes && r.foto_depois);
+    const itensOk = marcados.length >= its.length;
+    const pronto = fotosOk && itensOk;
+    const falta = !fotosOk ? '📷 Tire a foto ANTES e DEPOIS para concluir' : `☑️ Marque as ${its.length - marcados.length} que faltam`;
+    botao = `<button class="btn ${pronto ? 'pri' : ''}" data-act="concluir" data-id="${esc(t.id)}" ${pronto ? '' : 'disabled'}>${pronto ? '✔ Marcar como feita' : falta}</button>`;
   }
   return `<div class="tarefa ${cls}"><div class="cab"><div class="em">${esc(t.icone || CATS[t.categoria].icone)}</div>
     <div class="tt"><b>${esc(t.titulo)}</b><small>${infoTarefa(t)}</small>
       <div style="margin-top:4px">${t.valor > 0 ? `<span class="tag din">💰 ${brl(t.valor)}</span>` : ''}<span class="tag">+${t.xp} XP</span>${!t.obrigatoria ? '<span class="tag">opcional</span>' : ''}</div></div>
     ${pode('tarefas') && S.papel === 'filho' ? `<button class="icone-btn" data-act="editarTarefa" data-id="${esc(t.id)}">✏️</button>` : ''}
     <button class="icone-btn" data-act="agendaTarefa" data-id="${esc(t.id)}" title="Pôr na agenda">📅</button></div>
-    ${t.descricao ? `<p class="mut peq" style="margin:8px 0 0">${esc(t.descricao)}</p>` : ''}${fotos}${botao}</div>`;
+    ${t.descricao ? `<p class="mut peq" style="margin:8px 0 0">${esc(t.descricao)}</p>` : ''}${lista}${fotos}${botao}</div>`;
 }
 
 function cardTarefaPai(t, dia) {
@@ -569,12 +576,14 @@ function cardTarefaPai(t, dia) {
   const tag = { pendente: (r && r.foto_antes) ? '<span class="tag warn">em andamento</span>' : '<span class="tag">pendente</span>', feita: '<span class="tag ok">feita</span>', aprovada: '<span class="tag ok">aprovada ⭐</span>', reprovada: '<span class="tag bad">refazer</span>' }[st];
   const cls = st === 'aprovada' || st === 'feita' ? 'ok' : st === 'reprovada' ? 'bad' : '';
   const fotos = t.foto && r && (r.foto_antes || r.foto_depois) ? `<div class="fotos">${slotFoto(t, r, 'antes', true, true)}${slotFoto(t, r, 'depois', true, true)}</div>` : '';
+  const its = itensDe(t), mk = itensMarcados(r);
+  const lista = its.length ? `<div class="itens">${its.map((nome, i) => `<div class="item ${mk.includes(i) ? 'ok' : ''}"><span class="cx">${mk.includes(i) ? '✓' : ''}</span>${esc(nome)}</div>`).join('')}<div class="mut peq">${mk.length}/${its.length} marcadas</div></div>` : '';
   let acoes = '';
   if (st === 'feita') acoes = `<div class="acoes"><button class="btn ok sm" data-act="aprovar" data-reg="${esc(r.id)}">⭐ Aprovar</button><button class="btn bad sm" data-act="reprovar" data-reg="${esc(r.id)}">🔁 Refazer</button></div>`;
   else if (st === 'aprovada') acoes = `<div class="acoes"><button class="btn ghost sm" data-act="reprovar" data-reg="${esc(r.id)}">Desfazer e pedir para refazer</button></div>`;
   return `<div class="tarefa ${cls}"><div class="cab"><div class="em">${esc(t.icone || CATS[t.categoria].icone)}</div>
     <div class="tt"><b>${esc(t.titulo)}</b><small>${infoTarefa(t)}${r && r.feito_em ? ' · feita às ' + hora(r.feito_em) : ''}</small><div style="margin-top:4px">${tag}${t.valor > 0 ? `<span class="tag din">${brl(t.valor)}</span>` : ''}</div></div></div>
-    ${r && r.obs && st === 'reprovada' ? `<div class="aviso bad">Motivo: ${esc(r.obs)}</div>` : ''}${fotos}${acoes}</div>`;
+    ${r && r.obs && st === 'reprovada' ? `<div class="aviso bad">Motivo: ${esc(r.obs)}</div>` : ''}${lista}${fotos}${acoes}</div>`;
 }
 
 function avisoNotificacao() {
@@ -782,6 +791,7 @@ function formTarefa(t, cat) {
     <label class="campo"><span>Título</span><input name="titulo" value="${esc(t.titulo)}" required placeholder="Ex.: Arrumar o quarto"></label></div>
     <label class="campo"><span>Categoria</span><select name="categoria">${Object.entries(CATS).map(([k, v]) => `<option value="${k}" ${t.categoria === k ? 'selected' : ''}>${v.icone} ${v.nome}</option>`).join('')}</select></label>
     <label class="campo"><span>Explicação (o que precisa ficar feito)</span><textarea name="descricao">${esc(t.descricao)}</textarea></label>
+    <label class="campo"><span>Itens para marcar um por um (um por linha, opcional)</span><textarea name="itens" rows="3" placeholder="Ex.: Lixeira da cozinha&#10;Lixeira do banheiro&#10;Lixeira do quarto" ${souPai ? '' : 'readonly'}>${esc(itensDe(t).join('\n'))}</textarea></label>
     <label class="campo"><span>Repetição</span><select name="recorrencia" data-change="recorrencia"><option value="diaria" ${t.recorrencia === 'diaria' ? 'selected' : ''}>Repete (dias da semana)</option><option value="unica" ${t.recorrencia === 'unica' ? 'selected' : ''}>Uma vez só (fica até ser feita)</option></select></label>
     <div id="boxDias" ${t.recorrencia === 'unica' ? 'hidden' : ''}><span class="mut peq">Dias (nenhum marcado = todo dia)</span><div class="dias" style="margin:6px 0 12px">${DSEM.map((d, i) => `<label><input type="checkbox" name="dia" value="${i}" ${(t.dias || []).includes(i) ? 'checked' : ''}><span>${d}</span></label>`).join('')}</div></div>
     <label class="campo" id="boxData" ${t.recorrencia === 'unica' ? '' : 'hidden'}><span>A partir de</span><input type="date" name="data_unica" value="${esc(t.data_unica || hojeISO())}"></label>
@@ -889,6 +899,7 @@ const acoes = {
   concluir: async d => {
     const t = tarefaPorId(d.id); const dia = hojeISO(); const r0 = regDe(t, dia) || novoReg(t, dia);
     if (t.foto && !(r0.foto_antes && r0.foto_depois)) return toast('Tire a foto ANTES e DEPOIS primeiro.', 'bad');
+    if (itensMarcados(r0).length < itensDe(t).length) return toast('Marque todos os itens primeiro.', 'bad');
     const antes = statusDia(dia).liberado;
     const r = { ...r0, status: 'feita', feito_em: agoraISO(), obs: '' };
     if (!(await salvarReg(r))) return;
@@ -903,7 +914,17 @@ const acoes = {
   },
   refazer: async d => {
     const t = tarefaPorId(d.id); const r = regDe(t, hojeISO()); if (!r) return;
-    await salvarReg({ ...r, status: 'pendente', foto_antes: null, foto_antes_em: null, foto_depois: null, foto_depois_em: null, feito_em: null });
+    const limpo = { ...r, status: 'pendente', foto_antes: null, foto_antes_em: null, foto_depois: null, foto_depois_em: null, feito_em: null };
+    if (itensDe(t).length) limpo.itens_feitos = [];
+    await salvarReg(limpo);
+  },
+  marcarItem: async d => {
+    const t = tarefaPorId(d.id); if (!t) return; const dia = hojeISO(); const r0 = regDe(t, dia) || novoReg(t, dia);
+    if (ehFeita(r0)) return;
+    const i = Number(d.i); const m = itensMarcados(r0);
+    const novo = m.includes(i) ? m.filter(x => x !== i) : [...m, i].sort((a, b) => a - b);
+    const r = { ...r0, itens_feitos: novo }; if (r.status === 'reprovada') r.status = 'pendente';
+    if (await salvarReg(r) && !m.includes(i)) { if (novo.length >= itensDe(t).length) toast('Tudo marcado! Agora toque em "Marcar como feita".', 'ok'); }
   },
   aprovar: async d => {
     const r = S.dados.registros.find(x => x.id === d.reg); if (!r) return;
@@ -982,7 +1003,10 @@ const acoes = {
   ativarNotif: async () => {
     if (!('Notification' in window)) return toast('Este navegador não tem notificações. Instale o app pelo Chrome.', 'bad');
     const p = await Notification.requestPermission();
-    if (p === 'granted') { notificar('🔔 Notificações ativadas!', 'Você vai receber os avisos do TáFeito.', 'teste'); render(); }
+    if (p === 'granted') {
+      const ok = await inscreverPush(true);
+      notificar('🔔 Notificações ativadas!', ok ? 'Agora chegam mesmo com o app fechado.' : 'Você vai receber os avisos do TáFeito.', 'teste'); render();
+    }
     else toast('Notificações bloqueadas. Libere nas configurações do navegador.', 'bad');
   },
   instalar: async () => {
@@ -1064,6 +1088,7 @@ const forms = {
     if (S.papel === 'pai') { t.valor = f.valor ? num(f.valor.value) : 0; t.foto = f.foto.checked; t.obrigatoria = f.obrigatoria.checked; }
     else if (!ant) { t.valor = 0; t.foto = true; t.obrigatoria = true; }
     t.ativa = f.ativa.checked;
+    if (S.papel === 'pai' && f.itens) { const its = f.itens.value.split('\n').map(x => x.trim()).filter(Boolean).slice(0, 12); if (its.length || Array.isArray(t.itens)) t.itens = its; }
     try {
       const s = await DB.salvar('tarefas', t); const i = S.dados.tarefas.findIndex(x => x.id === t.id);
       if (i >= 0) S.dados.tarefas[i] = s || t; else S.dados.tarefas.push(s || t);
@@ -1138,8 +1163,10 @@ document.addEventListener('change', e => { const el = e.target.closest('[data-ch
 
 /* ---------------- registros / fotos ---------------- */
 function novoReg(t, dia) {
-  return { id: regId(t, dia), filho_id: t.filho_id, tarefa_id: t.id, data: dia, categoria: t.categoria, foto_antes: null, foto_antes_em: null, foto_depois: null, foto_depois_em: null, status: 'pendente', feito_em: null, obs: '', xp: num(t.xp), valor: num(t.valor) };
+  return { id: regId(t, dia), filho_id: t.filho_id, tarefa_id: t.id, data: dia, categoria: t.categoria, foto_antes: null, foto_antes_em: null, foto_depois: null, foto_depois_em: null, status: 'pendente', feito_em: null, obs: '', xp: num(t.xp), valor: num(t.valor), ...(itensDe(t).length ? { itens_feitos: [] } : {}) };
 }
+function itensDe(t) { return t && Array.isArray(t.itens) ? t.itens.filter(x => typeof x === 'string' && x.trim()) : []; }
+function itensMarcados(r) { return r && Array.isArray(r.itens_feitos) ? r.itens_feitos.map(Number).filter(n => Number.isInteger(n)) : []; }
 async function salvarReg(r) {
   const limpo = { ...r }; delete limpo.atualizado_em;
   try {
@@ -1214,10 +1241,33 @@ function beep() {
     });
   } catch { }
 }
+/* push de verdade (chega com o app fechado): o servidor manda pelo Supabase */
+async function inscreverPush(avisarErro) {
+  try {
+    if (S.modo !== 'online' || !('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window) || Notification.permission !== 'granted') return false;
+    const reg = await navigator.serviceWorker.ready;
+    const resp = await fetch(DB.c.u.replace(/\/$/, '') + '/functions/v1/tafeito-push?chave=1', { headers: { apikey: DB.c.k } });
+    if (!resp.ok) throw new Error('push indisponível (' + resp.status + ')');
+    const { chave } = await resp.json(); if (!chave) throw new Error('sem chave');
+    let sub = await reg.pushManager.getSubscription();
+    if (sub && lsGet('mok_push_chave') !== chave) { try { await sub.unsubscribe(); } catch { } sub = null; }
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64url(chave) });
+    const j = sub.toJSON();
+    await DB.rpc('mok_push_salvar', { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_base: DB.c.u.replace(/\/$/, '') });
+    lsSet('mok_push_chave', chave); lsSet('mok_push_ok', 1); return true;
+  } catch (e) {
+    console.warn('push', e); localStorage.removeItem('mok_push_ok');
+    if (avisarErro) toast('Aviso com app fechado ainda não ligado no servidor. Com o app aberto funciona.', '');
+    return false;
+  }
+}
+function b64url(s) { const p = '='.repeat((4 - s.length % 4) % 4); const b = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(b, c => c.charCodeAt(0)); }
+
 async function notificar(titulo, corpo, tag) {
   beep(); if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
   if (document.visibilityState === 'visible') { const c = corpo || ''; toast(`${titulo}${c ? ' — ' + (c.length > 70 ? c.slice(0, 70) + '…' : c) : ''}`); }
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (lsGet('mok_push_ok') && ['msg', 'ped', 'reg', 'tar'].includes(tag)) return; // o push do servidor já mostra
   const op = { body: corpo || '', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: tag ? tag + '-' + Date.now() : undefined, vibrate: [200, 100, 200], requireInteraction: true };
   try { const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (reg) await reg.showNotification(titulo, op); else new Notification(titulo, op); }
   catch { try { new Notification(titulo, op); } catch { } }
