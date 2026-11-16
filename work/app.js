@@ -455,6 +455,17 @@ function regFail() { const f = lsGet(FAIL_KEY, { n: 0, until: 0 }); f.n++; if (f
 const clearFail = () => lsSet(FAIL_KEY, { n: 0, until: 0 });
 
 const AUTH = { pin: '', user: null, email: lsGet('bw_email', ''), stage: 'pick' };
+const appUrl = () => location.origin + location.pathname.replace(/index\.html$/, '');
+async function sendReset(email) {
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: appUrl() });
+  if (error) throw new Error(/rate|seconds/i.test(error.message) ? 'Aguarde um minuto antes de pedir outro link.' : error.message);
+}
+function renderRecovery(err = '') {
+  $('#app').innerHTML = `<div class="auth"><div class="abox"><img class="logo" src="icons/icon.svg" alt="Bravus Work"><h1>BRAVUS <span>WORK</span></h1><p class="slogan">Crie sua nova senha</p>
+    ${err ? `<p class="warnbox" style="margin:16px 0">${esc(err)}</p><button class="btn pri" data-act="recoveryBack">Voltar ao login</button>` : `<form data-form="recoverySave" class="f" style="text-align:left;margin-top:16px">
+      ${fld('Nova senha (mín. 6 caracteres)', 'pin', '', 'password', 'minlength="6" required autocomplete="new-password"')}${fld('Repita a nova senha', 'pin2', '', 'password', 'minlength="6" required autocomplete="new-password"')}
+      <button class="btn pri">Salvar e entrar</button></form>`}</div></div>`;
+}
 function renderAuth(lockMsg = '') {
   const app = $('#app'); const locals = SUPA ? [] : S.d.profiles;
   if (!SUPA && !locals.length) return renderSetup();
@@ -465,7 +476,7 @@ function renderAuth(lockMsg = '') {
     body = `<form data-form="authEmail" class="f" style="text-align:left">${fld('E-mail de acesso', 'email', AUTH.email, 'email', 'required autocomplete="username"')}<button class="btn pri">Continuar</button></form>`;
   } else {
     if (!SUPA && !AUTH.user && locals.length === 1) AUTH.user = locals[0].id;
-    const users = SUPA ? `<p class="muted small">${esc(AUTH.email)} · <a href="#" data-act="authChangeEmail">trocar</a></p>`
+    const users = SUPA ? `<p class="muted small">${esc(AUTH.email)} · <a href="#" data-act="authChangeEmail">trocar</a> · <a href="#" data-act="forgotPw">esqueci a senha</a></p>`
       : `<div class="users">${locals.map(p => `<button type="button" class="${AUTH.user === p.id ? 'on' : ''}" data-act="authPick" data-id="${p.id}">${avatar(p, 54)}<b>${esc(p.name.split(' ')[0])}</b><small class="muted">${esc(cargo(p))}</small></button>`).join('')}</div>`;
     const lk = lockedFor();
     body = `${users}${lockMsg ? `<p class="small" style="margin-top:10px;color:var(--warn)">${esc(lockMsg)}</p>` : ''}
@@ -1097,7 +1108,7 @@ V.ajustes = () => {
     ${integ('Instagram, RD Station, ClickUp', false, 'Preparados para a próxima etapa; enquanto isso, registro manual.')}
   </div></div>
   <div class="card" style="margin-top:14px"><h3>${ic('down')}Backup</h3><div class="row wrap"><button class="btn" data-act="backup">${ic('down')}Baixar backup (JSON)</button>${!SUPA ? `<label class="btn">Restaurar backup<input type="file" accept="application/json" data-act-change="restore" hidden></label>` : ''}</div><p class="note" style="margin-top:8px">O backup contém dados de clientes: guarde em local seguro (ex.: pasta privada no Drive).</p></div>
-  <div class="card" style="margin-top:14px"><h3>${ic('users')}Equipe</h3><div class="list">${team().map(p => `<div class="li">${avatar(p)}<div class="t" data-act="editProfile" data-id="${p.id}" style="cursor:pointer"><b>${esc(p.name)}</b><small>${esc(cargo(p))}${p.email ? ' · ' + esc(p.email) : ''}</small></div>${p.id === S.me.id || isAdmin() ? `<label class="btn sm" title="Trocar foto">${ic('plus')}Foto<input type="file" accept="image/*" data-act-change="setPhoto" data-id="${p.id}" hidden></label>` : ''}${!SUPA || p.id === S.me.id ? `<button class="btn sm" data-act="changePin" data-id="${p.id}">Trocar senha</button>` : ''}</div>`).join('')}</div>
+  <div class="card" style="margin-top:14px"><h3>${ic('users')}Equipe</h3><div class="list">${team().map(p => `<div class="li">${avatar(p)}<div class="t" data-act="editProfile" data-id="${p.id}" style="cursor:pointer"><b>${esc(p.name)}</b><small>${esc(cargo(p))}${p.email ? ' · ' + esc(p.email) : ''}</small></div>${p.id === S.me.id || isAdmin() ? `<label class="btn sm" title="Trocar foto">${ic('plus')}Foto<input type="file" accept="image/*" data-act-change="setPhoto" data-id="${p.id}" hidden></label>` : ''}${!SUPA || p.id === S.me.id ? `<button class="btn sm" data-act="changePin" data-id="${p.id}">Trocar senha</button>` : `<button class="btn sm" data-act="resetPw" data-id="${p.id}">Redefinir senha</button>`}</div>`).join('')}</div>
   ${SUPA ? '<p class="note" style="margin-top:8px">Novos usuários são criados no painel do Supabase (Authentication → Add user) — veja o README.</p>' : ''}</div>
   <p class="note" style="margin-top:14px;text-align:center">Bravus Work v${VERSION} · ${SUPA ? 'Supabase' : 'modo local'}</p>`;
 };
@@ -1113,6 +1124,11 @@ const A = {
   authChangeEmail: () => { AUTH.stage = 'email'; AUTH.pin = ''; renderAuth(); },
   moreMenu: () => modal('Menu', `<div class="list">${NAV.filter(navOk).map(n => `<a class="li" href="#${n[0]}" data-act="closeModal">${ic(n[2])}<div class="t"><b>${n[1]}</b></div>${n[0] === 'alertas' && unread() ? `<span class="badge">${unread()}</span>` : ''}</a>`).join('')}<button class="li" data-act="logout" style="width:100%">${ic('lock')}<div class="t" style="text-align:left"><b>Bloquear / sair</b></div></button></div>`),
   cliFilter: d => { S.cliFilter = d.f; renderView(); },
+  resetPw: d => { const p = prof(d.id); if (!p) return; if (!p.email) return toast('Este membro não tem e-mail no perfil', 'Confira em Authentication → Users no Supabase.', 'warn');
+    confirmBox('Redefinir senha', `Vou mandar para <b>${esc(p.email)}</b> um link para <b>${esc(p.name.split(' ')[0])}</b> criar uma senha nova. A senha atual continua valendo até ela criar a nova.`, 'Enviar link', async () => {
+      try { await sendReset(p.email); await log(`Enviou link de redefinição de senha para ${p.name}`); toast('Link enviado', `${p.email} · peça para olhar também o spam.`, 'ok'); } catch (e) { toast('Não foi possível enviar', e.message, 'bad'); } }); },
+  forgotPw: async () => { if (!AUTH.email) return; try { await sendReset(AUTH.email); toast('Enviamos um link para o seu e-mail', `${AUTH.email} · confira também o spam.`, 'ok'); } catch (e) { toast('Não foi possível enviar', e.message, 'bad'); } },
+  recoveryBack: async () => { await sb.auth.signOut(); renderAuth(); },
   editGoals: () => goalsForm(), goalMonth: d => { S.goalMonth = d.m; renderView(); },
   payMenu: d => {
     const c = client(d.id); if (!c) return; const k = curYM(); const inv = monthInv(c, k); const late = S.d.invoices.filter(i => i.client_id === c.id && ym(i.due_date) < k && invStatus(i) === 'atrasado');
@@ -1156,7 +1172,7 @@ const A = {
       <div class="small" style="display:grid;gap:6px">${p.phone ? `<span>📱 ${esc(p.phone)}</span>` : ''}${p.birth_date ? `<span>🎂 ${fdateY(p.birth_date)}</span>` : ''}${p.bio ? `<span>${esc(p.bio)}</span>` : ''}</div>`);
     modal(mine ? 'Meu perfil' : `Perfil de ${p.name.split(' ')[0]}`, `<div class="f">
       <input type="hidden" name="id" value="${p.id}">
-      <div class="row" style="gap:14px">${avatar(p, 72)}<div class="row wrap" style="gap:8px"><label class="btn sm">${ic('plus')}${p.avatar_url ? 'Trocar foto' : 'Adicionar foto'}<input type="file" accept="image/*" data-act-change="setPhoto" data-id="${p.id}" data-reopen="1" hidden></label>${p.avatar_url ? `<button type="button" class="btn sm" data-act="removePhoto" data-id="${p.id}">Remover foto</button>` : ''}<div class="small muted" style="width:100%">${role}${p.email ? ' · ' + esc(p.email) : ''}</div></div></div>
+      <div class="row" style="gap:14px">${avatar(p, 72)}<div class="row wrap" style="gap:8px"><label class="btn sm">${ic('plus')}${p.avatar_url ? 'Trocar foto' : 'Adicionar foto'}<input type="file" accept="image/*" data-act-change="setPhoto" data-id="${p.id}" data-reopen="1" hidden></label>${p.avatar_url ? `<button type="button" class="btn sm" data-act="removePhoto" data-id="${p.id}">Remover foto</button>` : ''}${SUPA && isAdmin() && !mine ? `<button type="button" class="btn sm" data-act="resetPw" data-id="${p.id}">Redefinir senha</button>` : ''}<div class="small muted" style="width:100%">${role}${p.email ? ' · ' + esc(p.email) : ''}</div></div></div>
       <div class="f2">${fld('Nome *', 'name', p.name, 'text', 'required maxlength="80"')}${isAdmin() ? `${fld('Cargo', 'title', p.title, 'text', 'maxlength="60" list="cargos" placeholder="escolha ou digite"')}<datalist id="cargos">${CARGOS.map(c => `<option value="${esc(c)}">`).join('')}</datalist>` : `<label class="fl">Cargo<input value="${esc(cargo(p))}" disabled title="Só o administrador define o cargo"></label>`}</div>
       <div class="f2">${fld('Data de nascimento', 'birth_date', p.birth_date, 'date')}${fld('WhatsApp', 'phone', p.phone, 'tel', 'placeholder="(85) 9 9999-9999"')}</div>
       ${area('Sobre / detalhes', 'bio', p.bio)}
@@ -1438,6 +1454,12 @@ const F = {
     const s = { ...S.set, shutdown: { auto: form.auto.checked, trigger: v.trigger, days: Math.max(1, num(v.days) || 5), pause: form.pause.checked, msg } };
     await store.upsertSettings(s); S.set = s; await log(`Atualizou o comunicado de desligamento (automático ${s.shutdown.auto ? 'ligado' : 'desligado'})`); toast('Comunicado salvo', s.shutdown.auto ? 'Automático ligado.' : 'Automático desligado — envio só manual.', 'ok'); await refresh();
   },
+  recoverySave: async v => {
+    if (v.pin.length < 6 || v.pin !== v.pin2) return toast('As senhas não conferem ou têm menos de 6 caracteres', '', 'bad');
+    if (WEAK.includes(v.pin)) return toast('Senha muito fácil', 'Escolha outra.', 'bad');
+    const { data, error } = await sb.auth.updateUser({ password: v.pin }); if (error) return toast('Erro ao salvar a senha', error.message, 'bad');
+    toast('Senha criada', 'Bem-vindo(a) ao Bravus Work!', 'ok'); startSession(data.user.id);
+  },
   savePin: async v => {
     if (v.pin.length < 6 || v.pin !== v.pin2) return toast('As senhas não conferem ou têm menos de 6 caracteres', '', 'bad');
     if (WEAK.includes(v.pin)) return toast('Senha muito fácil', '', 'bad');
@@ -1509,12 +1531,16 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && S.
    ===================================================================== */
 (async function boot() {
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+  const hashQ = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const recovery = hashQ.get('type') === 'recovery', recErr = hashQ.get('error_description');
   if (SUPA) {
     try {
       const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm');
       sb = createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
       store = new SupaStore(sb); store.listen();
       const { data } = await sb.auth.getSession();
+      if (recErr) { history.replaceState(null, '', location.pathname); return renderRecovery(/expired|invalid/i.test(recErr) ? 'Este link expirou ou já foi usado. Peça um novo ao administrador ou use “esqueci a senha” no login.' : recErr.replace(/\+/g, ' ')); }
+      if (recovery && data.session) { history.replaceState(null, '', location.pathname); return renderRecovery(); }
       store.onChange(t => { if (S.me) { clearTimeout(refreshing); refreshing = setTimeout(() => refresh(t), 250); } });
       if (data.session) return startSession(data.session.user.id);
     } catch (e) { $('#app').innerHTML = `<div class="auth"><div class="abox"><img class="logo" src="icons/icon.svg" alt=""><p class="warnbox" style="margin-top:20px">Não foi possível conectar ao servidor. Verifique a internet e tente novamente.</p><button class="btn pri" style="margin-top:14px" data-act="reload">Tentar de novo</button></div></div>`; return; }
