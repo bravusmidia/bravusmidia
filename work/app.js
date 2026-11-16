@@ -165,7 +165,7 @@ TABLES.forEach(t => S.d[t] = []);
 let store, sb;
 
 const isAdmin = () => S.me && S.me.role === 'admin';
-const canFin = () => isAdmin() || !!S.set.priscila_finance;
+const canFin = () => true; /* toda a equipe vê o financeiro; só o administrador altera */
 const prof = id => S.d.profiles.find(p => p.id === id);
 const pname = id => (prof(id) || {}).name || '—';
 const firstName = id => pname(id).split(' ')[0];
@@ -224,7 +224,7 @@ const SERVICES = [['trafego', 'Tráfego pago'], ['social', 'Social media'], ['si
 const svcName = k => (SERVICES.find(s => s[0] === k) || [k, k])[1];
 const OP = [['ativo', 'Ativo (online)'], ['pausado', 'Pausado (online)'], ['onboarding', 'Em implantação (online)'], ['cancelado', 'Saiu da carteira (offline)']];
 const inWallet = c => c.op_status !== 'cancelado';
-const walletBtn = c => `<button type="button" class="wsw ${inWallet(c) ? 'on' : ''}" data-act="setWallet" data-id="${c.id}" data-on="${inWallet(c) ? '0' : '1'}" title="${inWallet(c) ? 'Clique para desativar' : 'Clique para ativar'}"><i></i>${inWallet(c) ? 'Ativo' : 'Inativo'}</button>`;
+const walletBtn = c => !isAdmin() ? walletChip(c) : `<button type="button" class="wsw ${inWallet(c) ? 'on' : ''}" data-act="setWallet" data-id="${c.id}" data-on="${inWallet(c) ? '0' : '1'}" title="${inWallet(c) ? 'Clique para desativar' : 'Clique para ativar'}"><i></i>${inWallet(c) ? 'Ativo' : 'Inativo'}</button>`;
 const walletChip = c => inWallet(c) ? '<span class="chip ok"><i class="dot on"></i>Online</span>' : '<span class="chip"><i class="dot"></i>Offline</span>';
 
 function invStatus(i) {
@@ -637,7 +637,7 @@ V.painel = () => {
   realTasks().filter(t => isLate(t) && (isAdmin() || t.assignee === S.me.id)).slice(0, 5).forEach(t => prio.push(['warn', t.title, `Atrasada · ${firstName(t.assignee)} · ${fdate(t.date)}`, 'agenda']));
   if (S.d.content.some(c => c.status === 'aprovacao')) prio.push(['blue', `${S.d.content.filter(c => c.status === 'aprovacao').length} publicação(ões) aguardando aprovação`, 'Conteúdo', 'conteudo']);
 
-  return head(`${greet}, ${firstName(S.me.id)}`, fdateL(d), `<button class="btn pri" data-act="newTask">${ic('plus')}Tarefa</button>`) + `
+  return head(`${greet}, ${firstName(S.me.id)}`, fdateL(d), isAdmin() ? `<button class="btn pri" data-act="newTask">${ic('plus')}Tarefa</button>` : `<button class="btn pri" data-act="editMeet">${ic('plus')}Reunião</button>`) + `
   ${canFin() ? `<div class="grid g4">
     ${kpi('Entrou no mês', brl(fm.recebido), 'pagamentos confirmados', 'hl')}
     ${kpi('A receber', brl(fm.aReceber), 'vencimentos do mês', 'y')}
@@ -692,7 +692,7 @@ V.clientes = () => {
   if (f === 'offline') cl = cl.filter(c => !inWallet(c)).sort((a, b) => String(b.end_date || '').localeCompare(String(a.end_date || '')));
   if (f === 'inad') cl = cl.filter(c => clientFin(c) === 'inadimplente');
   const tabs = [['online', `Online · ${ativos}`], ['offline', `Offline · ${nOff}`], ['inad', 'Inadimplentes'], ['todos', `Todos · ${S.d.clients.length}`]];
-  return head('Clientes', `${ativos} de ${S.set.max_clients} vagas usadas`, `${isAdmin() ? `<label class="btn" title="Importar planilha (ex.: Metrifiquei)">${ic('down')}<span class="hide-m">Importar</span><input type="file" accept=".csv,text/csv" data-act-change="importCsv" hidden></label>` : ''}<button class="btn pri" data-act="editClient">${ic('plus')}Cliente</button>`) +
+  return head('Clientes', `${ativos} de ${S.set.max_clients} vagas usadas`, `${isAdmin() ? `<label class="btn" title="Importar planilha (ex.: Metrifiquei)">${ic('down')}<span class="hide-m">Importar</span><input type="file" accept=".csv,text/csv" data-act-change="importCsv" hidden></label>` : ''}${isAdmin() ? `<button class="btn pri" data-act="editClient">${ic('plus')}Cliente</button>` : ''}`) +
     (isAdmin() ? ['shutdown'].filter(k => nDue(k).length).map(k => `<div class="card" style="margin-bottom:14px;border-color:${k === 'shutdown' ? 'rgba(255,107,122,.45)' : 'rgba(255,190,80,.45)'}"><h3>${ic(NOTICE[k].icon)}${k === 'shutdown' ? 'Comunicados de desligamento' : 'Avisos de recarga'} pendentes<span class="sp"></span><a class="small" href="#ajustes">editar texto</a></h3><div class="list">${nDue(k).map(c => `<div class="li"><div class="t"><b>${esc(c.name)}</b><small>${esc(nReason(k, c))}</small></div><button class="btn sm ${k === 'shutdown' ? 'bad' : 'pri'}" data-act="noticeOpen" data-k="${k}" data-id="${c.id}">${ic('wa')}Enviar</button></div>`).join('')}</div></div>`).join('') : '') +
     `<div class="tabs" style="margin-bottom:14px">${tabs.map(t => `<button data-act="cliFilter" data-f="${t[0]}" class="${f === t[0] ? 'on' : ''}">${t[1]}</button>`).join('')}</div>
     <div class="grid g3">${cl.length ? cl.map(c => `<div class="ccard" data-act="openClient" data-id="${c.id}">
@@ -726,7 +726,7 @@ function clientDetail(id) {
   const inv = S.d.invoices.filter(i => i.client_id === id).sort((a, b) => b.due_date.localeCompare(a.due_date));
   const acts = S.d.activity.filter(a => a.client_id === id).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 15);
   const wa = onlyDigits(c.whatsapp || c.phone);
-  const wal = `<div class="card row wrap" style="gap:10px;margin-bottom:12px;padding:12px 14px"><div class="sp"><b>Status na carteira</b><div class="small muted">${inWallet(c) ? 'Cliente ativo na carteira' : `Saiu${c.end_date ? ' em ' + fdateY(c.end_date) : ''}${c.end_reason ? ' · ' + esc(c.end_reason) : ''}`}</div></div><div class="tabs" style="margin:0"><button type="button" class="${inWallet(c) ? 'on' : ''}" data-act="setWallet" data-id="${c.id}" data-on="1" data-from="detail"><i class="dot ${inWallet(c) ? 'on' : ''}"></i> Online</button><button type="button" class="${inWallet(c) ? '' : 'on'}" data-act="setWallet" data-id="${c.id}" data-on="0" data-from="detail"><i class="dot"></i> Offline</button></div></div>`;
+  const wal = !isAdmin() ? '' : `<div class="card row wrap" style="gap:10px;margin-bottom:12px;padding:12px 14px"><div class="sp"><b>Status na carteira</b><div class="small muted">${inWallet(c) ? 'Cliente ativo na carteira' : `Saiu${c.end_date ? ' em ' + fdateY(c.end_date) : ''}${c.end_reason ? ' · ' + esc(c.end_reason) : ''}`}</div></div><div class="tabs" style="margin:0"><button type="button" class="${inWallet(c) ? 'on' : ''}" data-act="setWallet" data-id="${c.id}" data-on="1" data-from="detail"><i class="dot ${inWallet(c) ? 'on' : ''}"></i> Online</button><button type="button" class="${inWallet(c) ? '' : 'on'}" data-act="setWallet" data-id="${c.id}" data-on="0" data-from="detail"><i class="dot"></i> Offline</button></div></div>`;
   modal(c.name, `${wal}<div class="row wrap" style="gap:6px;margin-bottom:12px">${walletChip(c)}${canFin() ? (isAdmin() ? payBtn(c) : finChip(clientFin(c))) : ''}${(c.services || []).map(s => `<span class="chip blue">${esc(svcName(s))}</span>`).join('')}</div>
     <div class="grid g2" style="gap:10px">
       <div class="card"><h3>Contato</h3><div class="small" style="display:grid;gap:4px"><span>👤 ${esc(c.contact || '—')}</span><span>📱 ${esc(c.whatsapp || c.phone || '—')}</span><span>✉️ ${esc(c.email || '—')}</span><span>📷 ${esc(c.instagram || '—')}</span><span>🏷️ ${esc(c.segment || '—')}</span><span>🧑‍💼 Responsável: ${esc(pname(c.owner))}</span></div></div>
@@ -736,7 +736,7 @@ function clientDetail(id) {
     <div class="sec">Histórico de atividades</div>
     <div class="list">${acts.length ? acts.map(a => `<div class="li"><div class="t"><b style="font-weight:500">${esc(a.action)}</b><small>${esc(firstName(a.user_id))} · ${new Date(a.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</small></div></div>`).join('') : empty('Sem registros ainda.')}</div>
     <form data-form="clientNote" class="row" style="margin-top:10px"><input type="hidden" name="id" value="${c.id}"><input name="text" placeholder="Registrar atividade (ex.: liguei, enviei proposta)" maxlength="300"><button class="btn">Registrar</button></form>`,
-    { wide: true, footer: `${wa ? `<a class="btn ok" href="https://wa.me/55${wa.replace(/^55/, '')}" target="_blank" rel="noopener">${ic('wa')}WhatsApp</a>` : ''}<button type="button" class="btn" data-act="editMeet" data-client="${c.id}">${ic('meet')}<span class="hide-m">Reunião</span></button><button type="button" class="btn" data-act="clientReport" data-id="${c.id}">${ic('file')}Relatório</button>${isAdmin() ? `<button type="button" class="btn bad" data-act="noticeOpen" data-k="shutdown" data-id="${c.id}" title="Comunicado de desligamento">${ic('bell')}<span class="hide-m">Desligamento</span></button>` : ''}<span class="sp"></span><button type="button" class="btn pri" data-act="editClient" data-id="${c.id}">${ic('edit')}Editar</button>` });
+    { wide: true, footer: `${wa ? `<a class="btn ok" href="https://wa.me/55${wa.replace(/^55/, '')}" target="_blank" rel="noopener">${ic('wa')}WhatsApp</a>` : ''}<button type="button" class="btn" data-act="editMeet" data-client="${c.id}">${ic('meet')}<span class="hide-m">Reunião</span></button><button type="button" class="btn" data-act="clientReport" data-id="${c.id}">${ic('file')}Relatório</button>${isAdmin() ? `<button type="button" class="btn bad" data-act="noticeOpen" data-k="shutdown" data-id="${c.id}" title="Comunicado de desligamento">${ic('bell')}<span class="hide-m">Desligamento</span></button>` : ''}<span class="sp"></span>${isAdmin() ? `<button type="button" class="btn pri" data-act="editClient" data-id="${c.id}">${ic('edit')}Editar</button>` : ''}` });
 }
 
 /* ---------- IMPORTAR CLIENTES (CSV do Metrifiquei ou planilha simples) ---------- */
@@ -896,7 +896,7 @@ V.agenda = () => {
   const done = ts.filter(t => t.status === 'feito').length;
   const goals = ts.filter(t => t.goal);
   const late = realTasks().filter(t => isLate(t) && t.date < d && (who === 'all' || t.assignee === who));
-  return head(wk ? 'Bravus Weekend' : 'Bravus Daily', wk ? 'Produção de conteúdo para a semana' : 'Rotina organizada automaticamente', `<button class="btn pri" data-act="newTask">${ic('plus')}Nova</button>`) + `
+  return head(wk ? 'Bravus Weekend' : 'Bravus Daily', wk ? 'Produção de conteúdo para a semana' : 'Rotina organizada automaticamente', isAdmin() ? `<button class="btn pri" data-act="newTask">${ic('plus')}Nova</button>` : `<button class="btn pri" data-act="editMeet">${ic('plus')}Reunião</button>`) + `
     <div class="row wrap" style="margin-bottom:14px;justify-content:space-between">
       <div class="datebar"><button class="btn sm ic" data-act="agDate" data-d="${addDays(d, -1)}">${ic('left')}</button><b>${d === today() ? 'Hoje' : esc(fdateL(d).split(',')[0])} · ${fdate(d)}</b><button class="btn sm ic" data-act="agDate" data-d="${addDays(d, 1)}">${ic('right')}</button>${d !== today() ? `<button class="btn sm" data-act="agDate" data-d="${today()}">Hoje</button>` : ''}</div>
       ${isAdmin() ? `<div class="tabs">${team().map(p => `<button data-act="agWho" data-w="${p.id}" class="${who === p.id ? 'on' : ''}">${esc(p.name.split(' ')[0])}</button>`).join('')}<button data-act="agWho" data-w="all" class="${who === 'all' ? 'on' : ''}">Todos</button></div>` : ''}
@@ -939,7 +939,7 @@ V.conteudo = () => {
   const start = S.contentWeek || (() => { const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return iso(d); })();
   S.contentWeek = start; const end = addDays(start, 6);
   const items = S.d.content.filter(c => !c.date || (c.date >= start && c.date <= end) || c.status === 'ideia');
-  return head('Conteúdo', 'Calendário editorial · prepare a semana no fim de semana', `<button class="btn pri" data-act="editContent">${ic('plus')}Conteúdo</button>`) + `
+  return head('Conteúdo', 'Calendário editorial · prepare a semana no fim de semana', isAdmin() ? `<button class="btn pri" data-act="editContent">${ic('plus')}Conteúdo</button>` : '') + `
   <div class="datebar" style="margin-bottom:14px"><button class="btn sm ic" data-act="cWeek" data-d="${addDays(start, -7)}">${ic('left')}</button><b>${fdate(start)} – ${fdate(end)}</b><button class="btn sm ic" data-act="cWeek" data-d="${addDays(start, 7)}">${ic('right')}</button></div>
   <div class="kan">${CST.map(s => { const it = items.filter(c => c.status === s[0]).sort((a, b) => (a.date || '').localeCompare(b.date || '')); return `<div class="kcol"><h4>${s[1]}<span>${it.length}</span></h4>${it.map(c => `<div class="kit" data-act="editContent" data-id="${c.id}"><b>${esc(c.title)}</b><div class="row wrap" style="gap:4px"><span class="chip blue">${esc((CHN.find(x => x[0] === c.channel) || ['', c.channel || '—'])[1])}</span><span class="chip">${c.date ? fdate(c.date) : 'sem data'}</span></div><div class="small muted" style="margin-top:6px">${esc(cname(c.client_id))} · ${esc(firstName(c.assignee))}</div>${s[0] !== 'publicado' ? `<button class="btn sm" style="margin-top:8px;width:100%" data-act="cNext" data-id="${c.id}">${s[0] === 'aprovacao' && isAdmin() ? 'Aprovar →' : 'Avançar →'}</button>` : ''}</div>`).join('')}</div>`; }).join('')}</div>
   <p class="note" style="margin-top:10px">Nada é publicado automaticamente: tudo passa por “Aprovação” antes de ir ao ar.</p>`;
@@ -1077,7 +1077,6 @@ V.ajustes = () => {
     <div class="f2">${fld('Aviso de bom dia às', 'morning_hour', s.morning_hour, 'time')}${fld('Bloquear após (min sem uso)', 'lock_minutes', s.lock_minutes, 'number', 'min="1" max="120"')}</div>
     ${fld('Lembretes de cobrança (dias em relação ao vencimento)', 'reminder_offsets', (s.reminder_offsets || []).join(', '), 'text', 'placeholder="-5, -2, 0, 1, 5, 10"')}
     <p class="note">Negativo = antes do vencimento · 0 = no dia · positivo = depois.</p>
-    <label class="sw"><input type="checkbox" name="priscila_finance" ${s.priscila_finance ? 'checked' : ''}> Priscila pode ver o financeiro</label>
     <div class="sec" style="margin:4px 0 0">Tipos de notificação</div>
     <div class="cks">${[['tarefas', 'Tarefas e reuniões'], ['financeiro', 'Cobranças'], ['conteudo', 'Conteúdo'], ['chat', 'Chat']].map(n => `<label><input type="checkbox" name="nf_${n[0]}" ${(s.notify || {})[n[0]] !== false ? 'checked' : ''}>${n[1]}</label>`).join('')}</div>
     <div><button class="btn pri">Salvar ajustes</button></div>
@@ -1098,7 +1097,7 @@ V.ajustes = () => {
     <div class="row wrap"><button class="btn pri">Salvar comunicado</button><button type="button" class="btn" data-act="noticeReset" data-k="shutdown">Restaurar texto padrão</button></div>
   </form>
   <div class="card" style="margin-top:14px"><h3>${ic('cal')}Rotinas automáticas (Daily e Weekend)<span class="sp"></span><button class="btn sm" data-act="newTemplate">${ic('plus')}Rotina</button></h3>
-    <div class="list">${tpls.map(t => `<div class="li"><span class="tm num" style="color:var(--blue2);font-weight:700;width:46px">${esc(t.time || '—')}</span><div class="t"><b>${esc(t.title)}</b><small>${esc(firstName(t.assignee))} · ${DN.map((n, i) => (t.days || []).includes(i) ? `<b style="color:var(--tx)">${n}</b>` : `<span style="opacity:.35">${n}</span>`).join(' ')}${t.goal ? ' · meta ' + t.goal : ''}</small></div><button class="btn sm ic" data-act="editTemplate" data-id="${t.id}">${ic('edit')}</button></div>`).join('') || empty('Sem rotinas.')}</div>
+    <div class="list scrollbox">${tpls.map(t => `<div class="li"><span class="tm num" style="color:var(--blue2);font-weight:700;width:46px">${esc(t.time || '—')}</span><div class="t"><b>${esc(t.title)}</b><small>${esc(firstName(t.assignee))} · ${DN.map((n, i) => (t.days || []).includes(i) ? `<b style="color:var(--tx)">${n}</b>` : `<span style="opacity:.35">${n}</span>`).join(' ')}${t.goal ? ' · meta ' + t.goal : ''}</small></div><button class="btn sm ic" data-act="editTemplate" data-id="${t.id}">${ic('edit')}</button></div>`).join('') || empty('Sem rotinas.')}</div>
     <p class="note" style="margin-top:8px">As tarefas do dia são criadas automaticamente a partir destas rotinas. Mudanças valem a partir do próximo dia gerado.</p></div>
   <div class="card" style="margin-top:14px"><h3>${ic('sync')}Integrações oficiais</h3><div class="list">
     ${integ('Banco de dados (Supabase)', SUPA, SUPA ? 'Dados na nuvem, criptografados e com backup diário do Supabase.' : 'Modo local: dados só neste aparelho. Siga o README para conectar.')}
@@ -1108,7 +1107,7 @@ V.ajustes = () => {
     ${integ('Instagram, RD Station, ClickUp', false, 'Preparados para a próxima etapa; enquanto isso, registro manual.')}
   </div></div>
   <div class="card" style="margin-top:14px"><h3>${ic('down')}Backup</h3><div class="row wrap"><button class="btn" data-act="backup">${ic('down')}Baixar backup (JSON)</button>${!SUPA ? `<label class="btn">Restaurar backup<input type="file" accept="application/json" data-act-change="restore" hidden></label>` : ''}</div><p class="note" style="margin-top:8px">O backup contém dados de clientes: guarde em local seguro (ex.: pasta privada no Drive).</p></div>
-  <div class="card" style="margin-top:14px"><h3>${ic('users')}Equipe</h3><div class="list">${team().map(p => `<div class="li">${avatar(p)}<div class="t" data-act="editProfile" data-id="${p.id}" style="cursor:pointer"><b>${esc(p.name)}</b><small>${esc(cargo(p))}${p.email ? ' · ' + esc(p.email) : ''}</small></div>${p.id === S.me.id || isAdmin() ? `<label class="btn sm" title="Trocar foto">${ic('plus')}Foto<input type="file" accept="image/*" data-act-change="setPhoto" data-id="${p.id}" hidden></label>` : ''}${!SUPA || p.id === S.me.id ? `<button class="btn sm" data-act="changePin" data-id="${p.id}">Trocar senha</button>` : `<button class="btn sm" data-act="resetPw" data-id="${p.id}">Redefinir senha</button>`}</div>`).join('')}</div>
+  <div class="card" style="margin-top:14px"><h3>${ic('users')}Equipe</h3><div class="list">${team().map(p => `<div class="li">${avatar(p)}<div class="t" data-act="editProfile" data-id="${p.id}" style="cursor:pointer"><b>${esc(p.name)}</b><small>${esc(cargo(p))} · <b style="color:${p.role === 'admin' ? 'var(--blue2)' : 'var(--tx2)'}">${p.role === 'admin' ? 'Administrador' : 'Membro'}</b>${p.email ? ' · ' + esc(p.email) : ''}</small></div>${p.id === S.me.id || isAdmin() ? `<label class="btn sm" title="Trocar foto">${ic('plus')}Foto<input type="file" accept="image/*" data-act-change="setPhoto" data-id="${p.id}" hidden></label>` : ''}${!SUPA || p.id === S.me.id ? `<button class="btn sm" data-act="changePin" data-id="${p.id}">Trocar senha</button>` : `<button class="btn sm" data-act="setRole" data-id="${p.id}">${p.role === 'admin' ? 'Tirar admin' : 'Dar admin'}</button><button class="btn sm" data-act="adminPw" data-id="${p.id}">Alterar senha</button><button class="btn sm" data-act="resetPw" data-id="${p.id}" title="Envia um link por e-mail para a pessoa criar a senha">Link por e-mail</button>`}</div>`).join('')}</div>
   ${SUPA ? '<p class="note" style="margin-top:8px">Novos usuários são criados no painel do Supabase (Authentication → Add user) — veja o README.</p>' : ''}</div>
   <p class="note" style="margin-top:14px;text-align:center">Bravus Work v${VERSION} · ${SUPA ? 'Supabase' : 'modo local'}</p>`;
 };
@@ -1124,6 +1123,16 @@ const A = {
   authChangeEmail: () => { AUTH.stage = 'email'; AUTH.pin = ''; renderAuth(); },
   moreMenu: () => modal('Menu', `<div class="list">${NAV.filter(navOk).map(n => `<a class="li" href="#${n[0]}" data-act="closeModal">${ic(n[2])}<div class="t"><b>${n[1]}</b></div>${n[0] === 'alertas' && unread() ? `<span class="badge">${unread()}</span>` : ''}</a>`).join('')}<button class="li" data-act="logout" style="width:100%">${ic('lock')}<div class="t" style="text-align:left"><b>Bloquear / sair</b></div></button></div>`),
   cliFilter: d => { S.cliFilter = d.f; renderView(); },
+  setRole: d => { const p = prof(d.id); if (!p || !isAdmin() || p.id === S.me.id) return; const toAdmin = p.role !== 'admin'; const nm = p.name.split(' ')[0];
+    confirmBox(toAdmin ? `Dar acesso de administrador a ${nm}?` : `Tirar o acesso de administrador de ${nm}?`, toAdmin ? `${esc(nm)} vai poder <b>cadastrar, editar, ativar e desativar clientes</b>, marcar pagamentos, ver o financeiro, mexer em Ajustes e alterar senhas da equipe — igual a você.` : `${esc(nm)} volta a ser membro: vê os clientes, mas não altera cadastro, status nem pagamentos.`, toAdmin ? 'Dar admin' : 'Tirar admin', async () => {
+      await store.update('profiles', p.id, { role: toAdmin ? 'admin' : 'comercial' }); await log(`${toAdmin ? 'Deu' : 'Tirou'} acesso de administrador ${toAdmin ? 'para' : 'de'} ${p.name}`);
+      await notifyUsers([p.id], toAdmin ? 'Você agora é administrador' : 'Seu acesso mudou para membro', `Alterado por ${firstName(S.me.id)}`, 'tarefa', null, 'painel');
+      toast('Acesso atualizado', `${nm}: ${toAdmin ? 'administrador' : 'membro'}`, 'ok'); await refresh(); renderView(); }, !toAdmin); },
+  adminPw: d => { const p = prof(d.id); if (!p || !isAdmin()) return;
+    modal(`Alterar senha · ${p.name.split(' ')[0]}`, `<div class="f"><input type="hidden" name="id" value="${p.id}">
+      ${fld('Nova senha (mín. 6 caracteres)', 'pin', '', 'password', 'minlength="6" required autocomplete="new-password"')}${fld('Repita a nova senha', 'pin2', '', 'password', 'minlength="6" required autocomplete="new-password"')}
+      <p class="note">A senha antiga para de funcionar na hora. Passe a nova para ${esc(p.name.split(' ')[0])} pessoalmente ou por mensagem, e peça para trocar depois em Equipe → Trocar senha.</p></div>`,
+      { form: 'adminPwSave', footer: `<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar senha</button>` }); },
   resetPw: d => { const p = prof(d.id); if (!p) return; if (!p.email) return toast('Este membro não tem e-mail no perfil', 'Confira em Authentication → Users no Supabase.', 'warn');
     confirmBox('Redefinir senha', `Vou mandar para <b>${esc(p.email)}</b> um link para <b>${esc(p.name.split(' ')[0])}</b> criar uma senha nova. A senha atual continua valendo até ela criar a nova.`, 'Enviar link', async () => {
       try { await sendReset(p.email); await log(`Enviou link de redefinição de senha para ${p.name}`); toast('Link enviado', `${p.email} · peça para olhar também o spam.`, 'ok'); } catch (e) { toast('Não foi possível enviar', e.message, 'bad'); } }); },
@@ -1172,7 +1181,7 @@ const A = {
       <div class="small" style="display:grid;gap:6px">${p.phone ? `<span>📱 ${esc(p.phone)}</span>` : ''}${p.birth_date ? `<span>🎂 ${fdateY(p.birth_date)}</span>` : ''}${p.bio ? `<span>${esc(p.bio)}</span>` : ''}</div>`);
     modal(mine ? 'Meu perfil' : `Perfil de ${p.name.split(' ')[0]}`, `<div class="f">
       <input type="hidden" name="id" value="${p.id}">
-      <div class="row" style="gap:14px">${avatar(p, 72)}<div class="row wrap" style="gap:8px"><label class="btn sm">${ic('plus')}${p.avatar_url ? 'Trocar foto' : 'Adicionar foto'}<input type="file" accept="image/*" data-act-change="setPhoto" data-id="${p.id}" data-reopen="1" hidden></label>${p.avatar_url ? `<button type="button" class="btn sm" data-act="removePhoto" data-id="${p.id}">Remover foto</button>` : ''}${SUPA && isAdmin() && !mine ? `<button type="button" class="btn sm" data-act="resetPw" data-id="${p.id}">Redefinir senha</button>` : ''}<div class="small muted" style="width:100%">${role}${p.email ? ' · ' + esc(p.email) : ''}</div></div></div>
+      <div class="row" style="gap:14px">${avatar(p, 72)}<div class="row wrap" style="gap:8px"><label class="btn sm">${ic('plus')}${p.avatar_url ? 'Trocar foto' : 'Adicionar foto'}<input type="file" accept="image/*" data-act-change="setPhoto" data-id="${p.id}" data-reopen="1" hidden></label>${p.avatar_url ? `<button type="button" class="btn sm" data-act="removePhoto" data-id="${p.id}">Remover foto</button>` : ''}${SUPA && isAdmin() && !mine ? `<button type="button" class="btn sm" data-act="adminPw" data-id="${p.id}">Alterar senha</button>` : ''}<div class="small muted" style="width:100%">${role}${p.email ? ' · ' + esc(p.email) : ''}</div></div></div>
       <div class="f2">${fld('Nome *', 'name', p.name, 'text', 'required maxlength="80"')}${isAdmin() ? `${fld('Cargo', 'title', p.title, 'text', 'maxlength="60" list="cargos" placeholder="escolha ou digite"')}<datalist id="cargos">${CARGOS.map(c => `<option value="${esc(c)}">`).join('')}</datalist>` : `<label class="fl">Cargo<input value="${esc(cargo(p))}" disabled title="Só o administrador define o cargo"></label>`}</div>
       <div class="f2">${fld('Data de nascimento', 'birth_date', p.birth_date, 'date')}${fld('WhatsApp', 'phone', p.phone, 'tel', 'placeholder="(85) 9 9999-9999"')}</div>
       ${area('Sobre / detalhes', 'bio', p.bio)}
@@ -1181,6 +1190,7 @@ const A = {
   },
   removePhoto: async d => { await store.update('profiles', d.id, { avatar_url: null }); toast('Foto removida', '', 'ok'); await refresh(); renderView(); A.editProfile({ id: d.id }); },
   setWallet: async d => {
+    if (!isAdmin()) return toast('Somente o administrador altera clientes', '', 'warn');
     const c = client(d.id); if (!c) return;
     const on = d.on === '1'; if (on === inWallet(c)) return;
     if (on) {
@@ -1201,7 +1211,7 @@ const A = {
     for (const c of IMPORT.filter(c => !c._skip)) { const { _skip, ...row } = c; const r = await store.insert('clients', row); n++; await log(`Importou o cliente ${row.name}`, r && r.id); }
     closeModal(); toast(`${n} cliente(s) importado(s)`, 'Complete valor e vencimento de cada um.', 'ok'); S.cliFilter = 'online'; await refresh();
   },
-  editClient: d => { if (!d.id && S.d.clients.filter(c => c.op_status !== 'cancelado').length >= S.set.max_clients) return toast('Limite de clientes atingido', `Seu espaço comporta ${S.set.max_clients} clientes. Aumente em Ajustes.`, 'warn'); clientForm(d.id ? client(d.id) : {}); },
+  editClient: d => { if (!isAdmin()) return toast('Somente o administrador altera clientes', 'Peça acesso de administrador ao Andrade.', 'warn'); if (!d.id && S.d.clients.filter(c => c.op_status !== 'cancelado').length >= S.set.max_clients) return toast('Limite de clientes atingido', `Seu espaço comporta ${S.set.max_clients} clientes. Aumente em Ajustes.`, 'warn'); clientForm(d.id ? client(d.id) : {}); },
   openClient: d => clientDetail(d.id),
   noticeOpen: d => { if (!isAdmin()) return toast('Somente o administrador envia este aviso', '', 'warn'); noticeModal(d.k, d.id); },
   noticeSend: async d => {
@@ -1244,7 +1254,7 @@ const A = {
   chargeWa: d => { const i = S.d.invoices.find(x => x.id === d.id); log('Abriu lembrete de cobrança no WhatsApp', i && i.client_id); },
   newExpense: () => modal('Nova despesa', `<div class="f">${fld('Descrição *', 'description', '', 'text', 'required')}<div class="f2">${fld('Valor (R$) *', 'amount', '', 'number', 'step="0.01" min="0.01" required')}${fld('Data', 'date', today(), 'date', 'required')}</div>${sel('Categoria', 'category', ['Ferramentas', 'Equipe', 'Impostos', 'Anúncios próprios', 'Equipamentos', 'Outros'])}</div>`, { form: 'saveExpense', footer: `<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` }),
   delExpense: d => confirmBox('Excluir despesa?', 'Esta ação não pode ser desfeita.', 'Excluir', async () => { await store.remove('expenses', d.id); await refresh(); }, true),
-  newTask: () => taskForm({}), editTask: d => { const t = S.d.tasks.find(t => t.id === d.id); return t && t.kind === 'reuniao' ? meetForm(t) : taskForm(t); },
+  newTask: () => isAdmin() ? taskForm({}) : toast('Membros só adicionam reuniões', 'Use “+ Reunião”.', 'warn'), editTask: d => { const t = S.d.tasks.find(t => t.id === d.id); return t && t.kind === 'reuniao' ? meetForm(t) : taskForm(t); },
   newTemplate: () => taskForm({}, true), editTemplate: d => taskForm(S.d.tasks.find(t => t.id === d.id), true),
   delTask: d => confirmBox('Excluir?', 'Esta ação não pode ser desfeita.', 'Excluir', async () => { await store.remove('tasks', d.id); await refresh(); }, true),
   toggleTask: async d => {
@@ -1270,7 +1280,7 @@ const A = {
     const ga = document.createElement('a'); ga.href = g; ga.target = '_blank'; ga.rel = 'noopener'; document.body.appendChild(ga); ga.click(); ga.remove();
     toast('Evento enviado ao calendário', EMBED ? 'Google Agenda aberto em nova aba.' : 'Abra o arquivo .ics para adicionar no iPhone/Android.');
   },
-  editContent: d => contentForm(d.id ? S.d.content.find(c => c.id === d.id) : {}),
+  editContent: d => (!d.id && !isAdmin()) ? toast('Membros só adicionam reuniões', '', 'warn') : contentForm(d.id ? S.d.content.find(c => c.id === d.id) : {}),
   delContent: d => confirmBox('Excluir conteúdo?', 'Esta ação não pode ser desfeita.', 'Excluir', async () => { await store.remove('content', d.id); await refresh(); }, true),
   cNext: async (d, el, ev) => {
     const c = S.d.content.find(x => x.id === d.id); const i = CST.findIndex(s => s[0] === c.status);
@@ -1323,6 +1333,7 @@ const F = {
     sessionStorage.setItem('bw_session', a.id); await startSession(a.id);
   },
   saveClient: async (v, fd) => {
+    if (!isAdmin()) return toast('Somente o administrador altera clientes', '', 'warn');
     if (!v.name.trim()) return toast('Informe o nome da empresa', '', 'bad');
     const row = { name: v.name.trim(), contact: v.contact, whatsapp: v.whatsapp, phone: v.phone, email: v.email, instagram: v.instagram, segment: v.segment, owner: v.owner || null,
       services: fd.getAll('services'), contract_value: num(v.contract_value) || 0, due_day: num(v.due_day), installments: v.installments === '2' ? 2 : 1, due_day2: v.installments === '2' ? num(v.due_day2) : null, start_date: v.start_date || null, op_status: v.op_status,
@@ -1429,7 +1440,7 @@ const F = {
   saveSettings: async (v, fd, form) => {
     const offs = String(v.reminder_offsets || '').split(/[,; ]+/).filter(x => x !== '').map(Number).filter(n => Number.isFinite(n) && Math.abs(n) <= 60);
     const s = { ...S.set, agency_name: v.agency_name, max_clients: num(v.max_clients) || 20, calls_start: v.calls_start, meetings_start: v.meetings_start, prospect_goal: num(v.prospect_goal) || 0, followup_goal: num(v.followup_goal) || 0,
-      priscila_start: v.priscila_start, priscila_end: v.priscila_end, morning_hour: v.morning_hour, lock_minutes: num(v.lock_minutes) || 15, reminder_offsets: offs, priscila_finance: form.priscila_finance.checked,
+      priscila_start: v.priscila_start, priscila_end: v.priscila_end, morning_hour: v.morning_hour, lock_minutes: num(v.lock_minutes) || 15, reminder_offsets: offs,
       notify: Object.fromEntries(['tarefas', 'financeiro', 'conteudo', 'chat'].map(k => [k, !!form['nf_' + k].checked])) };
     await store.upsertSettings(s); S.set = s; await log('Atualizou os ajustes'); toast('Ajustes salvos', '', 'ok'); armLock(); await refresh();
   },
@@ -1453,6 +1464,14 @@ const F = {
     const msg = String(v.msg || '').trim(); if (!msg) return toast('Escreva o texto do comunicado', '', 'warn');
     const s = { ...S.set, shutdown: { auto: form.auto.checked, trigger: v.trigger, days: Math.max(1, num(v.days) || 5), pause: form.pause.checked, msg } };
     await store.upsertSettings(s); S.set = s; await log(`Atualizou o comunicado de desligamento (automático ${s.shutdown.auto ? 'ligado' : 'desligado'})`); toast('Comunicado salvo', s.shutdown.auto ? 'Automático ligado.' : 'Automático desligado — envio só manual.', 'ok'); await refresh();
+  },
+  adminPwSave: async v => {
+    const p = prof(v.id); if (!p) return;
+    if (v.pin.length < 6 || v.pin !== v.pin2) return toast('As senhas não conferem ou têm menos de 6 caracteres', '', 'bad');
+    if (WEAK.includes(v.pin)) return toast('Senha muito fácil', 'Escolha outra.', 'bad');
+    const { error } = await sb.rpc('admin_set_password', { target: v.id, new_password: v.pin });
+    if (error) return toast('Não foi possível alterar', /function|schema cache/i.test(error.message) ? 'Falta instalar a função de senha no banco (SQL v1.9).' : error.message, 'bad');
+    await log(`Alterou a senha de ${p.name}`); closeModal(); toast('Senha alterada', `${p.name.split(' ')[0]} já pode entrar com a senha nova.`, 'ok');
   },
   recoverySave: async v => {
     if (v.pin.length < 6 || v.pin !== v.pin2) return toast('As senhas não conferem ou têm menos de 6 caracteres', '', 'bad');

@@ -243,3 +243,4 @@ textarea{min-height:80px}
 .goal .row .i{width:18px;height:18px;color:var(--blue2)}
 .prog .pace{position:absolute;top:-3px;width:2px;height:14px;background:#fff;opacity:.75;border-radius:2px}
 .prog{overflow:visible}.prog i{border-radius:99px}
+.scrollbox{max-height:320px;overflow-y:auto;padding-right:6px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
