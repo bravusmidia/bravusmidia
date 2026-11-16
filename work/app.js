@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '1.0.0';
+const VERSION = '2.3.2';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -519,7 +519,7 @@ async function tryLogin() {
     } else {
       const p = S.d.profiles.find(x => x.id === AUTH.user);
       if (!p || await hashPin(pin, p.salt) !== p.pin_hash) throw new Error('Senha incorreta');
-      sessionStorage.setItem('bw_session', p.id);
+      localStorage.setItem('bw_session', p.id);
       await startSession(p.id);
     }
     clearFail();
@@ -552,7 +552,7 @@ async function startSession(userId) {
 }
 async function logout(silent) {
   if (S.me) { try { await store.update('profiles', S.me.id, { last_seen: new Date(Date.now() - 300000).toISOString() }); } catch {} }
-  timers.forEach(clearInterval); timers = []; S.me = null; sessionStorage.removeItem('bw_session');
+  timers.forEach(clearInterval); timers = []; S.me = null; localStorage.removeItem('bw_session');
   if (SUPA) await sb.auth.signOut();
   AUTH.pin = ''; closeModal(); renderAuth(silent ? 'Bloqueado por inatividade.' : '');
 }
@@ -560,7 +560,9 @@ let lockT;
 function armLock() {
   clearTimeout(lockT);
   if (!S.me) return;
-  lockT = setTimeout(() => logout(true), (S.set.lock_minutes || 15) * 60000);
+  const mins = S.set.lock_v2 ? +S.set.lock_minutes || 0 : 0; // 0 = nunca bloqueia sozinho (padrão: continua conectado)
+  if (!mins) return;
+  lockT = setTimeout(() => logout(true), mins * 60000);
 }
 ['click', 'keydown', 'touchstart'].forEach(ev => addEventListener(ev, () => S.me && armLock(), { passive: true }));
 
@@ -1044,7 +1046,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.3.1', notes: [
+const RELEASE = { version: '2.3.2', notes: [
+  'Você continua conectado: fechar o app ou ficar sem usar não desliga mais a sessão. Só sai se tocar no cadeado.',
   'Botão do chat flutuante: segure e arraste para qualquer lugar da tela; ele gruda na lateral mais próxima e lembra a posição.',
   'Painel: toque em qualquer card (Entrou no mês, A receber, Em atraso, Saldo, Clientes, Inadimplentes, Reuniões, Receita) e vá direto para a aba certa, já filtrada.',
   'Financeiro: filtro de cobranças (Todas, Pagas, A receber, Em atraso).',
@@ -1253,7 +1256,7 @@ V.ajustes = () => {
     <div class="f2">${fld('Última reunião termina às', 'meetings_end', s.meetings_end || '21:30', 'time')}${fld('Duração de cada reunião (min)', 'meet_slot', s.meet_slot || 60, 'number', 'min="15" max="180" step="15"')}</div>
     <div class="f2">${fld('Meta diária de prospecção', 'prospect_goal', s.prospect_goal, 'number')}${fld('Meta diária de follow-ups (Priscila)', 'followup_goal', s.followup_goal, 'number')}</div>
     <div class="f2">${fld('Priscila — início', 'priscila_start', s.priscila_start, 'time')}${fld('Priscila — fim', 'priscila_end', s.priscila_end, 'time')}</div>
-    <div class="f2">${fld('Aviso de bom dia às', 'morning_hour', s.morning_hour, 'time')}${fld('Bloquear após (min sem uso)', 'lock_minutes', s.lock_minutes, 'number', 'min="1" max="120"')}</div>
+    <div class="f2">${fld('Aviso de bom dia às', 'morning_hour', s.morning_hour, 'time')}${fld('Bloquear após (min sem uso · 0 = nunca)', 'lock_minutes', s.lock_v2 ? s.lock_minutes || 0 : 0, 'number', 'min="0" max="240"')}</div>
     ${fld('Lembretes de cobrança (dias em relação ao vencimento)', 'reminder_offsets', (s.reminder_offsets || []).join(', '), 'text', 'placeholder="-5, -2, 0, 1, 5, 10"')}
     <p class="note">Negativo = antes do vencimento · 0 = no dia · positivo = depois.</p>
     <div class="sec" style="margin:4px 0 0">Tipos de notificação</div>
@@ -1541,7 +1544,7 @@ const F = {
     const mk = async (name, pin, role, color) => { const salt = uid(); return store.insert('profiles', { name: name.trim(), role, color, salt, pin_hash: await hashPin(pin, salt) }); };
     const a = await mk(v.a_name, v.a_pin, 'admin', '#2f7bff'); await mk(v.p_name, v.p_pin, 'comercial', '#b44cff');
     await store.upsertSettings(DEFAULT_SETTINGS);
-    sessionStorage.setItem('bw_session', a.id); await startSession(a.id);
+    localStorage.setItem('bw_session', a.id); await startSession(a.id);
   },
   saveClient: async (v, fd) => {
     if (!isAdmin()) return toast('Somente o administrador altera clientes', '', 'warn');
@@ -1660,7 +1663,7 @@ const F = {
   saveSettings: async (v, fd, form) => {
     const offs = String(v.reminder_offsets || '').split(/[,; ]+/).filter(x => x !== '').map(Number).filter(n => Number.isFinite(n) && Math.abs(n) <= 60);
     const s = { ...S.set, agency_name: v.agency_name, max_clients: num(v.max_clients) || 20, calls_start: v.calls_start, meetings_start: v.meetings_start, meetings_end: v.meetings_end || '21:30', meet_slot: num(v.meet_slot) || 60, prospect_goal: num(v.prospect_goal) || 0, followup_goal: num(v.followup_goal) || 0,
-      priscila_start: v.priscila_start, priscila_end: v.priscila_end, morning_hour: v.morning_hour, lock_minutes: num(v.lock_minutes) || 15, reminder_offsets: offs,
+      priscila_start: v.priscila_start, priscila_end: v.priscila_end, morning_hour: v.morning_hour, lock_minutes: Math.max(0, num(v.lock_minutes) || 0), lock_v2: true, reminder_offsets: offs,
       notify: Object.fromEntries(['tarefas', 'financeiro', 'conteudo', 'chat'].map(k => [k, !!form['nf_' + k].checked])) };
     await store.upsertSettings(s); S.set = s; await log('Atualizou os ajustes'); toast('Ajustes salvos', '', 'ok'); armLock(); await refresh();
   },
@@ -1798,7 +1801,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && S.
     store = new LocalStore();
     store.onChange(t => { if (S.me && t !== 'profiles') { clearTimeout(refreshing); refreshing = setTimeout(() => refresh(), 150); } });
     await loadAll();
-    const sid = sessionStorage.getItem('bw_session'); if (sid && prof(sid)) return startSession(sid);
+    const sid = localStorage.getItem('bw_session'); if (sid && prof(sid)) return startSession(sid);
   }
   renderAuth();
 })();
