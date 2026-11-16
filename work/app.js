@@ -598,8 +598,40 @@ function render() {
     <section id="cw" class="cw"></section>
     <nav class="bnav">${[['painel', 'Painel', 'grid'], ['clientes', 'Clientes', 'users'], ['agenda', 'Agenda', 'cal'], ['reunioes', 'Reuniões', 'meet']].map(n => `<a href="#${n[0]}" class="${S.route === n[0] ? 'on' : ''}">${ic(n[2])}${n[1]}${badge(n[0])}</a>`).join('')}<button data-act="moreMenu">${ic('more')}Mais</button></nav>
   </div>`;
-  renderView(); renderChat(true);
+  renderView(); renderChat(true); fabPlace();
 }
+/* botão do chat: flutuante e arrastável (posição salva neste aparelho) */
+const FAB = { pos: lsGet('bw_fab_pos', null), drag: null, block: false };
+function fabLimits() { const m = innerWidth <= 860; return { top: m ? 70 : 16, bottom: innerHeight - 56 - (m ? 76 : 16), side: m ? 12 : 20 }; }
+function fabPlace() {
+  const f = $('#cwFab'); if (!f || !FAB.pos) return;
+  const L = fabLimits(); const y = Math.min(L.bottom, Math.max(L.top, FAB.pos.y * innerHeight));
+  f.style.top = y + 'px'; f.style.bottom = 'auto';
+  if (FAB.pos.side === 'l') { f.style.left = L.side + 'px'; f.style.right = 'auto'; } else { f.style.right = L.side + 'px'; f.style.left = 'auto'; }
+}
+addEventListener('resize', fabPlace);
+document.addEventListener('pointerdown', e => {
+  const f = e.target.closest('#cwFab'); if (!f || (e.button && e.button !== 0)) return;
+  const r = f.getBoundingClientRect();
+  FAB.drag = { f, id: e.pointerId, sx: e.clientX, sy: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top, moved: false };
+});
+document.addEventListener('pointermove', e => {
+  const d = FAB.drag; if (!d || e.pointerId !== d.id) return;
+  if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 8) return;
+  if (!d.moved) { d.moved = true; d.f.classList.add('drag'); try { d.f.setPointerCapture(d.id); } catch {} }
+  e.preventDefault();
+  const x = Math.min(innerWidth - 56, Math.max(0, e.clientX - d.dx)), y = Math.min(innerHeight - 56, Math.max(0, e.clientY - d.dy));
+  Object.assign(d.f.style, { left: x + 'px', top: y + 'px', right: 'auto', bottom: 'auto' });
+}, { passive: false });
+const fabEnd = e => {
+  const d = FAB.drag; if (!d || e.pointerId !== d.id) return; FAB.drag = null;
+  if (!d.moved) return;
+  d.f.classList.remove('drag'); FAB.block = true; setTimeout(() => { FAB.block = false; }, 350);
+  const r = d.f.getBoundingClientRect();
+  FAB.pos = { side: r.left + 28 < innerWidth / 2 ? 'l' : 'r', y: r.top / innerHeight }; lsSet('bw_fab_pos', FAB.pos); fabPlace();
+};
+document.addEventListener('pointerup', fabEnd); document.addEventListener('pointercancel', fabEnd);
+document.addEventListener('click', e => { if (FAB.block && e.target.closest('#cwFab')) { e.preventDefault(); e.stopPropagation(); FAB.block = false; } }, true);
 /* rolagem no celular: não reconstruir a tela enquanto o dedo está na tela ou a página ainda desliza */
 const SCR = { touching: false, last: 0, pending: null };
 addEventListener('touchstart', () => { SCR.touching = true; }, { passive: true });
@@ -1012,7 +1044,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.3.0', notes: [
+const RELEASE = { version: '2.3.1', notes: [
+  'Botão do chat flutuante: segure e arraste para qualquer lugar da tela; ele gruda na lateral mais próxima e lembra a posição.',
   'Painel: toque em qualquer card (Entrou no mês, A receber, Em atraso, Saldo, Clientes, Inadimplentes, Reuniões, Receita) e vá direto para a aba certa, já filtrada.',
   'Financeiro: filtro de cobranças (Todas, Pagas, A receber, Em atraso).',
   'Reuniões: menu da semana (Hoje, Amanhã, Qua, Qui…) mostrando só se há horário livre ou lotado; toque num horário livre para marcar.',

@@ -252,6 +252,7 @@ textarea{min-height:80px}
 /* v2.0 chat flutuante */
 .cw-fab{position:fixed;right:22px;bottom:22px;z-index:60;width:56px;height:56px;border-radius:50%;border:1px solid #2f6bff;background:linear-gradient(135deg,#2f7bff,#1c4fd0);color:#fff;display:grid;place-items:center;box-shadow:0 12px 30px -8px rgba(47,123,255,.6);cursor:pointer;transition:.15s}
 .cw-fab:hover{transform:translateY(-2px)}.cw-fab .i{width:24px;height:24px}.cw-fab.hide{display:none}
+.cw-fab{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;transition:transform .15s,left .2s,right .2s,top .2s}.cw-fab.drag{transition:none;transform:scale(1.08);opacity:.92;cursor:grabbing}
 .cw-fab .badge{position:absolute;top:-4px;right:-4px}
 .cw{position:fixed;right:22px;bottom:22px;z-index:61;width:370px;height:min(560px,calc(100dvh - 44px));background:#0c1427;border:1px solid var(--line2);border-radius:18px;box-shadow:0 24px 60px -12px #000;display:none;flex-direction:column;overflow:hidden}
 .cw.on{display:flex;animation:fade .18s}
