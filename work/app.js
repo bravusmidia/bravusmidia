@@ -544,7 +544,7 @@ async function startSession(userId) {
   S.route = (location.hash.replace(/^#\/?/, '') || 'painel').split('?')[0];
   render(); tick(); setTimeout(releaseNotice, 800); checkVersion();
   timers.forEach(clearInterval);
-  timers = [setInterval(tick, 60000), setInterval(heartbeat, 60000), setInterval(checkVersion, 30 * 60000), setInterval(() => { if (!document.hidden && !$('#modal-root').innerHTML && ['painel', 'equipe'].includes(S.route)) renderView(); if (CW.open) renderChat(); }, 30000)];
+  timers = [setInterval(tick, 60000), setInterval(heartbeat, 60000), setInterval(checkVersion, 30 * 60000), setInterval(() => { if (!document.hidden && !$('#modal-root').innerHTML && ['painel', 'equipe'].includes(S.route)) renderView(); if (CW.open) renderChat(); renderPresence(); }, 30000)];
   armLock();
 }
 async function logout(silent) {
@@ -588,6 +588,7 @@ function render() {
     </aside>
     <main class="main">
       <div class="mtop"><img src="icons/icon.svg" alt=""><b>BRAVUS <span>WORK</span></b><a class="btn sm ic" href="#alertas" style="position:relative">${ic('bell')}${unread() ? `<span class="badge" style="position:absolute;top:-6px;right:-6px">${unread()}</span>` : ''}</a><button class="btn sm ic" data-act="logout" title="Bloquear">${ic('lock')}</button></div>
+      <div class="presence" id="presence">${presenceHtml()}</div>
       <div id="view"></div>
     </main>
     <button id="cwFab" class="cw-fab" data-act="chatToggle" aria-label="Chat da equipe">${ic('chat')}</button>
@@ -991,6 +992,10 @@ function cwList() {
     const sb2 = mine ? seenBy(m) : []; const tick = mine ? (sb2.length ? '<span class="ck2 on" title="Visto">✓✓</span>' : '<span class="ck2" title="Enviado">✓</span>') : '';
     return `${sep}<div class="cw-m ${mine ? 'me' : ''}">${mine ? '' : `<small class="cw-who">${esc(firstName(m.user_id))}</small>`}<div class="cw-b">${esc(m.text)}<span class="cw-t">${msgTime(m.created_at).slice(-5)} ${tick}</span><button class="cw-pin ${m.pinned ? 'on' : ''}" data-act="msgPin" data-id="${m.id}" title="${m.pinned ? 'Tirar das anotações' : 'Guardar nas anotações'}">📌</button></div>${mine && m === lastMine && sb2.length ? `<small class="cw-seen">Visto por ${sb2.map(p => esc(firstName(p.id))).join(', ')} · ${msgTime(sb2.map(p => p.chat_seen_at).sort().pop())}</small>` : ''}</div>`; }).join('');
 }
+function presenceHtml() {
+  return team().map(p => { const on = isOnline(p); return `<span class="pr ${on ? 'on' : ''}" data-act="editProfile" data-id="${p.id}" title="${esc(p.name)} · ${on ? 'online agora' : 'visto ' + ago(p.last_seen)}">${avatar(p, 28)}<span><b>${esc(firstName(p.id))}${p.id === S.me.id ? ' (você)' : ''}</b><small>${on ? 'online' : 'offline · ' + ago(p.last_seen)}</small></span></span>`; }).join('');
+}
+const renderPresence = () => { const el = $('#presence'); if (el && S.me) el.innerHTML = presenceHtml(); };
 function renderChat(full = false) {
   const box = $('#cw'), fab = $('#cwFab'); if (!box || !S.me) return;
   const n = chatUnread(); if (fab) { fab.classList.toggle('hide', CW.open); fab.querySelector('.badge') && fab.querySelector('.badge').remove(); if (n && !CW.open) fab.insertAdjacentHTML('beforeend', `<span class="badge">${n}</span>`); }
@@ -1588,7 +1593,7 @@ const F = {
    EVENTOS GLOBAIS
    ===================================================================== */
 let refreshing;
-async function refresh(t) { await loadAll(t); if (S.me) { popNew(); popMsgs(); renderShellBadges(); if (!t || t !== 'messages') renderView(); if (!t || ['messages', 'profiles'].includes(t)) renderChat(); } }
+async function refresh(t) { await loadAll(t); if (S.me) { popNew(); popMsgs(); renderShellBadges(); renderPresence(); if (!t || t !== 'messages') renderView(); if (!t || ['messages', 'profiles'].includes(t)) renderChat(); } }
 function renderShellBadges() { if (!$('.shell')) return render(); const cur = $('.nav'); if (!cur) return; const u = unread(), c = chatUnread();
   document.querySelectorAll('.nav a, .bnav a').forEach(a => { const k = a.getAttribute('href').slice(1); let b = a.querySelector('.badge'); const n = k === 'alertas' ? u : k === 'chat' && S.route !== 'chat' ? c : 0; if (n) { if (!b) { b = document.createElement('span'); b.className = 'badge'; a.appendChild(b); } b.textContent = n; } else if (b) b.remove(); });
   const mb = $('.mtop a[href="#alertas"]'); if (mb) { let b = mb.querySelector('.badge'); if (u) { if (!b) { b = document.createElement('span'); b.className = 'badge'; b.style.cssText = 'position:absolute;top:-6px;right:-6px'; mb.appendChild(b); } b.textContent = u; } else if (b) b.remove(); } }
