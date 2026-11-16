@@ -213,3 +213,13 @@ textarea{min-height:80px}
   .chat{height:calc(100dvh - 190px - var(--safe-b))}
   .hide-m{display:none}
 }
+/* v1.3 botão ativar/desativar cliente */
+.wsw{display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 12px 0 5px;border-radius:99px;font:600 12px/1 inherit;font-family:inherit;cursor:pointer;background:var(--card2);border:1px solid var(--line2);color:var(--tx2);white-space:nowrap;transition:.15s}
+.wsw i{width:30px;height:18px;border-radius:99px;background:rgba(255,255,255,.12);position:relative;transition:.15s}
+.wsw i::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#8a93a8;transition:.15s}
+.wsw.on{color:var(--ok);border-color:rgba(43,212,138,.4);background:rgba(43,212,138,.08)}
+.wsw.on i{background:rgba(43,212,138,.45)}
+.wsw.on i::after{left:14px;background:var(--ok)}
+.wsw:hover{filter:brightness(1.15)}
+.cklbl{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--tx2);cursor:pointer}
+.cklbl input{width:18px;height:18px;accent-color:var(--pri,#2f7bff)}

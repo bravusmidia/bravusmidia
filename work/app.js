@@ -214,6 +214,7 @@ const SERVICES = [['trafego', 'Tráfego pago'], ['social', 'Social media'], ['si
 const svcName = k => (SERVICES.find(s => s[0] === k) || [k, k])[1];
 const OP = [['ativo', 'Ativo (online)'], ['pausado', 'Pausado (online)'], ['onboarding', 'Em implantação (online)'], ['cancelado', 'Saiu da carteira (offline)']];
 const inWallet = c => c.op_status !== 'cancelado';
+const walletBtn = c => `<button type="button" class="wsw ${inWallet(c) ? 'on' : ''}" data-act="setWallet" data-id="${c.id}" data-on="${inWallet(c) ? '0' : '1'}" title="${inWallet(c) ? 'Clique para desativar' : 'Clique para ativar'}"><i></i>${inWallet(c) ? 'Ativo' : 'Inativo'}</button>`;
 const walletChip = c => inWallet(c) ? '<span class="chip ok"><i class="dot on"></i>Online</span>' : '<span class="chip"><i class="dot"></i>Offline</span>';
 
 function invStatus(i) {
@@ -236,8 +237,8 @@ function adState(c) {
   if (c.op_status === 'cancelado') return { k: 'off', label: 'Cancelado', cls: 'bad' };
   if (blocked || cs.some(x => x.status === 'problema')) return { k: 'prob', label: 'Problema na conta', cls: 'bad' };
   if (c.ad_balance != null && c.ad_balance !== '' && Number(c.ad_balance) <= 0) return { k: 'saldo', label: 'Sem saldo', cls: 'warn' };
-  if (act.length) return { k: 'on', label: `Online · ${act.length} ativa${act.length > 1 ? 's' : ''}`, cls: 'ok' };
-  return { k: 'off', label: 'Offline', cls: '' };
+  if (act.length) return { k: 'on', label: `Anunciando · ${act.length}`, cls: 'ok' };
+  return { k: 'off', label: 'Sem campanha ativa', cls: '' };
 }
 /* ---------- avisos por WhatsApp (recarga e desligamento) ---------- */
 const NOTICE = {
@@ -421,7 +422,7 @@ async function tick() {
           await notifyUsers(finPeople(), t, `${cname(i.client_id)} — ${brl(i.amount)}`, diff > 0 ? 'alerta' : 'financeiro', `inv:${i.id}:${diff}`, 'financeiro');
         }
       }
-      if (nf.campanhas !== false) for (const c of S.d.clients) {
+      if (nf.campanhas !== false) for (const c of S.d.clients.filter(inWallet)) {
         const st = adState(c);
         if (st.k === 'prob' || st.k === 'saldo') await notifyUsers(team().map(p => p.id), st.k === 'saldo' ? 'Cliente sem saldo na conta de anúncios' : 'Problema em conta de anúncios', c.name, 'alerta', `ad:${c.id}:${st.k}:${d}`, 'campanhas');
       }
@@ -603,7 +604,7 @@ const V = {};
 /* ---------- PAINEL ---------- */
 V.painel = () => {
   const d = today(), k = curYM(), cl = S.d.clients;
-  const ativos = cl.filter(c => c.op_status === 'ativo'), cancel = cl.filter(c => c.op_status === 'cancelado');
+  const ativos = cl.filter(inWallet), cancel = cl.filter(c => !inWallet(c));
   const inativos = cl.filter(c => c.op_status === 'pausado');
   const novos = cl.filter(c => ym(c.start_date || c.created_at) === k);
   const inad = cl.filter(c => clientFin(c) === 'inadimplente');
@@ -643,7 +644,7 @@ V.painel = () => {
   </div>` : ''}
   <div class="sec">Clientes e anúncios</div>
   <div class="grid g4">
-    ${kpi('Clientes ativos', `${ativos.length}<span class="muted" style="font-size:15px"> / ${S.set.max_clients}</span>`, `${cl.length} no total · ${novos.length} novo(s) no mês`)}
+    ${kpi('Clientes ativos', `${ativos.length}<span class="muted" style="font-size:15px"> / ${S.set.max_clients}</span>`, `<a href="#clientes" data-act="cliFilterGo" data-f="offline">${cancel.length} inativo(s)</a> · ${novos.length} novo(s) no mês`)}
     ${kpi('Anunciando agora', `<span style="color:var(--ok)">${on.length}</span>`, 'online: campanha ativa e conta ok')}
     ${kpi('Parados', off.length, 'offline, sem saldo ou com problema', off.length ? 'y' : '')}
     ${kpi('Campanhas', `${cs.filter(c => c.status === 'ativa').length} <span class="muted" style="font-size:14px">ativas</span>`, `${cs.filter(c => c.status === 'pausada').length} pausadas · ${cs.filter(c => ['problema', 'sem_entrega'].includes(c.status)).length} com problema`)}
@@ -692,11 +693,11 @@ V.clientes = () => {
     (isAdmin() ? ['recharge', 'shutdown'].filter(k => nDue(k).length).map(k => `<div class="card" style="margin-bottom:14px;border-color:${k === 'shutdown' ? 'rgba(255,107,122,.45)' : 'rgba(255,190,80,.45)'}"><h3>${ic(NOTICE[k].icon)}${k === 'shutdown' ? 'Comunicados de desligamento' : 'Avisos de recarga'} pendentes<span class="sp"></span><a class="small" href="#ajustes">editar texto</a></h3><div class="list">${nDue(k).map(c => `<div class="li"><div class="t"><b>${esc(c.name)}</b><small>${esc(nReason(k, c))}</small></div><button class="btn sm ${k === 'shutdown' ? 'bad' : 'pri'}" data-act="noticeOpen" data-k="${k}" data-id="${c.id}">${ic('wa')}Enviar</button></div>`).join('')}</div></div>`).join('') : '') +
     `<div class="tabs" style="margin-bottom:14px">${tabs.map(t => `<button data-act="cliFilter" data-f="${t[0]}" class="${f === t[0] ? 'on' : ''}">${t[1]}</button>`).join('')}</div>
     <div class="grid g3">${cl.length ? cl.map(c => `<div class="ccard" data-act="openClient" data-id="${c.id}">
-      <div class="hd"><span class="av" style="background:linear-gradient(135deg,#1c5fe6,#0b1a3d)">${esc(initials(c.name))}</span><b>${esc(c.name)}</b>${walletChip(c)}</div>
+      <div class="hd"><span class="av" style="background:linear-gradient(135deg,#1c5fe6,#0b1a3d)">${esc(initials(c.name))}</span><b>${esc(c.name)}</b>${walletBtn(c)}</div>
       <div class="row wrap" style="gap:6px">${(c.services || []).map(s => `<span class="chip blue">${esc(svcName(s))}</span>`).join('') || '<span class="muted small">Sem serviços</span>'}</div>
       <div class="ft"><span class="muted">${esc(c.segment || 'Segmento —')} · vence dia ${esc(c.due_day || '—')}</span>${canFin() ? `<b>${brl(c.contract_value)}</b>` : ''}</div>
       ${!inWallet(c) ? `<div class="small muted">Saiu ${c.end_date ? 'em ' + fdateY(c.end_date) : ''}${c.end_reason ? ' · ' + esc(c.end_reason) : ''}${c.start_date ? ` · cliente desde ${fdateY(c.start_date)}` : ''}</div>` : ''}
-      <div class="row">${canFin() ? finChip(clientFin(c)) : ''}${inWallet(c) ? `<span class="chip">${esc((OP.find(o => o[0] === c.op_status) || ['', c.op_status])[1])}</span>${(c.services || []).includes('trafego') ? adChip(c) : ''}` : ''}<span class="sp"></span><span class="small muted">${esc(firstName(c.owner))}</span></div>
+      <div class="row">${canFin() ? finChip(clientFin(c)) : ''}${inWallet(c) ? `${c.op_status !== 'ativo' ? `<span class="chip warn">${esc(c.op_status === 'pausado' ? 'Pausado' : 'Em implantação')}</span>` : ''}${(c.services || []).includes('trafego') ? adChip(c) : ''}` : ''}<span class="sp"></span><span class="small muted">${esc(firstName(c.owner))}</span></div>
     </div>`).join('') : `<div class="card" style="grid-column:1/-1">${empty(S.d.clients.length ? 'Nenhum cliente neste filtro.' : 'Cadastre seu primeiro cliente no botão “+ Cliente”.')}</div>`}</div>`;
 };
 function clientForm(c = {}) {
@@ -723,7 +724,7 @@ function clientDetail(id) {
   const inv = S.d.invoices.filter(i => i.client_id === id).sort((a, b) => b.due_date.localeCompare(a.due_date));
   const cs = campsOf(id); const acts = S.d.activity.filter(a => a.client_id === id).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 15);
   const wa = onlyDigits(c.whatsapp || c.phone);
-  const wal = `<div class="card row wrap" style="gap:10px;margin-bottom:12px;padding:12px 14px"><div class="sp"><b>Status na carteira</b><div class="small muted">${inWallet(c) ? 'Cliente ativo na carteira' : `Saiu${c.end_date ? ' em ' + fdateY(c.end_date) : ''}${c.end_reason ? ' · ' + esc(c.end_reason) : ''}`}</div></div><div class="tabs" style="margin:0"><button type="button" class="${inWallet(c) ? 'on' : ''}" data-act="setWallet" data-id="${c.id}" data-on="1"><i class="dot ${inWallet(c) ? 'on' : ''}"></i> Online</button><button type="button" class="${inWallet(c) ? '' : 'on'}" data-act="setWallet" data-id="${c.id}" data-on="0"><i class="dot"></i> Offline</button></div></div>`;
+  const wal = `<div class="card row wrap" style="gap:10px;margin-bottom:12px;padding:12px 14px"><div class="sp"><b>Status na carteira</b><div class="small muted">${inWallet(c) ? 'Cliente ativo na carteira' : `Saiu${c.end_date ? ' em ' + fdateY(c.end_date) : ''}${c.end_reason ? ' · ' + esc(c.end_reason) : ''}`}</div></div><div class="tabs" style="margin:0"><button type="button" class="${inWallet(c) ? 'on' : ''}" data-act="setWallet" data-id="${c.id}" data-on="1" data-from="detail"><i class="dot ${inWallet(c) ? 'on' : ''}"></i> Online</button><button type="button" class="${inWallet(c) ? '' : 'on'}" data-act="setWallet" data-id="${c.id}" data-on="0" data-from="detail"><i class="dot"></i> Offline</button></div></div>`;
   modal(c.name, `${wal}<div class="row wrap" style="gap:6px;margin-bottom:12px">${walletChip(c)}${inWallet(c) && (c.services || []).includes('trafego') ? adChip(c) : ''}${canFin() ? finChip(clientFin(c)) : ''}${(c.services || []).map(s => `<span class="chip blue">${esc(svcName(s))}</span>`).join('')}</div>
     <div class="grid g2" style="gap:10px">
       <div class="card"><h3>Contato</h3><div class="small" style="display:grid;gap:4px"><span>👤 ${esc(c.contact || '—')}</span><span>📱 ${esc(c.whatsapp || c.phone || '—')}</span><span>✉️ ${esc(c.email || '—')}</span><span>📷 ${esc(c.instagram || '—')}</span><span>🏷️ ${esc(c.segment || '—')}</span><span>🧑‍💼 Responsável: ${esc(pname(c.owner))}</span></div></div>
@@ -949,7 +950,7 @@ V.alertas = () => {
 
 /* ---------- RELATÓRIOS ---------- */
 V.relatorios = () => head('Relatórios', 'Bravus Reports · por cliente, prontos para PDF e WhatsApp') + `
-  <div class="grid g3">${S.d.clients.filter(c => (c.services || []).includes('trafego')).map(c => { const cs = campsOf(c.id); const sp = cs.reduce((a, x) => a + +x.spend, 0); const ld = cs.reduce((a, x) => a + +x.leads, 0); return `<div class="ccard" data-act="clientReport" data-id="${c.id}"><div class="hd"><b>${esc(c.name)}</b>${ic('file')}</div><div class="row small muted"><span>${brl(sp)} investidos</span><span class="sp"></span><span>${int(ld)} leads</span></div></div>`; }).join('') || `<div class="card" style="grid-column:1/-1">${empty('Cadastre clientes com o serviço de tráfego pago para gerar relatórios.')}</div>`}</div>`;
+  <div class="grid g3">${S.d.clients.filter(c => inWallet(c) && (c.services || []).includes('trafego')).map(c => { const cs = campsOf(c.id); const sp = cs.reduce((a, x) => a + +x.spend, 0); const ld = cs.reduce((a, x) => a + +x.leads, 0); return `<div class="ccard" data-act="clientReport" data-id="${c.id}"><div class="hd"><b>${esc(c.name)}</b>${ic('file')}</div><div class="row small muted"><span>${brl(sp)} investidos</span><span class="sp"></span><span>${int(ld)} leads</span></div></div>`; }).join('') || `<div class="card" style="grid-column:1/-1">${empty('Cadastre clientes com o serviço de tráfego pago para gerar relatórios.')}</div>`}</div>`;
 function clientReport(id) {
   const c = client(id); if (!c) return; const cs = campsOf(id);
   const t = cs.reduce((a, x) => { ['spend', 'reach', 'impressions', 'clicks', 'leads', 'conversions'].forEach(k => a[k] += +x[k] || 0); return a; }, { spend: 0, reach: 0, impressions: 0, clicks: 0, leads: 0, conversions: 0 });
@@ -969,7 +970,7 @@ function clientReport(id) {
 
 /* ---------- BOAS PRÁTICAS (Compliance) ---------- */
 V['boas-praticas'] = () => {
-  const probs = S.d.clients.filter(c => adState(c).k === 'prob');
+  const probs = S.d.clients.filter(c => inWallet(c) && adState(c).k === 'prob');
   const B = (t, items) => `<div class="card"><h3>${ic('shield')}${t}</h3><ul style="padding-left:18px;display:grid;gap:7px;font-size:14px;color:var(--tx2)">${items.map(i => `<li>${i}</li>`).join('')}</ul></div>`;
   return head('Boas práticas', 'Bravus Compliance · Meta, Instagram e WhatsApp') + `
   <div class="warnbox" style="margin-bottom:14px">Seguir estas práticas reduz riscos, mas nenhuma ferramenta garante imunidade contra bloqueios. A palavra final é sempre das políticas oficiais de cada plataforma.</div>
@@ -1048,6 +1049,7 @@ const A = {
   authChangeEmail: () => { AUTH.stage = 'email'; AUTH.pin = ''; renderAuth(); },
   moreMenu: () => modal('Menu', `<div class="list">${NAV.filter(navOk).map(n => `<a class="li" href="#${n[0]}" data-act="closeModal">${ic(n[2])}<div class="t"><b>${n[1]}</b></div>${n[0] === 'alertas' && unread() ? `<span class="badge">${unread()}</span>` : ''}</a>`).join('')}<button class="li" data-act="logout" style="width:100%">${ic('lock')}<div class="t" style="text-align:left"><b>Bloquear / sair</b></div></button></div>`),
   cliFilter: d => { S.cliFilter = d.f; renderView(); },
+  cliFilterGo: d => { S.cliFilter = d.f; location.hash = 'clientes'; renderView(); },
   editProfile: d => {
     const p = prof(d.id); if (!p) return;
     const mine = p.id === S.me.id, can = mine || isAdmin();
@@ -1064,13 +1066,20 @@ const A = {
     </div>`, { form: 'saveProfile', footer: `<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
   },
   removePhoto: async d => { await store.update('profiles', d.id, { avatar_url: null }); toast('Foto removida', '', 'ok'); await refresh(); renderView(); A.editProfile({ id: d.id }); },
-  setWallet: d => {
+  setWallet: async d => {
     const c = client(d.id); if (!c) return;
     const on = d.on === '1'; if (on === inWallet(c)) return;
-    if (on) return confirmBox('Voltar para a carteira', `Marcar <b>${esc(c.name)}</b> como <b>Online</b> (ativo na carteira)?`, 'Marcar online', () => F.walletSave({ id: c.id, on: '1' }));
-    modal('Marcar como offline', `<div class="f"><input type="hidden" name="id" value="${c.id}"><input type="hidden" name="on" value="0"><p><b>${esc(c.name)}</b> sai da carteira e vai para a aba Offline.</p>
-      <div class="f2">${fld('Data de saída', 'end_date', today(), 'date')}${fld('Motivo da saída', 'end_reason', '', 'text', 'placeholder="ex.: encerrou contrato, sem verba"')}</div></div>`,
-      { form: 'walletSave', footer: `<button type="button" class="btn" data-act="openClient" data-id="${c.id}">Cancelar</button><button class="btn bad">Marcar offline</button>` });
+    if (on) {
+      if (S.d.clients.filter(inWallet).length >= S.set.max_clients) return toast('Limite de clientes atingido', `Seu limite é ${S.set.max_clients}. Aumente em Ajustes.`, 'warn');
+      return F.walletSave({ id: c.id, on: '1', from: d.from || '' });
+    }
+    const open = S.d.invoices.filter(i => i.client_id === c.id && ['pendente', 'atrasado'].includes(invStatus(i)));
+    modal('Desativar cliente', `<div class="f"><input type="hidden" name="id" value="${c.id}"><input type="hidden" name="on" value="0"><input type="hidden" name="from" value="${esc(d.from || '')}">
+      <p><b>${esc(c.name)}</b> sai da carteira: vai para a aba Offline e deixa de contar no painel, no financeiro, nos alertas e nas vagas.</p>
+      <div class="f2">${fld('Data de saída', 'end_date', today(), 'date')}${fld('Motivo (opcional)', 'end_reason', '', 'text', 'placeholder="ex.: encerrou contrato, sem verba"')}</div>
+      ${open.length && canFin() ? `<label class="cklbl"><input type="checkbox" name="cancel_inv" value="1" checked> Cancelar ${open.length} cobrança(s) em aberto (${brl(open.reduce((a, i) => a + +i.amount, 0))})</label>` : ''}
+      ${isAdmin() && c.whatsapp ? `<label class="cklbl"><input type="checkbox" name="send_msg" value="1"> Enviar comunicado de desligamento no WhatsApp (opcional)</label>` : ''}
+    </div>`, { form: 'walletSave', footer: `<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn bad">Desativar</button>` });
   }, campFilter: d => { S.campFilter = d.f; renderView(); },
   importDo: async (d, el) => {
     el.disabled = true; let n = 0;
@@ -1234,9 +1243,13 @@ const F = {
     const row = on ? { op_status: 'ativo', end_date: null, end_reason: null } : { op_status: 'cancelado', end_date: v.end_date || today(), end_reason: (v.end_reason || '').trim() || null };
     try { await store.update('clients', c.id, row); }
     catch (e) { if (!/end_date|end_reason|column/i.test(e && e.message || '')) throw e; await store.update('clients', c.id, { op_status: row.op_status }); toast('Banco ainda sem os campos de saída', 'Rode o SQL v1.1 no Supabase para guardar data e motivo.', 'warn'); }
-    await log(on ? `${c.name} voltou para a carteira (online)` : `${c.name} saiu da carteira (offline)${row.end_reason ? ': ' + row.end_reason : ''}`, c.id);
-    toast(on ? 'Cliente online' : 'Cliente offline', on ? 'Voltou para a carteira.' : 'Foi para a aba Offline.', 'ok');
-    await refresh(); clientDetail(c.id);
+    let nInv = 0;
+    if (!on && v.cancel_inv) for (const i of S.d.invoices.filter(i => i.client_id === c.id && ['pendente', 'atrasado'].includes(invStatus(i)))) { await store.update('invoices', i.id, { status: 'cancelado' }); nInv++; }
+    await log(on ? `${c.name} foi ativado (voltou para a carteira)` : `${c.name} foi desativado (saiu da carteira)${row.end_reason ? ': ' + row.end_reason : ''}${nInv ? ` · ${nInv} cobrança(s) cancelada(s)` : ''}`, c.id);
+    closeModal(); await refresh(); renderView();
+    toast(on ? `${c.name} ativado` : `${c.name} desativado`, on ? 'Voltou para a carteira (online).' : `Foi para a aba Offline${nInv ? ' e as cobranças em aberto foram canceladas' : ''}.`, 'ok');
+    if (!on && v.send_msg) return noticeModal('shutdown', c.id);
+    if (v.from === 'detail') clientDetail(c.id);
   },
   clientNote: async v => { if (!v.text.trim()) return; await store.insert('activity', { user_id: S.me.id, action: v.text.trim(), client_id: v.id }); await refresh(); clientDetail(v.id); },
   saveCamp: async v => {
