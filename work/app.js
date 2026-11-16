@@ -547,7 +547,7 @@ async function startSession(userId) {
   S.route = (location.hash.replace(/^#\/?/, '') || 'painel').split('?')[0];
   render(); tick(); setTimeout(releaseNotice, 800); checkVersion();
   timers.forEach(clearInterval);
-  timers = [setInterval(tick, 60000), setInterval(heartbeat, 60000), setInterval(checkVersion, 30 * 60000), setInterval(() => { if (!document.hidden && !$('#modal-root').innerHTML && ['painel', 'equipe'].includes(S.route)) renderView(); if (CW.open) renderChat(); renderPresence(); }, 30000)];
+  timers = [setInterval(tick, 60000), setInterval(heartbeat, 60000), setInterval(checkVersion, 30 * 60000), setInterval(() => { if (!document.hidden && !$('#modal-root').innerHTML && ['painel', 'equipe'].includes(S.route)) renderViewSoft(); if (CW.open) renderChat(); renderPresence(); }, 30000)];
   armLock();
 }
 async function logout(silent) {
@@ -600,12 +600,25 @@ function render() {
   </div>`;
   renderView(); renderChat(true);
 }
-function renderView() {
+/* rolagem no celular: não reconstruir a tela enquanto o dedo está na tela ou a página ainda desliza */
+const SCR = { touching: false, last: 0, pending: null };
+addEventListener('touchstart', () => { SCR.touching = true; }, { passive: true });
+addEventListener('touchend', () => { SCR.touching = false; SCR.last = Date.now(); }, { passive: true });
+addEventListener('touchcancel', () => { SCR.touching = false; }, { passive: true });
+addEventListener('scroll', () => { SCR.last = Date.now(); }, { passive: true });
+const scrollBusy = () => SCR.touching || Date.now() - SCR.last < 900;
+function renderViewSoft() {
+  if (scrollBusy()) { clearTimeout(SCR.pending); SCR.pending = setTimeout(renderViewSoft, 400); return; }
+  renderView(true);
+}
+function renderView(keepScroll) {
   const v = $('#view'); if (!v) return;
+  const y = keepScroll ? window.scrollY : 0;
   if (S.route === 'chat') { S.route = 'painel'; history.replaceState(null, '', '#painel'); CW.open = true; CW.tab = 'chat'; lsSet('bw_cw_open', true); setTimeout(() => renderChat(true)); }
   if (!NAV.some(n => n[0] === S.route && navOk(n))) { S.route = 'painel'; if (location.hash !== '#painel') history.replaceState(null, '', '#painel'); }
   const keep = $('#chatInput') && $('#chatInput').value;
   try { v.innerHTML = (V[S.route] || V.painel)(); } catch (e) { console.error(e); v.innerHTML = `<div class="card warnbox">Erro ao montar a tela: ${esc(e.message)}</div>`; }
+  if (keepScroll && y) window.scrollTo(0, y);
 
   document.querySelectorAll('.nav a, .bnav a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + S.route));
 }
@@ -963,7 +976,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.1', notes: [
+const RELEASE = { version: '2.1.1', notes: [
+  'Celular: a tela de Alertas (e as outras) não volta mais para o topo enquanto você rola; avisos aparecem com o texto completo.',
   'Adicionar e remover membros da equipe, com senha definida por você.',
   'Quem está online aparece no topo da tela.',
   'Selo de pagamento corrigido: cobranças canceladas não contam mais como "em dia".',
@@ -1070,7 +1084,7 @@ V.alertas = () => {
   const perm = 'Notification' in window ? Notification.permission : 'unsupported';
   return head('Alertas', 'Bravus Notify', `<button class="btn" data-act="readAll">${ic('check')}<span class="hide-m">Marcar lidas</span></button>`) + `
     ${perm !== 'granted' ? `<div class="infobox row" style="margin-bottom:14px"><div class="sp">${perm === 'unsupported' ? 'Este navegador não suporta notificações. No iPhone, instale o app na Tela de Início (Compartilhar → Adicionar à Tela de Início) e abra por lá.' : perm === 'denied' ? 'As notificações estão bloqueadas neste aparelho. Libere nas configurações do navegador para este site.' : 'Ative as notificações para receber lembretes no celular e no computador.'}</div>${perm === 'default' ? `<button class="btn pri" data-act="enablePush">${ic('bell')}Ativar</button>` : ''}</div>` : `<div class="row small muted" style="margin-bottom:12px">${ic('bell')}Notificações ativas neste aparelho. <button class="btn sm" data-act="testPush">Testar</button></div>`}
-    <div class="card"><div class="list">${ns.length ? ns.map(n => `<a class="li" href="#${esc(n.route || 'painel')}" data-act="readOne" data-id="${n.id}" style="${n.read ? 'opacity:.55' : ''}"><i class="dot ${n.type === 'alerta' ? 'bad' : n.type === 'pago' ? 'on' : n.read ? '' : 'warn'}"></i><div class="t"><b>${esc(n.title)}</b><small>${esc(n.body || '')} · ${ago(n.created_at)}</small></div></a>`).join('') : empty('Nenhum alerta por enquanto.')}</div></div>
+    <div class="card"><div class="list alist">${ns.length ? ns.map(n => `<a class="li" href="#${esc(n.route || 'painel')}" data-act="readOne" data-id="${n.id}" style="${n.read ? 'opacity:.55' : ''}"><i class="dot ${n.type === 'alerta' ? 'bad' : n.type === 'pago' ? 'on' : n.read ? '' : 'warn'}"></i><div class="t"><b>${esc(n.title)}</b><small>${esc(n.body || '')} · ${ago(n.created_at)}</small></div></a>`).join('') : empty('Nenhum alerta por enquanto.')}</div></div>
     <p class="note" style="margin-top:10px">Lembretes no horário exato dependem do sistema do aparelho. Com o app fechado, os avisos chegam pelo servidor (Supabase + push) quando estiver configurado.</p>`;
 };
 
@@ -1624,7 +1638,7 @@ const F = {
    EVENTOS GLOBAIS
    ===================================================================== */
 let refreshing;
-async function refresh(t) { await loadAll(t); if (S.me) { popNew(); popMsgs(); renderShellBadges(); renderPresence(); if (!t || t !== 'messages') renderView(); if (!t || ['messages', 'profiles'].includes(t)) renderChat(); } }
+async function refresh(t) { await loadAll(t); if (S.me) { popNew(); popMsgs(); renderShellBadges(); renderPresence(); if (!t || (t !== 'messages' && (t !== 'profiles' || S.route === 'equipe'))) renderViewSoft(); if (!t || ['messages', 'profiles'].includes(t)) renderChat(); } }
 function renderShellBadges() { if (!$('.shell')) return render(); const cur = $('.nav'); if (!cur) return; const u = unread(), c = chatUnread();
   document.querySelectorAll('.nav a, .bnav a').forEach(a => { const k = a.getAttribute('href').slice(1); let b = a.querySelector('.badge'); const n = k === 'alertas' ? u : k === 'chat' && S.route !== 'chat' ? c : 0; if (n) { if (!b) { b = document.createElement('span'); b.className = 'badge'; a.appendChild(b); } b.textContent = n; } else if (b) b.remove(); });
   const mb = $('.mtop a[href="#alertas"]'); if (mb) { let b = mb.querySelector('.badge'); if (u) { if (!b) { b = document.createElement('span'); b.className = 'badge'; b.style.cssText = 'position:absolute;top:-6px;right:-6px'; mb.appendChild(b); } b.textContent = u; } else if (b) b.remove(); } }

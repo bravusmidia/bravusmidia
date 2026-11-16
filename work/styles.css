@@ -290,3 +290,10 @@ ul.rel{list-style:none;display:grid;gap:8px}ul.rel li{position:relative;padding-
 .presence .pr.on small{color:var(--ok)}
 @media (max-width:860px){.presence{justify-content:flex-start;margin:0 0 10px}.presence .pr small{display:none}}
 pre.acc{white-space:pre-wrap;background:var(--card2);border:1px solid var(--line2);border-radius:12px;padding:12px;font:13px/1.5 ui-monospace,Consolas,monospace;color:var(--tx)}
+/* v2.1.1 rolagem no celular + alertas com texto completo */
+html,body{overscroll-behavior-y:none}
+.alist .li{align-items:flex-start}
+.alist .li .dot{margin-top:6px;flex:0 0 auto}
+.alist .li .t b{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.35}
+.alist .li .t small{display:block;margin-top:2px;line-height:1.4;word-break:break-word}
+@media (max-width:860px){.main{overflow:visible;overflow-x:clip}}
