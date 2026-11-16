@@ -210,7 +210,7 @@ const clientOpts = (none = 'Bravus Mídia (interno)') => [['', none], ...S.d.cli
    ===================================================================== */
 const SERVICES = [['trafego', 'Tráfego pago'], ['social', 'Social media'], ['site', 'Site'], ['landing', 'Landing page'], ['automacao', 'Automação'], ['mentoria', 'Mentoria']];
 const svcName = k => (SERVICES.find(s => s[0] === k) || [k, k])[1];
-const OP = [['ativo', 'Ativo'], ['pausado', 'Pausado'], ['onboarding', 'Em implantação'], ['cancelado', 'Saiu da carteira (offline)']];
+const OP = [['ativo', 'Ativo (online)'], ['pausado', 'Pausado (online)'], ['onboarding', 'Em implantação (online)'], ['cancelado', 'Saiu da carteira (offline)']];
 const inWallet = c => c.op_status !== 'cancelado';
 const walletChip = c => inWallet(c) ? '<span class="chip ok"><i class="dot on"></i>Online</span>' : '<span class="chip"><i class="dot"></i>Offline</span>';
 
@@ -721,7 +721,8 @@ function clientDetail(id) {
   const inv = S.d.invoices.filter(i => i.client_id === id).sort((a, b) => b.due_date.localeCompare(a.due_date));
   const cs = campsOf(id); const acts = S.d.activity.filter(a => a.client_id === id).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 15);
   const wa = onlyDigits(c.whatsapp || c.phone);
-  modal(c.name, `<div class="row wrap" style="gap:6px;margin-bottom:12px">${adChip(c)}${canFin() ? finChip(clientFin(c)) : ''}${(c.services || []).map(s => `<span class="chip blue">${esc(svcName(s))}</span>`).join('')}</div>
+  const wal = `<div class="card row wrap" style="gap:10px;margin-bottom:12px;padding:12px 14px"><div class="sp"><b>Status na carteira</b><div class="small muted">${inWallet(c) ? 'Cliente ativo na carteira' : `Saiu${c.end_date ? ' em ' + fdateY(c.end_date) : ''}${c.end_reason ? ' · ' + esc(c.end_reason) : ''}`}</div></div><div class="tabs" style="margin:0"><button type="button" class="${inWallet(c) ? 'on' : ''}" data-act="setWallet" data-id="${c.id}" data-on="1"><i class="dot ${inWallet(c) ? 'on' : ''}"></i> Online</button><button type="button" class="${inWallet(c) ? '' : 'on'}" data-act="setWallet" data-id="${c.id}" data-on="0"><i class="dot"></i> Offline</button></div></div>`;
+  modal(c.name, `${wal}<div class="row wrap" style="gap:6px;margin-bottom:12px">${walletChip(c)}${inWallet(c) && (c.services || []).includes('trafego') ? adChip(c) : ''}${canFin() ? finChip(clientFin(c)) : ''}${(c.services || []).map(s => `<span class="chip blue">${esc(svcName(s))}</span>`).join('')}</div>
     <div class="grid g2" style="gap:10px">
       <div class="card"><h3>Contato</h3><div class="small" style="display:grid;gap:4px"><span>👤 ${esc(c.contact || '—')}</span><span>📱 ${esc(c.whatsapp || c.phone || '—')}</span><span>✉️ ${esc(c.email || '—')}</span><span>📷 ${esc(c.instagram || '—')}</span><span>🏷️ ${esc(c.segment || '—')}</span><span>🧑‍💼 Responsável: ${esc(pname(c.owner))}</span></div></div>
       <div class="card"><h3>Contrato</h3><div class="small" style="display:grid;gap:4px">${canFin() ? `<span>Valor: <b>${brl(c.contract_value)}</b>/mês</span>` : ''}<span>Vencimento: dia ${esc(c.due_day || '—')}</span><span>Desde: ${c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}</span><span>Conta de anúncios: ${esc(c.ad_account_id || '—')}</span><span>Saldo: ${c.ad_balance != null && c.ad_balance !== '' ? brl(c.ad_balance) + ` (${esc(c.ad_balance_source || 'manual')})` : 'não informado'}</span>${c.ad_synced_at ? `<span class="muted">Meta sincronizada ${ago(c.ad_synced_at)}</span>` : ''}</div></div>
@@ -1044,7 +1045,15 @@ const A = {
   authPick: d => { AUTH.user = d.id; AUTH.pin = ''; renderAuth(); },
   authChangeEmail: () => { AUTH.stage = 'email'; AUTH.pin = ''; renderAuth(); },
   moreMenu: () => modal('Menu', `<div class="list">${NAV.filter(navOk).map(n => `<a class="li" href="#${n[0]}" data-act="closeModal">${ic(n[2])}<div class="t"><b>${n[1]}</b></div>${n[0] === 'alertas' && unread() ? `<span class="badge">${unread()}</span>` : ''}</a>`).join('')}<button class="li" data-act="logout" style="width:100%">${ic('lock')}<div class="t" style="text-align:left"><b>Bloquear / sair</b></div></button></div>`),
-  cliFilter: d => { S.cliFilter = d.f; renderView(); }, campFilter: d => { S.campFilter = d.f; renderView(); },
+  cliFilter: d => { S.cliFilter = d.f; renderView(); },
+  setWallet: d => {
+    const c = client(d.id); if (!c) return;
+    const on = d.on === '1'; if (on === inWallet(c)) return;
+    if (on) return confirmBox('Voltar para a carteira', `Marcar <b>${esc(c.name)}</b> como <b>Online</b> (ativo na carteira)?`, 'Marcar online', () => F.walletSave({ id: c.id, on: '1' }));
+    modal('Marcar como offline', `<div class="f"><input type="hidden" name="id" value="${c.id}"><input type="hidden" name="on" value="0"><p><b>${esc(c.name)}</b> sai da carteira e vai para a aba Offline.</p>
+      <div class="f2">${fld('Data de saída', 'end_date', today(), 'date')}${fld('Motivo da saída', 'end_reason', '', 'text', 'placeholder="ex.: encerrou contrato, sem verba"')}</div></div>`,
+      { form: 'walletSave', footer: `<button type="button" class="btn" data-act="openClient" data-id="${c.id}">Cancelar</button><button class="btn bad">Marcar offline</button>` });
+  }, campFilter: d => { S.campFilter = d.f; renderView(); },
   importDo: async (d, el) => {
     el.disabled = true; let n = 0;
     for (const c of IMPORT.filter(c => !c._skip)) { const { _skip, ...row } = c; const r = await store.insert('clients', row); n++; await log(`Importou o cliente ${row.name}`, r && r.id); }
@@ -1190,6 +1199,16 @@ const F = {
     let saved; try { saved = await save(row); } catch (e) { if (!noCol(e)) throw e; delete row.end_date; delete row.end_reason; saved = await save(row); toast('Banco ainda sem os campos de saída', 'Rode o SQL v1.1 no Supabase para guardar data e motivo.', 'warn'); }
     if (v.id) await log(`Atualizou o cadastro de ${row.name}`, v.id); else await log(`Cadastrou o cliente ${row.name}`, saved && saved.id);
     closeModal(); toast('Cliente salvo', '', 'ok'); await refresh();
+  },
+  walletSave: async v => {
+    const c = client(v.id); if (!c) return;
+    const on = v.on === '1';
+    const row = on ? { op_status: 'ativo', end_date: null, end_reason: null } : { op_status: 'cancelado', end_date: v.end_date || today(), end_reason: (v.end_reason || '').trim() || null };
+    try { await store.update('clients', c.id, row); }
+    catch (e) { if (!/end_date|end_reason|column/i.test(e && e.message || '')) throw e; await store.update('clients', c.id, { op_status: row.op_status }); toast('Banco ainda sem os campos de saída', 'Rode o SQL v1.1 no Supabase para guardar data e motivo.', 'warn'); }
+    await log(on ? `${c.name} voltou para a carteira (online)` : `${c.name} saiu da carteira (offline)${row.end_reason ? ': ' + row.end_reason : ''}`, c.id);
+    toast(on ? 'Cliente online' : 'Cliente offline', on ? 'Voltou para a carteira.' : 'Foi para a aba Offline.', 'ok');
+    await refresh(); clientDetail(c.id);
   },
   clientNote: async v => { if (!v.text.trim()) return; await store.insert('activity', { user_id: S.me.id, action: v.text.trim(), client_id: v.id }); await refresh(); clientDetail(v.id); },
   saveCamp: async v => {
