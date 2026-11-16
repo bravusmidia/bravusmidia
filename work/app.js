@@ -160,7 +160,7 @@ Caso deseje manter os serviços ativos, solicitamos a regularização do saldo p
 
 *Esta é uma mensagem automática do sistema.*`;
 const S = { me: null, route: 'painel', d: {}, set: { ...DEFAULT_SETTINGS }, agendaDate: today(), agendaWho: null,
-  finMonth: curYM(), meetMonth: curYM(), meetWho: '', cliFilter: 'online', contentWeek: null, popped: new Set(), startedAt: new Date().toISOString() };
+  finMonth: curYM(), meetMonth: curYM(), goalMonth: curYM(), meetWho: '', cliFilter: 'online', contentWeek: null, popped: new Set(), startedAt: new Date().toISOString() };
 TABLES.forEach(t => S.d[t] = []);
 let store, sb;
 
@@ -552,9 +552,9 @@ function armLock() {
    ===================================================================== */
 const NAV = [
   ['painel', 'Painel', 'grid'], ['clientes', 'Clientes', 'users'],
-  ['financeiro', 'Financeiro', 'wallet', 'fin'], ['agenda', 'Agenda', 'cal'], ['reunioes', 'Reuniões', 'meet'], ['conteudo', 'Conteúdo', 'film'],
+  ['financeiro', 'Financeiro', 'wallet', 'fin'], ['agenda', 'Agenda', 'cal'], ['reunioes', 'Reuniões', 'meet'], ['metas', 'Metas', 'target'], ['conteudo', 'Conteúdo', 'film'],
   ['chat', 'Chat', 'chat'], ['equipe', 'Equipe', 'team'], ['alertas', 'Alertas', 'bell'],
-  ['boas-praticas', 'Boas práticas', 'shield'], ['ajustes', 'Ajustes', 'gear', 'admin']
+  ['ajustes', 'Ajustes', 'gear', 'admin']
 ];
 const navOk = n => !n[3] || (n[3] === 'fin' ? canFin() : isAdmin());
 const unread = () => S.d.notifications.filter(n => n.user_id === S.me.id && !n.read).length;
@@ -633,7 +633,7 @@ V.painel = () => {
     ${kpi('Em atraso', brl(fm.atrasado), `${inad.length} cliente(s) inadimplente(s)`, fm.atrasado ? 'r' : '')}
     ${kpi('Saldo do mês', brl(fm.saldo), `saídas ${brl(fm.saidas)}`, fm.saldo >= 0 ? 'g' : 'r')}
   </div>` : ''}
-  <div class="sec">Clientes</div>
+  <div class="sec">Clientes<span class="sp"></span><a class="small" href="#metas" style="text-transform:none;letter-spacing:0">ver metas do mês →</a></div>
   <div class="grid g4">
     ${kpi('Clientes ativos', `${ativos.length}<span class="muted" style="font-size:15px"> / ${S.set.max_clients}</span>`, `<a href="#clientes" data-act="cliFilterGo" data-f="offline">${cancel.length} inativo(s)</a> · ${novos.length} novo(s) no mês`)}
     ${kpi('Inadimplentes', inad.length, inad.length ? 'clique no cliente para cobrar' : 'ninguém em atraso', inad.length ? 'r' : '')}
@@ -1000,20 +1000,57 @@ function clientReport(id) {
 }
 
 /* ---------- BOAS PRÁTICAS (Compliance) ---------- */
-V['boas-praticas'] = () => {
-  const probs = S.d.clients.filter(c => inWallet(c) && adState(c).k === 'prob');
-  const B = (t, items) => `<div class="card"><h3>${ic('shield')}${t}</h3><ul style="padding-left:18px;display:grid;gap:7px;font-size:14px;color:var(--tx2)">${items.map(i => `<li>${i}</li>`).join('')}</ul></div>`;
-  return head('Boas práticas', 'Bravus Compliance · Meta, Instagram e WhatsApp') + `
-  <div class="warnbox" style="margin-bottom:14px">Seguir estas práticas reduz riscos, mas nenhuma ferramenta garante imunidade contra bloqueios. A palavra final é sempre das políticas oficiais de cada plataforma.</div>
-  ${probs.length ? `<div class="card" style="margin-bottom:14px;border-color:rgba(255,90,106,.4)"><h3>Contas com alerta agora</h3><div class="list">${probs.map(c => `<div class="li" data-act="openClient" data-id="${c.id}" style="cursor:pointer"><div class="t"><b>${esc(c.name)}</b><small>Situação: ${esc(c.ad_account_status || 'campanha com problema')}</small></div>${adChip(c)}</div>`).join('')}</div></div>` : ''}
-  <div class="grid g2">
-  ${B('Anúncios na Meta', ['Nada de promessas de resultado garantido, “antes e depois” enganoso ou ganhos financeiros irreais.', 'Evite falar de características pessoais do público (“Você está acima do peso?”) — é uma das reprovações mais comuns.', 'Saúde, finanças, apostas, álcool e temas sociais/políticos têm regras e autorizações próprias.', 'A página de destino precisa cumprir o que o anúncio promete, funcionar no celular e ter política de privacidade.', 'Não use logos e marcas de terceiros sem autorização.', 'Revise o texto das imagens e evite elementos que imitem botões ou notificações do sistema.'])}
-  ${B('Saúde das contas de anúncios', ['Use Business Manager com verificação da empresa e autenticação em dois fatores para todos.', 'Mantenha formas de pagamento válidas e em nome do responsável; falhas de pagamento travam a entrega.', 'Escale orçamento aos poucos em contas novas.', 'Cada cliente com sua própria conta de anúncios e acesso concedido pelo próprio cliente (parceiro no BM).', 'Quando houver reprovação, peça revisão pelo canal oficial — não recrie o mesmo anúncio em massa.'])}
-  ${B('Instagram (rotina da Priscila)', ['Seguir e deixar de seguir sempre de forma manual e em ritmo natural, distribuído ao longo do dia.', 'Nada de apps ou robôs de seguir/curtir/comentar em massa — violam os termos e derrubam o alcance.', 'Interaja de verdade: comente e responda com conteúdo relevante.', 'Ao receber aviso de “ação bloqueada”, pare as ações por alguns dias.'])}
-  ${B('WhatsApp Business', ['Envie mensagens só para quem deu permissão (cliente ativo ou contato que pediu informação).', 'Na API oficial, mensagens fora da janela de 24h só com modelos aprovados.', 'Ofereça uma forma simples de a pessoa parar de receber mensagens.', 'Evite disparos em massa por números pessoais; isso leva a banimento.', 'Cobranças: tom respeitoso, com dados corretos e link oficial de pagamento.'])}
-  ${B('Segurança e dados (LGPD)', ['Cada pessoa tem login próprio — nunca compartilhe a senha.', 'Tokens da Meta e do WhatsApp ficam só no servidor (Supabase), nunca no app ou no GitHub.', 'Colete só os dados necessários dos clientes e apague o que não usa mais.', 'Faça backup mensal em Ajustes > Backup.'])}
-  </div>`;
+/* ---------- METAS (Bravus Goals) ---------- */
+const GOALS_DEF = { revenue: 10000, mrr: 10000, clients: 20, new_clients: 3, meetings: 12, closes: 3, prospects: 300 };
+const goals = () => ({ ...GOALS_DEF, ...(S.set.goals || {}) });
+function goalData(k) {
+  const g = goals(), cl = S.d.clients, ms = meetings().filter(t => ym(t.date) === k);
+  const prosp = realTasks().filter(t => ym(t.date) === k && /prospec/i.test(t.title || '')).reduce((a, t) => a + (+t.count || 0), 0);
+  const rows = [
+    canFin() && ['revenue', 'Faturamento recebido', finMonth(k).recebido, g.revenue, true, 'pagamentos marcados como Pago no mês', 'wallet'],
+    canFin() && ['mrr', 'Receita recorrente (contratos)', mrr(), g.mrr, true, 'soma dos contratos ativos hoje', 'wallet'],
+    ['clients', 'Clientes ativos', cl.filter(inWallet).length, g.clients, false, 'na carteira hoje', 'users'],
+    ['new_clients', 'Novos clientes', cl.filter(c => ym(c.start_date || c.created_at) === k).length, g.new_clients, false, 'data de contratação no mês', 'plus'],
+    ['meetings', 'Reuniões realizadas', ms.filter(t => t.status === 'feito').length, g.meetings, false, `${ms.length} marcadas no mês`, 'meet'],
+    ['closes', 'Fechamentos', ms.filter(t => t.outcome === 'fechou').length, g.closes, false, 'reuniões com resultado “Fechou”', 'check'],
+    ['prospects', 'Prospecções', prosp, g.prospects, false, 'contador das tarefas de prospecção', 'chat']
+  ].filter(Boolean);
+  return rows.map(([key, name, val, goal, money, sub, icon]) => ({ key, name, val: +val || 0, goal: +goal || 0, money, sub, icon, pct: goal ? Math.min(100, Math.round((+val || 0) / goal * 100)) : 0 }));
+}
+V.metas = () => {
+  const k = S.goalMonth || curYM();
+  const label = (l => l[0].toUpperCase() + l.slice(1))(new Date(k + '-15T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
+  const shift = n => { const d = new Date(k + '-15T12:00:00'); d.setMonth(d.getMonth() + n); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
+  const rows = goalData(k); const fmt = (r, v) => r.money ? brl(v) : int(v);
+  const done = rows.filter(r => r.goal && r.val >= r.goal).length;
+  const avg = rows.length ? Math.round(rows.reduce((a, r) => a + r.pct, 0) / rows.length) : 0;
+  const [y, m] = k.split('-').map(Number); const dim = new Date(y, m, 0).getDate();
+  const elapsed = k === curYM() ? new Date().getDate() : k < curYM() ? dim : 0; const pace = Math.round(elapsed / dim * 100);
+  const g10 = goals().revenue;
+  return head('Metas', 'Bravus Goals · acompanhe o mês e o caminho até a meta', isAdmin() ? `<button class="btn pri" data-act="editGoals">${ic('edit')}Editar metas</button>` : '') + `
+    <div class="datebar" style="margin-bottom:14px"><button class="btn sm ic" data-act="goalMonth" data-m="${shift(-1)}">${ic('left')}</button><b>${label}</b><button class="btn sm ic" data-act="goalMonth" data-m="${shift(1)}">${ic('right')}</button></div>
+    <div class="grid g3" style="margin-bottom:14px">
+      ${kpi('Metas batidas', `${done}<span class="muted" style="font-size:15px"> / ${rows.length}</span>`, done === rows.length ? 'todas batidas 🎯' : 'no mês', 'hl')}
+      ${kpi('Progresso médio', avg + '%', `${pace}% do mês já passou`, avg >= pace ? 'g' : 'y')}
+      ${canFin() ? kpi('Falta para a meta', brl(Math.max(0, g10 - finMonth(k).recebido)), `de faturamento (meta ${brl(g10)})`, finMonth(k).recebido >= g10 ? 'g' : '') : kpi('Dias restantes', Math.max(0, dim - elapsed), 'até o fim do mês')}
+    </div>
+    <div class="grid g2">${rows.map(r => { const ok = r.goal && r.val >= r.goal; const behind = !ok && k === curYM() && r.pct < pace - 10;
+      return `<div class="card goal"><div class="row" style="margin-bottom:10px">${ic(r.icon)}<b class="sp">${esc(r.name)}</b>${ok ? '<span class="chip ok">Batida</span>' : behind ? '<span class="chip warn">Abaixo do ritmo</span>' : '<span class="chip blue">No caminho</span>'}</div>
+        <div class="row" style="align-items:baseline;gap:8px"><b class="gv">${fmt(r, r.val)}</b><span class="muted">de ${fmt(r, r.goal)}</span><span class="sp"></span><b class="num" style="color:${ok ? 'var(--ok)' : 'var(--tx)'}">${r.pct}%</b></div>
+        <div class="prog" style="margin:10px 0 6px;position:relative"><i style="width:${r.pct}%;${ok ? 'background:linear-gradient(90deg,#14a86b,#2bd48a)' : ''}"></i>${k === curYM() ? `<span class="pace" style="left:${pace}%" title="ritmo esperado hoje"></span>` : ''}</div>
+        <div class="small muted">${esc(r.sub)}${!ok && r.goal ? ` · faltam ${fmt(r, r.goal - r.val)}` : ''}</div></div>`; }).join('')}</div>
+    <p class="note" style="margin-top:12px">A linha branca na barra mostra onde você deveria estar hoje para bater a meta até o fim do mês.</p>`;
 };
+function goalsForm() {
+  const g = goals();
+  modal('Editar metas do mês', `<div class="f">
+    <div class="f2">${fld('Faturamento recebido (R$)', 'revenue', g.revenue, 'number', 'min="0" step="0.01"')}${fld('Receita recorrente (R$)', 'mrr', g.mrr, 'number', 'min="0" step="0.01"')}</div>
+    <div class="f2">${fld('Clientes ativos', 'clients', g.clients, 'number', 'min="0"')}${fld('Novos clientes no mês', 'new_clients', g.new_clients, 'number', 'min="0"')}</div>
+    <div class="f2">${fld('Reuniões realizadas no mês', 'meetings', g.meetings, 'number', 'min="0"')}${fld('Fechamentos no mês', 'closes', g.closes, 'number', 'min="0"')}</div>
+    ${fld('Prospecções no mês', 'prospects', g.prospects, 'number', 'min="0"')}
+    <p class="note">As metas valem para todos os meses até você mudar. Os números do progresso vêm do próprio app: pagamentos, clientes, reuniões e contador de prospecção da agenda.</p>
+  </div>`, { form: 'saveGoals', footer: `<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar metas</button>` });
+}
 
 /* ---------- AJUSTES ---------- */
 V.ajustes = () => {
@@ -1076,6 +1113,7 @@ const A = {
   authChangeEmail: () => { AUTH.stage = 'email'; AUTH.pin = ''; renderAuth(); },
   moreMenu: () => modal('Menu', `<div class="list">${NAV.filter(navOk).map(n => `<a class="li" href="#${n[0]}" data-act="closeModal">${ic(n[2])}<div class="t"><b>${n[1]}</b></div>${n[0] === 'alertas' && unread() ? `<span class="badge">${unread()}</span>` : ''}</a>`).join('')}<button class="li" data-act="logout" style="width:100%">${ic('lock')}<div class="t" style="text-align:left"><b>Bloquear / sair</b></div></button></div>`),
   cliFilter: d => { S.cliFilter = d.f; renderView(); },
+  editGoals: () => goalsForm(), goalMonth: d => { S.goalMonth = d.m; renderView(); },
   payMenu: d => {
     const c = client(d.id); if (!c) return; const k = curYM(); const inv = monthInv(c, k); const late = S.d.invoices.filter(i => i.client_id === c.id && ym(i.due_date) < k && invStatus(i) === 'atrasado');
     const B = (id, st, cur) => `<div class="row" style="gap:6px">${[['pago', 'Pago', 'ok'], ['areceber', 'A receber', 'warn'], ['atrasado', 'Em atraso', 'bad']].map(o => `<button type="button" class="btn sm ${cur === (o[0] === 'areceber' ? 'pendente' : o[0]) ? o[2] : ''}" data-act="invSet" data-id="${id}" data-s="${o[0]}" data-client="${c.id}">${o[1]}</button>`).join('')}</div>`;
@@ -1384,6 +1422,11 @@ const F = {
     if (!list.length) return toast('Escreva pelo menos um motivo', '', 'warn');
     const s = { ...S.set, exit_reasons: list }; await store.upsertSettings(s); S.set = s;
     await log('Atualizou os motivos de saída do cliente'); toast('Motivos salvos', `${list.length} frase(s) prontas.`, 'ok'); await refresh();
+  },
+  saveGoals: async v => {
+    const g = Object.fromEntries(Object.keys(GOALS_DEF).map(k => [k, Math.max(0, num(v[k]) || 0)]));
+    const s = { ...S.set, goals: g }; await store.upsertSettings(s); S.set = s;
+    await log('Atualizou as metas'); closeModal(); toast('Metas salvas', '', 'ok'); await refresh();
   },
   saveRecharge: async (v, fd, form) => {
     const msg = String(v.msg || '').trim(); if (!msg) return toast('Escreva o texto do aviso', '', 'warn');
