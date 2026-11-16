@@ -243,15 +243,8 @@ const monthInv = (c, k = curYM()) => S.d.invoices.filter(i => i.client_id === c.
 const payBtn = c => { const s = clientFin(c); return `<button type="button" class="chip ${s === 'inadimplente' ? 'bad' : s === 'em dia' ? 'ok' : s === 'a vencer' ? 'warn' : ''}" style="cursor:pointer" data-act="payMenu" data-id="${c.id}" title="Clique para marcar: pago, a receber ou em atraso">${esc(s)} ▾</button>`; };
 const finChip = s => `<span class="chip ${s === 'inadimplente' ? 'bad' : s === 'em dia' ? 'ok' : s === 'a vencer' ? 'warn' : ''}">${esc(s)}</span>`;
 const campsOf = id => S.d.campaigns.filter(c => c.client_id === id);
-/* Conta de anúncios: ok, sem saldo ou com problema (informado pela Meta ou registro manual) */
-function adState(c) {
-  if (!(c.services || []).includes('trafego')) return { k: 'na', label: 'Sem tráfego', cls: '' };
-  if (c.op_status === 'cancelado') return { k: 'off', label: 'Inativo', cls: '' };
-  const blocked = c.ad_account_status && !/^(1|ACTIVE|ativa)$/i.test(String(c.ad_account_status));
-  if (blocked) return { k: 'prob', label: 'Problema na conta', cls: 'bad' };
-  if (c.ad_balance != null && c.ad_balance !== '' && Number(c.ad_balance) <= 0) return { k: 'saldo', label: 'Sem saldo', cls: 'warn' };
-  return { k: 'on', label: 'Conta ok', cls: 'ok' };
-}
+/* Anúncios/Meta removidos do Bravus Work: nenhum status de conta de anúncios é calculado */
+function adState() { return { k: 'na', label: '', cls: '' }; }
 /* ---------- avisos por WhatsApp (recarga e desligamento) ---------- */
 const NOTICE = {
   recharge: { name: 'Aviso de recarga', log: 'Enviou aviso de recarga', icon: 'wallet', def: () => RECHARGE_MSG },
@@ -259,7 +252,7 @@ const NOTICE = {
 };
 const nCfg = k => ({ ...DEFAULT_SETTINGS[k], ...(S.set[k] || {}) });
 const nText = k => (nCfg(k).msg || '').trim() || NOTICE[k].def();
-const shutCfg = () => nCfg('shutdown');
+const shutCfg = () => ({ ...nCfg('shutdown'), trigger: 'atraso' });
 const isNoBalance = c => (c.services || []).includes('trafego') && c.op_status !== 'cancelado' && adState(c).k === 'saldo';
 const overdueDays = c => S.d.invoices.filter(i => i.client_id === c.id && invStatus(i) === 'atrasado').reduce((m, i) => Math.max(m, dayDiff(today(), i.due_date)), 0);
 const overdueSum = c => S.d.invoices.filter(i => i.client_id === c.id && invStatus(i) === 'atrasado').reduce((a, i) => a + +i.amount, 0);
@@ -434,11 +427,6 @@ async function tick() {
           await notifyUsers(finPeople(), t, `${cname(i.client_id)} — ${brl(i.amount)}`, diff > 0 ? 'alerta' : 'financeiro', `inv:${i.id}:${diff}`, 'financeiro');
         }
       }
-      if (nf.campanhas !== false) for (const c of S.d.clients.filter(inWallet)) {
-        const st = adState(c);
-        if (st.k === 'prob' || st.k === 'saldo') await notifyUsers(team().map(p => p.id), st.k === 'saldo' ? 'Cliente sem saldo na conta de anúncios' : 'Problema em conta de anúncios', c.name, 'alerta', `ad:${c.id}:${st.k}:${d}`, 'campanhas');
-      }
-      for (const c of nDue('recharge')) await notifyUsers(admins(), `Aviso de recarga pronto: ${c.name}`, 'Campanhas sem saldo · toque para enviar no WhatsApp', 'alerta', `rech:${c.id}:${sentAt('recharge', c) || 'novo'}`, 'clientes');
       for (const c of shutDue()) await notifyUsers(admins(), `Comunicado de desligamento pronto: ${c.name}`, nReason('shutdown', c) + ' · toque para enviar no WhatsApp', 'alerta', `shut:${c.id}:${curYM()}`, 'clientes');
       const appr = S.d.content.filter(c => c.status === 'aprovacao').length;
       if (appr && nf.conteudo !== false && hm >= S.set.morning_hour) await notifyUsers([me.id], appr === 1 ? 'Existe 1 publicação aguardando aprovação' : `Existem ${appr} publicações aguardando aprovação`, 'Revise antes de publicar.', 'conteudo', `appr:${d}:${appr}`, 'conteudo');
@@ -566,7 +554,7 @@ const NAV = [
   ['painel', 'Painel', 'grid'], ['clientes', 'Clientes', 'users'],
   ['financeiro', 'Financeiro', 'wallet', 'fin'], ['agenda', 'Agenda', 'cal'], ['reunioes', 'Reuniões', 'meet'], ['conteudo', 'Conteúdo', 'film'],
   ['chat', 'Chat', 'chat'], ['equipe', 'Equipe', 'team'], ['alertas', 'Alertas', 'bell'],
-  ['relatorios', 'Relatórios', 'file'], ['boas-praticas', 'Boas práticas', 'shield'], ['ajustes', 'Ajustes', 'gear', 'admin']
+  ['boas-praticas', 'Boas práticas', 'shield'], ['ajustes', 'Ajustes', 'gear', 'admin']
 ];
 const navOk = n => !n[3] || (n[3] === 'fin' ? canFin() : isAdmin());
 const unread = () => S.d.notifications.filter(n => n.user_id === S.me.id && !n.read).length;
@@ -621,7 +609,6 @@ V.painel = () => {
   const novos = cl.filter(c => ym(c.start_date || c.created_at) === k);
   const inad = cl.filter(c => clientFin(c) === 'inadimplente');
   const traf = cl.filter(c => (c.services || []).includes('trafego') && c.op_status !== 'cancelado');
-  const semSaldo = traf.filter(c => adState(c).k === 'saldo'), probl = traf.filter(c => adState(c).k === 'prob');
   const tasks = realTasks().filter(t => t.date === d && (isAdmin() || t.assignee === S.me.id));
   const done = tasks.filter(t => t.status === 'feito');
   const meets = realTasks().filter(t => t.kind === 'reuniao' && ym(t.date) === k);
@@ -635,11 +622,7 @@ V.painel = () => {
   // Assistente Bravus: prioridades calculadas (sem IA paga)
   const prio = [];
   if (isAdmin()) shutDue().forEach(c => prio.push(['bad', `Enviar comunicado de desligamento: ${c.name}`, nReason('shutdown', c), 'clientes', { act: 'noticeOpen', k: 'shutdown', id: c.id }]));
-  if (isAdmin()) nDue('recharge').forEach(c => prio.push(['warn', `Enviar aviso de recarga: ${c.name}`, 'Conta de anúncios sem saldo', 'clientes', { act: 'noticeOpen', k: 'recharge', id: c.id }]));
-  const recharging = new Set(isAdmin() ? nDue('recharge').map(c => c.id) : []);
   inad.forEach(c => prio.push(['bad', `Cobrar ${c.name}`, 'Pagamento em atraso', 'financeiro']));
-  traf.filter(c => adState(c).k === 'prob').forEach(c => prio.push(['bad', `Verificar conta de anúncios de ${c.name}`, 'Problema reportado', 'clientes']));
-  traf.filter(c => adState(c).k === 'saldo' && !recharging.has(c.id)).forEach(c => prio.push(['warn', `${c.name} está sem saldo`, 'Avisar o cliente para recarregar', 'clientes']));
   realTasks().filter(t => isLate(t) && (isAdmin() || t.assignee === S.me.id)).slice(0, 5).forEach(t => prio.push(['warn', t.title, `Atrasada · ${firstName(t.assignee)} · ${fdate(t.date)}`, 'agenda']));
   if (S.d.content.some(c => c.status === 'aprovacao')) prio.push(['blue', `${S.d.content.filter(c => c.status === 'aprovacao').length} publicação(ões) aguardando aprovação`, 'Conteúdo', 'conteudo']);
 
@@ -650,20 +633,21 @@ V.painel = () => {
     ${kpi('Em atraso', brl(fm.atrasado), `${inad.length} cliente(s) inadimplente(s)`, fm.atrasado ? 'r' : '')}
     ${kpi('Saldo do mês', brl(fm.saldo), `saídas ${brl(fm.saidas)}`, fm.saldo >= 0 ? 'g' : 'r')}
   </div>` : ''}
-  <div class="sec">Clientes e anúncios</div>
+  <div class="sec">Clientes</div>
   <div class="grid g4">
     ${kpi('Clientes ativos', `${ativos.length}<span class="muted" style="font-size:15px"> / ${S.set.max_clients}</span>`, `<a href="#clientes" data-act="cliFilterGo" data-f="offline">${cancel.length} inativo(s)</a> · ${novos.length} novo(s) no mês`)}
-    ${kpi('Clientes de tráfego', traf.length, 'com gestão de tráfego pago ativa')}
-    ${kpi('Sem saldo', semSaldo.length, 'conta de anúncios zerada', semSaldo.length ? 'y' : '')}
-    ${kpi('Conta com problema', probl.length, 'bloqueio ou pagamento na Meta', probl.length ? 'r' : '')}
+    ${kpi('Inadimplentes', inad.length, inad.length ? 'clique no cliente para cobrar' : 'ninguém em atraso', inad.length ? 'r' : '')}
+    ${kpi('Reuniões no mês', meets.length, `${meets.filter(t => t.status === 'feito').length} realizadas · ${meets.filter(t => t.outcome === 'fechou').length} fecharam`)}
+    ${canFin() ? kpi('Receita mensal', brl(mrr()), 'soma dos contratos ativos', 'g') : kpi('Novos no mês', novos.length)}
   </div>
   <div class="grid g2" style="margin-top:14px">
     <div class="card"><h3>${ic('spark')}Prioridades de hoje<span class="sp"></span><span class="chip blue">Assistente Bravus</span></h3>
       <div class="list">${prio.length ? prio.slice(0, 8).map(p => `<a class="li" href="#${p[3]}"${p[4] ? ` data-act="${p[4].act}" data-k="${p[4].k}" data-id="${p[4].id}"` : ''}><i class="dot ${p[0] === 'bad' ? 'bad' : p[0] === 'warn' ? 'warn' : 'on'}"></i><div class="t"><b>${esc(p[1])}</b><small>${esc(p[2])}</small></div>${ic('right')}</a>`).join('') : empty('Tudo em ordem por aqui. ✅')}</div>
     </div>
-    <div class="card"><h3>${ic('target')}Contas de anúncios dos clientes<span class="sp"></span><a class="small" href="#clientes">ver clientes</a></h3>
-      <div class="list">${traf.length ? traf.slice().sort((a, b) => adState(a).k.localeCompare(adState(b).k)).slice(0, 8).map(c => `<div class="li" data-act="openClient" data-id="${c.id}" style="cursor:pointer"><div class="t"><b>${esc(c.name)}</b><small>${c.ad_balance != null && c.ad_balance !== '' ? `Saldo: ${brl(c.ad_balance)} (${esc(c.ad_balance_source || 'manual')})` : 'Saldo não informado'}</small></div>${adChip(c)}</div>`).join('') : empty('Nenhum cliente com tráfego pago cadastrado.')}</div>
+    <div class="card"><h3>${ic('wallet')}Pagamentos do mês<span class="sp"></span><a class="small" href="#clientes">ver clientes</a></h3>
+      <div class="list">${ativos.length ? ativos.slice().sort((a, b) => ['inadimplente', 'a vencer', 'sem cobrança', 'em dia'].indexOf(clientFin(a)) - ['inadimplente', 'a vencer', 'sem cobrança', 'em dia'].indexOf(clientFin(b))).slice(0, 10).map(c => `<div class="li"><div class="t" data-act="openClient" data-id="${c.id}" style="cursor:pointer"><b>${esc(c.name)}</b><small>vence ${esc(dueTxt(c))}${canFin() ? ' · ' + brl(c.contract_value) : ''}</small></div>${canFin() ? (isAdmin() ? payBtn(c) : finChip(clientFin(c))) : ''}</div>`).join('') : empty('Nenhum cliente ativo.')}</div>
     </div>
+
   </div>
   <div class="grid g2" style="margin-top:14px">
     ${canFin() ? `<div class="card"><h3>${ic('wallet')}Entradas x saídas (6 meses)<span class="sp"></span><span class="legend"><span><i style="background:#3d86ff"></i>Entrou</span><span><i style="background:#ff6b7a"></i>Saiu</span></span></h3>
@@ -698,7 +682,7 @@ V.clientes = () => {
   if (f === 'inad') cl = cl.filter(c => clientFin(c) === 'inadimplente');
   const tabs = [['online', `Online · ${ativos}`], ['offline', `Offline · ${nOff}`], ['inad', 'Inadimplentes'], ['todos', `Todos · ${S.d.clients.length}`]];
   return head('Clientes', `${ativos} de ${S.set.max_clients} vagas usadas`, `${isAdmin() ? `<label class="btn" title="Importar planilha (ex.: Metrifiquei)">${ic('down')}<span class="hide-m">Importar</span><input type="file" accept=".csv,text/csv" data-act-change="importCsv" hidden></label>` : ''}<button class="btn pri" data-act="editClient">${ic('plus')}Cliente</button>`) +
-    (isAdmin() ? ['recharge', 'shutdown'].filter(k => nDue(k).length).map(k => `<div class="card" style="margin-bottom:14px;border-color:${k === 'shutdown' ? 'rgba(255,107,122,.45)' : 'rgba(255,190,80,.45)'}"><h3>${ic(NOTICE[k].icon)}${k === 'shutdown' ? 'Comunicados de desligamento' : 'Avisos de recarga'} pendentes<span class="sp"></span><a class="small" href="#ajustes">editar texto</a></h3><div class="list">${nDue(k).map(c => `<div class="li"><div class="t"><b>${esc(c.name)}</b><small>${esc(nReason(k, c))}</small></div><button class="btn sm ${k === 'shutdown' ? 'bad' : 'pri'}" data-act="noticeOpen" data-k="${k}" data-id="${c.id}">${ic('wa')}Enviar</button></div>`).join('')}</div></div>`).join('') : '') +
+    (isAdmin() ? ['shutdown'].filter(k => nDue(k).length).map(k => `<div class="card" style="margin-bottom:14px;border-color:${k === 'shutdown' ? 'rgba(255,107,122,.45)' : 'rgba(255,190,80,.45)'}"><h3>${ic(NOTICE[k].icon)}${k === 'shutdown' ? 'Comunicados de desligamento' : 'Avisos de recarga'} pendentes<span class="sp"></span><a class="small" href="#ajustes">editar texto</a></h3><div class="list">${nDue(k).map(c => `<div class="li"><div class="t"><b>${esc(c.name)}</b><small>${esc(nReason(k, c))}</small></div><button class="btn sm ${k === 'shutdown' ? 'bad' : 'pri'}" data-act="noticeOpen" data-k="${k}" data-id="${c.id}">${ic('wa')}Enviar</button></div>`).join('')}</div></div>`).join('') : '') +
     `<div class="tabs" style="margin-bottom:14px">${tabs.map(t => `<button data-act="cliFilter" data-f="${t[0]}" class="${f === t[0] ? 'on' : ''}">${t[1]}</button>`).join('')}</div>
     <div class="grid g3">${cl.length ? cl.map(c => `<div class="ccard" data-act="openClient" data-id="${c.id}">
       <div class="hd"><span class="av" style="background:linear-gradient(135deg,#1c5fe6,#0b1a3d)">${esc(initials(c.name))}</span><b>${esc(c.name)}</b>${walletBtn(c)}</div>
@@ -723,10 +707,6 @@ function clientForm(c = {}) {
     <div class="f2">${fld('Data de contratação', 'start_date', c.start_date || today(), 'date')}${sel('Status na carteira', 'op_status', OP, c.op_status || 'ativo')}</div>
     ${fld('Data de saída (se saiu)', 'end_date', c.end_date, 'date')}
     ${reasonField(c.end_reason)}
-    <div class="sec" style="margin:6px 0 0">Anúncios (Meta)</div>
-    <div class="f2">${fld('ID da conta de anúncios', 'ad_account_id', c.ad_account_id, 'text', 'placeholder="act_123456789"')}${fld('Saldo na conta (R$) — manual', 'ad_balance', c.ad_balance, 'number', 'step="0.01" placeholder="deixe vazio se não souber"')}</div>
-    ${sel('Situação da conta de anúncios', 'ad_account_status', [['', 'Não informado'], ['ativa', 'Ativa'], ['bloqueada', 'Bloqueada / restrita'], ['pagamento', 'Problema de pagamento']], c.ad_account_status)}
-    <p class="note">Com a Meta conectada, saldo e situação são atualizados automaticamente e o registro manual é substituído pelos dados oficiais.</p>
     ${area('Observações', 'notes', c.notes)}
   </div>`, { form: 'saveClient', onOpen: f => { const sl = f.installments; sl.addEventListener('change', () => { const two = sl.value === '2'; $('#dd2').style.visibility = two ? '' : 'hidden'; $('#ddNote').style.display = two ? '' : 'none'; if (two) f.due_day2.focus(); }); }, footer: `${c.id && isAdmin() ? `<button type="button" class="btn bad" data-act="delClient" data-id="${c.id}">${ic('trash')}</button><span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
 }
@@ -736,16 +716,16 @@ function clientDetail(id) {
   const acts = S.d.activity.filter(a => a.client_id === id).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 15);
   const wa = onlyDigits(c.whatsapp || c.phone);
   const wal = `<div class="card row wrap" style="gap:10px;margin-bottom:12px;padding:12px 14px"><div class="sp"><b>Status na carteira</b><div class="small muted">${inWallet(c) ? 'Cliente ativo na carteira' : `Saiu${c.end_date ? ' em ' + fdateY(c.end_date) : ''}${c.end_reason ? ' · ' + esc(c.end_reason) : ''}`}</div></div><div class="tabs" style="margin:0"><button type="button" class="${inWallet(c) ? 'on' : ''}" data-act="setWallet" data-id="${c.id}" data-on="1" data-from="detail"><i class="dot ${inWallet(c) ? 'on' : ''}"></i> Online</button><button type="button" class="${inWallet(c) ? '' : 'on'}" data-act="setWallet" data-id="${c.id}" data-on="0" data-from="detail"><i class="dot"></i> Offline</button></div></div>`;
-  modal(c.name, `${wal}<div class="row wrap" style="gap:6px;margin-bottom:12px">${walletChip(c)}${inWallet(c) && (c.services || []).includes('trafego') ? adChip(c) : ''}${canFin() ? (isAdmin() ? payBtn(c) : finChip(clientFin(c))) : ''}${(c.services || []).map(s => `<span class="chip blue">${esc(svcName(s))}</span>`).join('')}</div>
+  modal(c.name, `${wal}<div class="row wrap" style="gap:6px;margin-bottom:12px">${walletChip(c)}${canFin() ? (isAdmin() ? payBtn(c) : finChip(clientFin(c))) : ''}${(c.services || []).map(s => `<span class="chip blue">${esc(svcName(s))}</span>`).join('')}</div>
     <div class="grid g2" style="gap:10px">
       <div class="card"><h3>Contato</h3><div class="small" style="display:grid;gap:4px"><span>👤 ${esc(c.contact || '—')}</span><span>📱 ${esc(c.whatsapp || c.phone || '—')}</span><span>✉️ ${esc(c.email || '—')}</span><span>📷 ${esc(c.instagram || '—')}</span><span>🏷️ ${esc(c.segment || '—')}</span><span>🧑‍💼 Responsável: ${esc(pname(c.owner))}</span></div></div>
-      <div class="card"><h3>Contrato</h3><div class="small" style="display:grid;gap:4px">${canFin() ? `<span>Valor: <b>${brl(c.contract_value)}</b>/mês</span>` : ''}<span>Vencimento: ${esc(dueTxt(c))}${isSplit(c) && canFin() ? ` · ${parts(c).map(p => brl(p[1])).join(' + ')}` : ''}</span><span>Desde: ${c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}</span><span>Conta de anúncios: ${esc(c.ad_account_id || '—')}</span><span>Saldo: ${c.ad_balance != null && c.ad_balance !== '' ? brl(c.ad_balance) + ` (${esc(c.ad_balance_source || 'manual')})` : 'não informado'}</span>${c.ad_synced_at ? `<span class="muted">Meta sincronizada ${ago(c.ad_synced_at)}</span>` : ''}</div></div>
+      <div class="card"><h3>Contrato</h3><div class="small" style="display:grid;gap:4px">${canFin() ? `<span>Valor: <b>${brl(c.contract_value)}</b>/mês</span>` : ''}<span>Vencimento: ${esc(dueTxt(c))}${isSplit(c) && canFin() ? ` · ${parts(c).map(p => brl(p[1])).join(' + ')}` : ''}</span><span>Desde: ${c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}</span></div></div>
     </div>
     ${canFin() ? `<div class="sec">Cobranças</div><div class="list">${inv.length ? inv.slice(0, 8).map(i => `<div class="li"><div class="t"><b>${brl(i.amount)} · ${fdate(i.due_date)}</b><small>${esc(i.description || 'Mensalidade')}</small></div>${invChip(i)}</div>`).join('') : empty('Nenhuma cobrança.')}</div>` : ''}
     <div class="sec">Histórico de atividades</div>
     <div class="list">${acts.length ? acts.map(a => `<div class="li"><div class="t"><b style="font-weight:500">${esc(a.action)}</b><small>${esc(firstName(a.user_id))} · ${new Date(a.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</small></div></div>`).join('') : empty('Sem registros ainda.')}</div>
     <form data-form="clientNote" class="row" style="margin-top:10px"><input type="hidden" name="id" value="${c.id}"><input name="text" placeholder="Registrar atividade (ex.: liguei, enviei proposta)" maxlength="300"><button class="btn">Registrar</button></form>`,
-    { wide: true, footer: `${wa ? `<a class="btn ok" href="https://wa.me/55${wa.replace(/^55/, '')}" target="_blank" rel="noopener">${ic('wa')}WhatsApp</a>` : ''}<button type="button" class="btn" data-act="editMeet" data-client="${c.id}">${ic('meet')}<span class="hide-m">Reunião</span></button><button type="button" class="btn" data-act="clientReport" data-id="${c.id}">${ic('file')}Relatório</button>${isAdmin() && (c.services || []).includes('trafego') ? `<button type="button" class="btn" data-act="noticeOpen" data-k="recharge" data-id="${c.id}" title="Aviso de recarga (sem saldo)">${ic('wallet')}<span class="hide-m">Recarga</span></button>` : ''}${isAdmin() ? `<button type="button" class="btn bad" data-act="noticeOpen" data-k="shutdown" data-id="${c.id}" title="Comunicado de desligamento">${ic('bell')}<span class="hide-m">Desligamento</span></button>` : ''}<span class="sp"></span><button type="button" class="btn pri" data-act="editClient" data-id="${c.id}">${ic('edit')}Editar</button>` });
+    { wide: true, footer: `${wa ? `<a class="btn ok" href="https://wa.me/55${wa.replace(/^55/, '')}" target="_blank" rel="noopener">${ic('wa')}WhatsApp</a>` : ''}<button type="button" class="btn" data-act="editMeet" data-client="${c.id}">${ic('meet')}<span class="hide-m">Reunião</span></button><button type="button" class="btn" data-act="clientReport" data-id="${c.id}">${ic('file')}Relatório</button>${isAdmin() ? `<button type="button" class="btn bad" data-act="noticeOpen" data-k="shutdown" data-id="${c.id}" title="Comunicado de desligamento">${ic('bell')}<span class="hide-m">Desligamento</span></button>` : ''}<span class="sp"></span><button type="button" class="btn pri" data-act="editClient" data-id="${c.id}">${ic('edit')}Editar</button>` });
 }
 
 /* ---------- IMPORTAR CLIENTES (CSV do Metrifiquei ou planilha simples) ---------- */
@@ -1040,7 +1020,6 @@ V.ajustes = () => {
   const s = S.set; const tpls = S.d.tasks.filter(t => t.is_template).sort((a, b) => firstName(a.assignee).localeCompare(firstName(b.assignee)) || (a.time || '').localeCompare(b.time || ''));
   const DN = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
   const integ = (n, st, how) => `<div class="li"><div class="t"><b>${n}</b><small>${how}</small></div><span class="chip ${st ? 'ok' : ''}">${st ? 'Conectado' : 'Pendente'}</span></div>`;
-  const metaOn = S.d.clients.some(c => c.ad_synced_at);
   return head('Ajustes', 'Somente o administrador vê esta tela') + `
   <form class="card f" data-form="saveSettings"><h3>${ic('gear')}Operação</h3>
     <div class="f2">${fld('Nome da agência', 'agency_name', s.agency_name)}${fld('Limite de clientes', 'max_clients', s.max_clients, 'number', 'min="1" max="500"')}</div>
@@ -1052,7 +1031,7 @@ V.ajustes = () => {
     <p class="note">Negativo = antes do vencimento · 0 = no dia · positivo = depois.</p>
     <label class="sw"><input type="checkbox" name="priscila_finance" ${s.priscila_finance ? 'checked' : ''}> Priscila pode ver o financeiro</label>
     <div class="sec" style="margin:4px 0 0">Tipos de notificação</div>
-    <div class="cks">${[['tarefas', 'Tarefas e reuniões'], ['financeiro', 'Cobranças'], ['campanhas', 'Contas de anúncios'], ['conteudo', 'Conteúdo'], ['chat', 'Chat']].map(n => `<label><input type="checkbox" name="nf_${n[0]}" ${(s.notify || {})[n[0]] !== false ? 'checked' : ''}>${n[1]}</label>`).join('')}</div>
+    <div class="cks">${[['tarefas', 'Tarefas e reuniões'], ['financeiro', 'Cobranças'], ['conteudo', 'Conteúdo'], ['chat', 'Chat']].map(n => `<label><input type="checkbox" name="nf_${n[0]}" ${(s.notify || {})[n[0]] !== false ? 'checked' : ''}>${n[1]}</label>`).join('')}</div>
     <div><button class="btn pri">Salvar ajustes</button></div>
   </form>
   <form class="card f" data-form="saveReasons" style="margin-top:14px"><h3>${ic('users')}Motivos de saída do cliente</h3>
@@ -1060,17 +1039,10 @@ V.ajustes = () => {
     <p class="note">Aparecem como botões quando você desativa um cliente ou edita o cadastro. Você ainda pode digitar um motivo diferente na hora. A ordem daqui é a ordem dos botões.</p>
     <div class="row wrap"><button class="btn pri">Salvar motivos</button><button type="button" class="btn" data-act="reasonsReset">Restaurar lista padrão</button></div>
   </form>
-  <form class="card f" data-form="saveRecharge" style="margin-top:14px"><h3>${ic('wallet')}Aviso de recarga — campanhas sem saldo (WhatsApp)</h3>
-    <label class="sw"><input type="checkbox" name="auto" ${nCfg('recharge').auto ? 'checked' : ''}> <b>Automático ligado</b> — quando um cliente ficar sem saldo, o app deixa o aviso pronto (alerta + Prioridades de hoje)</label>
-    ${fld('Reenviar se continuar sem saldo após (dias)', 'repeat', nCfg('recharge').repeat, 'number', 'min="1" max="30"')}
-    <label class="fl">Texto da mensagem<textarea name="msg" style="min-height:260px">${esc(nText('recharge'))}</textarea></label>
-    <p class="note">Só dispara para clientes de tráfego marcados como <b>Sem saldo</b> (saldo informado pela Meta ou registrado manualmente). Pode usar {cliente} e {contato}. Negrito do WhatsApp: *texto*.</p>
-    <div class="row wrap"><button class="btn pri">Salvar aviso</button><button type="button" class="btn" data-act="noticeReset" data-k="recharge">Restaurar texto padrão</button></div>
-  </form>
   <form class="card f" data-form="saveShutdown" style="margin-top:14px"><h3>${ic('bell')}Comunicado de desligamento (WhatsApp)</h3>
     <label class="sw"><input type="checkbox" name="auto" ${shutCfg().auto ? 'checked' : ''}> <b>Automático ligado</b> — o app identifica sozinho quem entrou na regra e deixa o comunicado pronto (alerta + Prioridades de hoje)</label>
-    <div class="f2">${sel('Quando disparar', 'trigger', [['ambos', 'Sem saldo OU mensalidade atrasada'], ['saldo', 'Só quando ficar sem saldo'], ['atraso', 'Só quando a mensalidade atrasar']], shutCfg().trigger)}${fld('Prazo em dias', 'days', shutCfg().days, 'number', 'min="1" max="90"')}</div>
-    <p class="note">Prazo = dias de atraso da mensalidade. Para “sem saldo”: com o Aviso de recarga ligado, o desligamento só vem depois do aviso + este prazo, se o cliente continuar sem saldo.</p>
+    <div class="f2"><input type="hidden" name="trigger" value="atraso">${fld('Prazo em dias', 'days', shutCfg().days, 'number', 'min="1" max="90"')}</div>
+    <p class="note">Dispara quando a mensalidade passar este número de dias em atraso.</p>
     <label class="fl">Texto da mensagem<textarea name="msg" style="min-height:260px">${esc(nText('shutdown'))}</textarea></label>
     <p class="note">Pode usar: <b>{cliente}</b> nome da empresa · <b>{contato}</b> primeiro nome do contato · <b>{valor}</b> total em atraso · <b>{dias}</b> dias de atraso. Negrito do WhatsApp: *texto*.</p>
     <label class="sw"><input type="checkbox" name="pause" ${shutCfg().pause ? 'checked' : ''}> Marcar o cliente como Pausado quando o comunicado for enviado</label>
@@ -1082,7 +1054,6 @@ V.ajustes = () => {
     <p class="note" style="margin-top:8px">As tarefas do dia são criadas automaticamente a partir destas rotinas. Mudanças valem a partir do próximo dia gerado.</p></div>
   <div class="card" style="margin-top:14px"><h3>${ic('sync')}Integrações oficiais</h3><div class="list">
     ${integ('Banco de dados (Supabase)', SUPA, SUPA ? 'Dados na nuvem, criptografados e com backup diário do Supabase.' : 'Modo local: dados só neste aparelho. Siga o README para conectar.')}
-    ${integ('Meta Ads (Marketing API)', metaOn, 'Campanhas, métricas, saldo e situação das contas. Token fica no servidor.')}
     ${integ('Push com app fechado', !!CFG.VAPID_PUBLIC_KEY && SUPA, 'Chaves VAPID + função send-push no Supabase.')}
     ${integ('WhatsApp Business Platform', false, 'Hoje: botões que abrem o WhatsApp com a mensagem pronta. API oficial: próxima etapa (exige modelos aprovados).')}
     ${integ('Google Calendar / iPhone / Android', true, 'Botão “Calendário” em cada tarefa gera o evento (.ics) compatível com todos.')}
@@ -1192,12 +1163,7 @@ const A = {
     const c = client(d.id); for (const t of ['campaigns', 'invoices']) for (const r of S.d[t].filter(x => x.client_id === d.id)) await store.remove(t, r.id);
     await store.remove('clients', d.id); await log(`Excluiu o cliente ${c && c.name}`); toast('Cliente excluído', '', 'ok'); await refresh(); }, true),
   clientReport: d => clientReport(d.id), print: () => EMBED ? toast('Disponível no app publicado', 'Na versão instalada, este botão salva o relatório em PDF.', 'warn') : window.print(),
-  metaSync: async (d, el) => {
-    el.disabled = true;
-    try { const r = await store.invoke('meta-sync'); toast('Meta sincronizada', `${r.accounts || 0} contas · ${r.campaigns || 0} campanhas`, 'ok'); await log('Sincronizou a Meta Ads'); await refresh(); }
-    catch (e) { toast('Não foi possível sincronizar', e.message, 'warn'); }
-    el.disabled = false;
-  },
+
   finMonth: d => { S.finMonth = d.m; renderView(); },
   newInvoice: () => { if (!S.d.clients.length) return toast('Cadastre um cliente primeiro', '', 'warn'); invoiceForm({}); },
   editInvoice: d => invoiceForm(S.d.invoices.find(i => i.id === d.id)),
@@ -1306,14 +1272,13 @@ const F = {
     if (!v.name.trim()) return toast('Informe o nome da empresa', '', 'bad');
     const row = { name: v.name.trim(), contact: v.contact, whatsapp: v.whatsapp, phone: v.phone, email: v.email, instagram: v.instagram, segment: v.segment, owner: v.owner || null,
       services: fd.getAll('services'), contract_value: num(v.contract_value) || 0, due_day: num(v.due_day), installments: v.installments === '2' ? 2 : 1, due_day2: v.installments === '2' ? num(v.due_day2) : null, start_date: v.start_date || null, op_status: v.op_status,
-      ad_account_id: v.ad_account_id.trim() || null, notes: v.notes, ad_account_status: v.ad_account_status || null };
+      notes: v.notes };
     if (row.installments === 2 && (!row.due_day2 || row.due_day2 < 1 || row.due_day2 > 31)) return toast('Informe o dia do 2º vencimento', 'Parcelado aceita até 2x.', 'warn');
     if (row.installments === 2 && row.due_day2 === row.due_day) return toast('Os dois vencimentos estão no mesmo dia', 'Escolha dias diferentes ou use À vista.', 'warn');
     const old = v.id && client(v.id);
     if (row.op_status === 'cancelado') { row.end_date = v.end_date || (old && old.end_date) || today(); row.end_reason = (v.end_reason || '').trim() || null; }
     else { row.end_date = null; row.end_reason = null; }
     if (old && inWallet(old) !== inWallet(row)) await log(inWallet(row) ? `${row.name} voltou para a carteira (online)` : `${row.name} saiu da carteira (offline)${row.end_reason ? ': ' + row.end_reason : ''}`, v.id);
-    if (!old || !old.ad_synced_at || v.ad_balance !== String(old.ad_balance ?? '')) { row.ad_balance = num(v.ad_balance); row.ad_balance_source = row.ad_balance == null ? null : 'manual'; }
     const noCol = e => /end_date|end_reason|installments|due_day2|column/i.test(e && e.message || '');
     const save = r => v.id ? store.update('clients', v.id, r) : store.insert('clients', r);
     let saved; try { saved = await save(row); } catch (e) { if (!noCol(e)) throw e; delete row.end_date; delete row.end_reason; delete row.installments; delete row.due_day2; saved = await save(row); toast('Banco ainda sem alguns campos', 'Rode o SQL v1.5 no Supabase para guardar o parcelamento e a saída.', 'warn'); }
@@ -1411,7 +1376,7 @@ const F = {
     const offs = String(v.reminder_offsets || '').split(/[,; ]+/).filter(x => x !== '').map(Number).filter(n => Number.isFinite(n) && Math.abs(n) <= 60);
     const s = { ...S.set, agency_name: v.agency_name, max_clients: num(v.max_clients) || 20, calls_start: v.calls_start, meetings_start: v.meetings_start, prospect_goal: num(v.prospect_goal) || 0, followup_goal: num(v.followup_goal) || 0,
       priscila_start: v.priscila_start, priscila_end: v.priscila_end, morning_hour: v.morning_hour, lock_minutes: num(v.lock_minutes) || 15, reminder_offsets: offs, priscila_finance: form.priscila_finance.checked,
-      notify: Object.fromEntries(['tarefas', 'financeiro', 'campanhas', 'conteudo', 'chat'].map(k => [k, !!form['nf_' + k].checked])) };
+      notify: Object.fromEntries(['tarefas', 'financeiro', 'conteudo', 'chat'].map(k => [k, !!form['nf_' + k].checked])) };
     await store.upsertSettings(s); S.set = s; await log('Atualizou os ajustes'); toast('Ajustes salvos', '', 'ok'); armLock(); await refresh();
   },
   saveReasons: async v => {
