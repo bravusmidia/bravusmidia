@@ -297,3 +297,26 @@ html,body{overscroll-behavior-y:none}
 .alist .li .t b{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.35}
 .alist .li .t small{display:block;margin-top:2px;line-height:1.4;word-break:break-word}
 @media (max-width:860px){.main{overflow:visible;overflow-x:clip}}
+
+/* v2.2 — Reuniões: semana, horários livres e horário em destaque */
+.wk-card h3{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.wk{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;scrollbar-width:thin}
+.wd{flex:0 0 auto;min-width:86px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 8px;border-radius:var(--r2);border:1px solid var(--line2);background:var(--card2);color:var(--tx)}
+.wd b{font-size:14px}.wd small{color:var(--tx3);font-size:11.5px}
+.wd i{font-style:normal;font-size:11.5px;font-weight:700;margin-top:4px;padding:2px 8px;border-radius:99px}
+.wd.ok i{color:var(--ok);background:rgba(43,212,138,.12)}
+.wd.bad i{color:var(--bad);background:rgba(255,90,106,.12)}
+.wd.off i{color:var(--tx3);background:var(--card)}
+.wd.on{border-color:var(--blue);background:rgba(47,123,255,.14);box-shadow:0 0 0 1px var(--blue) inset}
+.slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:12px}
+.slot{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:10px 12px;border-radius:var(--r2);border:1px solid var(--line2);background:var(--card2);color:var(--tx);text-align:left}
+.slot b{font-size:22px;font-weight:800;letter-spacing:.5px;font-variant-numeric:tabular-nums}
+.slot span{font-size:12.5px;font-weight:700}
+.slot small{font-size:11px;color:var(--tx3);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.slot.free{border-color:rgba(43,212,138,.45);background:rgba(43,212,138,.07)}.slot.free span{color:var(--ok)}
+.slot.busy{border-color:rgba(255,90,106,.4);background:rgba(255,90,106,.07)}.slot.busy span{color:var(--bad)}
+.slot.past{opacity:.4}.slot.past span{color:var(--tx3)}
+.mtime{flex:0 0 auto;min-width:70px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 8px;border-radius:var(--r2);background:rgba(47,123,255,.12);border:1px solid rgba(47,123,255,.4);cursor:pointer}
+.mtime b{font-size:19px;font-weight:800;color:var(--blue2);font-variant-numeric:tabular-nums;line-height:1.1}
+.mtime small{font-size:10.5px;color:var(--tx2);white-space:nowrap}
+.mtime.hj{background:var(--blue);border-color:var(--blue)}.mtime.hj b,.mtime.hj small{color:#fff}
