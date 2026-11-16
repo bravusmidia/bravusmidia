@@ -232,16 +232,19 @@ function invStatus(i) {
   if (i.status === 'areceber') return 'pendente'; /* a receber = marcado manualmente, não vira atraso sozinho */
   return i.due_date < today() ? 'atrasado' : 'pendente';
 }
+/* status do mês atual (cobranças canceladas não contam) */
 function clientFin(c) {
-  const inv = S.d.invoices.filter(i => i.client_id === c.id);
+  const inv = S.d.invoices.filter(i => i.client_id === c.id && i.status !== 'cancelado');
   if (inv.some(i => invStatus(i) === 'atrasado')) return 'inadimplente';
-  if (inv.some(i => invStatus(i) === 'pendente')) return 'a vencer';
-  return inv.length ? 'em dia' : 'sem cobrança';
+  const cur = inv.filter(i => ym(i.due_date) === curYM());
+  if (cur.some(i => invStatus(i) === 'pendente')) return 'a vencer';
+  if (cur.length && cur.every(i => i.status === 'pago')) return 'pago';
+  return 'sem cobrança';
 }
 /* status de pagamento clicável: Pago · A receber · Em atraso (manual) */
 const monthInv = (c, k = curYM()) => S.d.invoices.filter(i => i.client_id === c.id && ym(i.due_date) === k && i.status !== 'cancelado').sort((a, b) => a.due_date.localeCompare(b.due_date));
-const payBtn = c => { const s = clientFin(c); return `<button type="button" class="chip ${s === 'inadimplente' ? 'bad' : s === 'em dia' ? 'ok' : s === 'a vencer' ? 'warn' : ''}" style="cursor:pointer" data-act="payMenu" data-id="${c.id}" title="Clique para marcar: pago, a receber ou em atraso">${esc(s)} ▾</button>`; };
-const finChip = s => `<span class="chip ${s === 'inadimplente' ? 'bad' : s === 'em dia' ? 'ok' : s === 'a vencer' ? 'warn' : ''}">${esc(s)}</span>`;
+const payBtn = c => { const s = clientFin(c); return `<button type="button" class="chip ${s === 'inadimplente' ? 'bad' : s === 'pago' ? 'ok' : s === 'a vencer' ? 'warn' : ''}" style="cursor:pointer" data-act="payMenu" data-id="${c.id}" title="Clique para marcar: pago, a receber ou em atraso">${esc(s)} ▾</button>`; };
+const finChip = s => `<span class="chip ${s === 'inadimplente' ? 'bad' : s === 'pago' ? 'ok' : s === 'a vencer' ? 'warn' : ''}">${esc(s)}</span>`;
 const campsOf = id => S.d.campaigns.filter(c => c.client_id === id);
 /* Anúncios/Meta removidos do Bravus Work: nenhum status de conta de anúncios é calculado */
 function adState() { return { k: 'na', label: '', cls: '' }; }
@@ -659,7 +662,7 @@ V.painel = () => {
       <div class="list">${prio.length ? prio.slice(0, 8).map(p => `<a class="li" href="#${p[3]}"${p[4] ? ` data-act="${p[4].act}" data-k="${p[4].k}" data-id="${p[4].id}"` : ''}><i class="dot ${p[0] === 'bad' ? 'bad' : p[0] === 'warn' ? 'warn' : 'on'}"></i><div class="t"><b>${esc(p[1])}</b><small>${esc(p[2])}</small></div>${ic('right')}</a>`).join('') : empty('Tudo em ordem por aqui. ✅')}</div>
     </div>
     <div class="card"><h3>${ic('wallet')}Pagamentos do mês<span class="sp"></span><a class="small" href="#clientes">ver clientes</a></h3>
-      <div class="list">${ativos.length ? ativos.slice().sort((a, b) => ['inadimplente', 'a vencer', 'sem cobrança', 'em dia'].indexOf(clientFin(a)) - ['inadimplente', 'a vencer', 'sem cobrança', 'em dia'].indexOf(clientFin(b))).slice(0, 10).map(c => `<div class="li"><div class="t" data-act="openClient" data-id="${c.id}" style="cursor:pointer"><b>${esc(c.name)}</b><small>vence ${esc(dueTxt(c))}${canFin() ? ' · ' + brl(c.contract_value) : ''}</small></div>${canFin() ? (isAdmin() ? payBtn(c) : finChip(clientFin(c))) : ''}</div>`).join('') : empty('Nenhum cliente ativo.')}</div>
+      <div class="list">${ativos.length ? ativos.slice().sort((a, b) => ['inadimplente', 'a vencer', 'sem cobrança', 'pago'].indexOf(clientFin(a)) - ['inadimplente', 'a vencer', 'sem cobrança', 'pago'].indexOf(clientFin(b))).slice(0, 10).map(c => `<div class="li"><div class="t" data-act="openClient" data-id="${c.id}" style="cursor:pointer"><b>${esc(c.name)}</b><small>vence ${esc(dueTxt(c))}${canFin() ? ' · ' + brl(c.contract_value) : ''}</small></div>${canFin() ? (isAdmin() ? payBtn(c) : finChip(clientFin(c))) : ''}</div>`).join('') : empty('Nenhum cliente ativo.')}</div>
     </div>
 
   </div>
@@ -960,7 +963,10 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.0', notes: [
+const RELEASE = { version: '2.1', notes: [
+  'Adicionar e remover membros da equipe, com senha definida por você.',
+  'Quem está online aparece no topo da tela.',
+  'Selo de pagamento corrigido: cobranças canceladas não contam mais como "em dia".',
   'Chat flutuante no canto direito: converse enquanto mexe em qualquer tela.',
   'Aba Anotações no chat para guardar o que é importante (fixe qualquer mensagem com 📌).',
   'Confirmação de leitura: ✓ enviado · ✓✓ visto.',
@@ -1044,7 +1050,7 @@ async function checkVersion() {
 /* ---------- EQUIPE ---------- */
 V.equipe = () => {
   const d = today(); const wk = Array.from({ length: 7 }, (_, i) => addDays(d, -i));
-  return head('Equipe', 'Bravus Team · produtividade e presença') + `<div class="grid g2">${team().map(p => {
+  return head('Equipe', 'Bravus Team · produtividade e presença', isAdmin() && SUPA ? `<button class="btn pri" data-act="newMember">${ic('plus')}Membro</button>` : '') + `<div class="grid g2">${team().map(p => {
     const mine = realTasks().filter(t => t.assignee === p.id);
     const td = mine.filter(t => t.date === d), tdn = td.filter(t => t.status === 'feito').length;
     const w = mine.filter(t => wk.includes(t.date)), wdn = w.filter(t => t.status === 'feito').length;
@@ -1192,7 +1198,7 @@ V.ajustes = () => {
     ${integ('Instagram, RD Station, ClickUp', false, 'Preparados para a próxima etapa; enquanto isso, registro manual.')}
   </div></div>
   <div class="card" style="margin-top:14px"><h3>${ic('down')}Backup</h3><div class="row wrap"><button class="btn" data-act="backup">${ic('down')}Baixar backup (JSON)</button>${!SUPA ? `<label class="btn">Restaurar backup<input type="file" accept="application/json" data-act-change="restore" hidden></label>` : ''}</div><p class="note" style="margin-top:8px">O backup contém dados de clientes: guarde em local seguro (ex.: pasta privada no Drive).</p></div>
-  <div class="card" style="margin-top:14px"><h3>${ic('users')}Equipe</h3><div class="list">${team().map(p => `<div class="li">${avatar(p)}<div class="t" data-act="editProfile" data-id="${p.id}" style="cursor:pointer"><b>${esc(p.name)}</b><small>${esc(cargo(p))} · <b style="color:${p.role === 'admin' ? 'var(--blue2)' : 'var(--tx2)'}">${p.role === 'admin' ? 'Administrador' : 'Membro'}</b>${p.email ? ' · ' + esc(p.email) : ''}</small></div>${p.id === S.me.id || isAdmin() ? `<label class="btn sm" title="Trocar foto">${ic('plus')}Foto<input type="file" accept="image/*" data-act-change="setPhoto" data-id="${p.id}" hidden></label>` : ''}${!SUPA || p.id === S.me.id ? `<button class="btn sm" data-act="changePin" data-id="${p.id}">Trocar senha</button>` : `<button class="btn sm" data-act="setRole" data-id="${p.id}">${p.role === 'admin' ? 'Tirar admin' : 'Dar admin'}</button><button class="btn sm" data-act="adminPw" data-id="${p.id}">Alterar senha</button><button class="btn sm" data-act="resetPw" data-id="${p.id}" title="Envia um link por e-mail para a pessoa criar a senha">Link por e-mail</button>`}</div>`).join('')}</div>
+  <div class="card" style="margin-top:14px"><h3>${ic('users')}Equipe<span class="sp"></span>${SUPA ? `<button class="btn sm pri" data-act="newMember">${ic('plus')}Membro</button>` : ''}</h3><div class="list">${team().map(p => `<div class="li">${avatar(p)}<div class="t" data-act="editProfile" data-id="${p.id}" style="cursor:pointer"><b>${esc(p.name)}</b><small>${esc(cargo(p))} · <b style="color:${p.role === 'admin' ? 'var(--blue2)' : 'var(--tx2)'}">${p.role === 'admin' ? 'Administrador' : 'Membro'}</b>${p.email ? ' · ' + esc(p.email) : ''}</small></div>${p.id === S.me.id || isAdmin() ? `<label class="btn sm" title="Trocar foto">${ic('plus')}Foto<input type="file" accept="image/*" data-act-change="setPhoto" data-id="${p.id}" hidden></label>` : ''}${!SUPA || p.id === S.me.id ? `<button class="btn sm" data-act="changePin" data-id="${p.id}">Trocar senha</button>` : `<button class="btn sm" data-act="setRole" data-id="${p.id}">${p.role === 'admin' ? 'Tirar admin' : 'Dar admin'}</button><button class="btn sm" data-act="adminPw" data-id="${p.id}">Alterar senha</button><button class="btn sm bad" data-act="removeMember" data-id="${p.id}" title="Remover da equipe">${ic('trash')}</button><button class="btn sm" data-act="resetPw" data-id="${p.id}" title="Envia um link por e-mail para a pessoa criar a senha">Link por e-mail</button>`}</div>`).join('')}</div>
   ${SUPA ? '<p class="note" style="margin-top:8px">Novos usuários são criados no painel do Supabase (Authentication → Add user) — veja o README.</p>' : ''}</div>
   <p class="note" style="margin-top:14px;text-align:center">Bravus Work v${VERSION} · ${SUPA ? 'Supabase' : 'modo local'}</p>`;
 };
@@ -1208,6 +1214,20 @@ const A = {
   authChangeEmail: () => { AUTH.stage = 'email'; AUTH.pin = ''; renderAuth(); },
   moreMenu: () => modal('Menu', `<div class="list">${NAV.filter(navOk).map(n => `<a class="li" href="#${n[0]}" data-act="closeModal">${ic(n[2])}<div class="t"><b>${n[1]}</b></div>${n[0] === 'alertas' && unread() ? `<span class="badge">${unread()}</span>` : ''}</a>`).join('')}<button class="li" data-act="logout" style="width:100%">${ic('lock')}<div class="t" style="text-align:left"><b>Bloquear / sair</b></div></button></div>`),
   cliFilter: d => { S.cliFilter = d.f; renderView(); },
+  newMember: () => { if (!isAdmin()) return;
+    const sug = 'bravus' + Math.floor(1000 + Math.random() * 9000);
+    modal('Adicionar membro à equipe', `<div class="f">
+      <div class="f2">${fld('Nome *', 'name', '', 'text', 'required maxlength="80" placeholder="ex.: Teste Bravus"')}${fld('E-mail de acesso *', 'email', '', 'email', 'required autocomplete="off" placeholder="nome@email.com"')}</div>
+      <div class="f2"><label class="fl">Senha *<div class="row" style="gap:6px"><input name="pin" id="nmPin" value="${sug}" minlength="6" required autocomplete="off" style="flex:1"><button type="button" class="btn sm" data-act="genPin">Gerar</button></div></label>${fld('Cargo', 'title', '', 'text', 'maxlength="60" list="cargos" placeholder="ex.: Social media"')}<datalist id="cargos">${CARGOS.map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
+      ${sel('Acesso', 'role', [['comercial', 'Membro — vê tudo e adiciona reuniões'], ['admin', 'Administrador — pode alterar tudo']], 'comercial')}
+      <p class="note">O e-mail pode ser inventado para teste (ex.: teste@bravusmidia.com.br): o acesso já sai liberado, sem confirmação por e-mail. Depois de criar, eu mostro o acesso pronto para copiar ou mandar no WhatsApp.</p></div>`,
+      { form: 'saveMember', footer: `<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Criar membro</button>` }); },
+  genPin: () => { const el = $('#nmPin'); if (el) el.value = 'bravus' + Math.floor(1000 + Math.random() * 9000); },
+  removeMember: d => { const p = prof(d.id); if (!p || !isAdmin() || p.id === S.me.id) return;
+    confirmBox(`Remover ${esc(p.name)} da equipe?`, `O acesso de <b>${esc(p.email || p.name)}</b> é apagado. Clientes e conteúdos dele(a) passam para você; tarefas, mensagens e histórico dele(a) são apagados. Não dá para desfazer.`, 'Remover', async () => {
+      const { error } = await sb.rpc('admin_remove_member', { target: p.id }); if (error) return toast('Não foi possível remover', error.message, 'bad');
+      await log(`Removeu ${p.name} da equipe`); toast('Membro removido', p.name, 'ok'); await refresh(); renderView(); }, true); },
+  copyAccess: d => { navigator.clipboard && navigator.clipboard.writeText(d.txt).then(() => toast('Acesso copiado', '', 'ok')); },
   chatToggle: () => { CW.open = !CW.open; lsSet('bw_cw_open', CW.open); renderChat(true); if (CW.open && innerWidth > 860) setTimeout(() => $('#chatInput') && $('#chatInput').focus(), 50); },
   cwTab: d => { CW.tab = d.t; renderChat(true); },
   msgPin: async d => { const m = S.d.messages.find(x => x.id === d.id); if (!m) return; try { await store.update('messages', m.id, { pinned: !m.pinned }); } catch (e) { return toast('Anotações ainda não ativadas no banco', 'Falta rodar o SQL v2.0 no Supabase.', 'warn'); } if (!m.pinned) toast('Guardado nas anotações', '', 'ok'); await loadAll('messages'); renderChat(); },
@@ -1565,6 +1585,17 @@ const F = {
     const msg = String(v.msg || '').trim(); if (!msg) return toast('Escreva o texto do comunicado', '', 'warn');
     const s = { ...S.set, shutdown: { auto: form.auto.checked, trigger: v.trigger, days: Math.max(1, num(v.days) || 5), pause: form.pause.checked, msg } };
     await store.upsertSettings(s); S.set = s; await log(`Atualizou o comunicado de desligamento (automático ${s.shutdown.auto ? 'ligado' : 'desligado'})`); toast('Comunicado salvo', s.shutdown.auto ? 'Automático ligado.' : 'Automático desligado — envio só manual.', 'ok'); await refresh();
+  },
+  saveMember: async v => {
+    const name = (v.name || '').trim(), email = (v.email || '').trim().toLowerCase(), pin = v.pin || '';
+    if (!name || !email) return toast('Preencha nome e e-mail', '', 'bad');
+    if (pin.length < 6 || WEAK.includes(pin)) return toast('Senha fraca', 'Use pelo menos 6 caracteres, sem sequências óbvias.', 'bad');
+    const { error } = await sb.rpc('admin_add_member', { p_email: email, p_password: pin, p_name: name, p_role: v.role, p_title: (v.title || '').trim() || null });
+    if (error) return toast('Não foi possível criar', /function|schema cache/i.test(error.message) ? 'Falta instalar a função no banco (SQL v2.1).' : error.message, 'bad');
+    await log(`Adicionou ${name} à equipe (${v.role === 'admin' ? 'administrador' : 'membro'})`); await refresh();
+    const txt = `Seu acesso ao Bravus Work:\n${appUrl()}\nE-mail: ${email}\nSenha: ${pin}\n\nNo iPhone: abra no Safari > Compartilhar > Adicionar à Tela de Início. Troque a senha depois em Equipe > Trocar senha.`;
+    modal('Membro criado ✅', `<p style="margin-bottom:10px"><b>${esc(name)}</b> já pode entrar no app.</p><pre class="acc">${esc(txt)}</pre>`,
+      { footer: `<a class="btn ok" href="https://wa.me/?text=${encodeURIComponent(txt)}" target="_blank" rel="noopener">${ic('wa')}Mandar no WhatsApp</a><button type="button" class="btn" data-act="copyAccess" data-txt="${esc(txt)}">Copiar</button><span class="sp"></span><button type="button" class="btn pri" data-act="closeModal">Pronto</button>` });
   },
   adminPwSave: async v => {
     const p = prof(v.id); if (!p) return;

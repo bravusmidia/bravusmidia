@@ -289,3 +289,4 @@ ul.rel{list-style:none;display:grid;gap:8px}ul.rel li{position:relative;padding-
 .presence .pr b{display:block;font-size:12.5px;line-height:1.1}.presence .pr small{display:block;font-size:11px;color:var(--tx3);line-height:1.2}
 .presence .pr.on small{color:var(--ok)}
 @media (max-width:860px){.presence{justify-content:flex-start;margin:0 0 10px}.presence .pr small{display:none}}
+pre.acc{white-space:pre-wrap;background:var(--card2);border:1px solid var(--line2);border-radius:12px;padding:12px;font:13px/1.5 ui-monospace,Consolas,monospace;color:var(--tx)}
