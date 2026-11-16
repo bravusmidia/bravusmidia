@@ -127,8 +127,13 @@ const DEFAULT_SETTINGS = {
   reminder_offsets: [-5, -2, 0, 1, 5, 10], remind_default: 10, lock_minutes: 15,
   notify: { tarefas: true, financeiro: true, campanhas: true, conteudo: true, chat: true },
   shutdown: { auto: false, trigger: 'ambos', days: 5, pause: true, msg: '' },
-  recharge: { auto: false, repeat: 3, msg: '' }
+  recharge: { auto: false, repeat: 3, msg: '' },
+  exit_reasons: ['Inadimplência', 'Cancelamento', 'Término de contrato', 'Falta de pagamento', 'Sem verba para anúncios', 'Insatisfação com os resultados', 'Pausou o negócio', 'Mudou de agência']
 };
+const exitReasons = () => (Array.isArray(S.set.exit_reasons) ? S.set.exit_reasons : DEFAULT_SETTINGS.exit_reasons).filter(Boolean);
+/* campo de motivo: lista pronta (editável em Ajustes) + texto livre */
+const reasonField = (v = '') => `<label class="fl">Motivo da saída<input name="end_reason" value="${esc(v || '')}" maxlength="120" list="exitR" placeholder="escolha abaixo ou digite"><datalist id="exitR">${exitReasons().map(r => `<option value="${esc(r)}">`).join('')}</datalist></label>
+  <div class="row wrap" style="gap:6px;margin-top:-4px">${exitReasons().map(r => `<button type="button" class="chip ${r === v ? 'blue' : ''}" style="cursor:pointer" data-act="pickReason" data-v="${esc(r)}">${esc(r)}</button>`).join('')}</div>`;
 /* Aviso de recarga (só para campanhas sem saldo). Texto editável em Ajustes. */
 const RECHARGE_MSG = `🔔 *AVISO AUTOMÁTICO – BRAVUS MÍDIA*
 
@@ -712,7 +717,8 @@ function clientForm(c = {}) {
     <label class="fl">Serviços contratados<div class="cks">${SERVICES.map(s => `<label><input type="checkbox" name="services" value="${s[0]}" ${svcs.includes(s[0]) ? 'checked' : ''}>${s[1]}</label>`).join('')}</div></label>
     <div class="f2">${fld('Valor mensal do contrato (R$)', 'contract_value', c.contract_value, 'number', 'step="0.01" min="0"')}${fld('Dia de vencimento', 'due_day', c.due_day || 10, 'number', 'min="1" max="31"')}</div>
     <div class="f2">${fld('Data de contratação', 'start_date', c.start_date || today(), 'date')}${sel('Status na carteira', 'op_status', OP, c.op_status || 'ativo')}</div>
-    <div class="f2">${fld('Data de saída (se saiu)', 'end_date', c.end_date, 'date')}${fld('Motivo da saída', 'end_reason', c.end_reason, 'text', 'placeholder="ex.: encerrou contrato, sem verba"')}</div>
+    ${fld('Data de saída (se saiu)', 'end_date', c.end_date, 'date')}
+    ${reasonField(c.end_reason)}
     <div class="sec" style="margin:6px 0 0">Anúncios (Meta)</div>
     <div class="f2">${fld('ID da conta de anúncios', 'ad_account_id', c.ad_account_id, 'text', 'placeholder="act_123456789"')}${fld('Saldo na conta (R$) — manual', 'ad_balance', c.ad_balance, 'number', 'step="0.01" placeholder="deixe vazio se não souber"')}</div>
     ${sel('Situação da conta de anúncios', 'ad_account_status', [['', 'Não informado'], ['ativa', 'Ativa'], ['bloqueada', 'Bloqueada / restrita'], ['pagamento', 'Problema de pagamento']], c.ad_account_status)}
@@ -1076,6 +1082,11 @@ V.ajustes = () => {
     <div class="cks">${[['tarefas', 'Tarefas e reuniões'], ['financeiro', 'Cobranças'], ['campanhas', 'Campanhas'], ['conteudo', 'Conteúdo'], ['chat', 'Chat']].map(n => `<label><input type="checkbox" name="nf_${n[0]}" ${(s.notify || {})[n[0]] !== false ? 'checked' : ''}>${n[1]}</label>`).join('')}</div>
     <div><button class="btn pri">Salvar ajustes</button></div>
   </form>
+  <form class="card f" data-form="saveReasons" style="margin-top:14px"><h3>${ic('users')}Motivos de saída do cliente</h3>
+    <label class="fl">Frases prontas — uma por linha<textarea name="list" style="min-height:190px">${esc(exitReasons().join('\n'))}</textarea></label>
+    <p class="note">Aparecem como botões quando você desativa um cliente ou edita o cadastro. Você ainda pode digitar um motivo diferente na hora. A ordem daqui é a ordem dos botões.</p>
+    <div class="row wrap"><button class="btn pri">Salvar motivos</button><button type="button" class="btn" data-act="reasonsReset">Restaurar lista padrão</button></div>
+  </form>
   <form class="card f" data-form="saveRecharge" style="margin-top:14px"><h3>${ic('wallet')}Aviso de recarga — campanhas sem saldo (WhatsApp)</h3>
     <label class="sw"><input type="checkbox" name="auto" ${nCfg('recharge').auto ? 'checked' : ''}> <b>Automático ligado</b> — quando um cliente ficar sem saldo, o app deixa o aviso pronto (alerta + Prioridades de hoje)</label>
     ${fld('Reenviar se continuar sem saldo após (dias)', 'repeat', nCfg('recharge').repeat, 'number', 'min="1" max="30"')}
@@ -1121,6 +1132,8 @@ const A = {
   authChangeEmail: () => { AUTH.stage = 'email'; AUTH.pin = ''; renderAuth(); },
   moreMenu: () => modal('Menu', `<div class="list">${NAV.filter(navOk).map(n => `<a class="li" href="#${n[0]}" data-act="closeModal">${ic(n[2])}<div class="t"><b>${n[1]}</b></div>${n[0] === 'alertas' && unread() ? `<span class="badge">${unread()}</span>` : ''}</a>`).join('')}<button class="li" data-act="logout" style="width:100%">${ic('lock')}<div class="t" style="text-align:left"><b>Bloquear / sair</b></div></button></div>`),
   cliFilter: d => { S.cliFilter = d.f; renderView(); },
+  pickReason: (d, el) => { const f = el.closest('form'); if (!f) return; f.end_reason.value = d.v; f.querySelectorAll('[data-act="pickReason"]').forEach(b => b.classList.toggle('blue', b === el)); },
+  reasonsReset: () => { const t = $('form[data-form="saveReasons"] textarea[name="list"]'); if (t) t.value = DEFAULT_SETTINGS.exit_reasons.join('\n'); toast('Lista padrão restaurada', 'Clique em salvar para gravar.'); },
   editMeet: d => meetForm(d.id ? S.d.tasks.find(t => t.id === d.id) : (d.client ? { client_id: d.client, meet_type: 'alinhamento' } : {})),
   meetMonth: d => { S.meetMonth = d.m; renderView(); }, meetWho: d => { S.meetWho = d.id; renderView(); },
   meetSet: async d => { const t = S.d.tasks.find(x => x.id === d.id); if (!t) return; await store.update('tasks', t.id, { status: d.s, done_at: d.s === 'feito' ? new Date().toISOString() : null }); await log(`Reunião com ${meetWho(t)}: ${lbl(MSTATUS, d.s).toLowerCase()}`, t.client_id); toast('Reunião atualizada', lbl(MSTATUS, d.s), 'ok'); await refresh(); if (d.s === 'feito') meetForm(S.d.tasks.find(x => x.id === d.id)); },
@@ -1154,7 +1167,8 @@ const A = {
     const open = S.d.invoices.filter(i => i.client_id === c.id && ['pendente', 'atrasado'].includes(invStatus(i)));
     modal('Desativar cliente', `<div class="f"><input type="hidden" name="id" value="${c.id}"><input type="hidden" name="on" value="0"><input type="hidden" name="from" value="${esc(d.from || '')}">
       <p><b>${esc(c.name)}</b> sai da carteira: vai para a aba Offline e deixa de contar no painel, no financeiro, nos alertas e nas vagas.</p>
-      <div class="f2">${fld('Data de saída', 'end_date', today(), 'date')}${fld('Motivo (opcional)', 'end_reason', '', 'text', 'placeholder="ex.: encerrou contrato, sem verba"')}</div>
+      ${fld('Data de saída', 'end_date', today(), 'date')}
+      ${reasonField(clientFin(c) === 'inadimplente' && exitReasons().includes('Inadimplência') ? 'Inadimplência' : '')}
       ${open.length && canFin() ? `<label class="cklbl"><input type="checkbox" name="cancel_inv" value="1" checked> Cancelar ${open.length} cobrança(s) em aberto (${brl(open.reduce((a, i) => a + +i.amount, 0))})</label>` : ''}
       ${isAdmin() && c.whatsapp ? `<label class="cklbl"><input type="checkbox" name="send_msg" value="1"> Enviar comunicado de desligamento no WhatsApp (opcional)</label>` : ''}
     </div>`, { form: 'walletSave', footer: `<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn bad">Desativar</button>` });
@@ -1405,6 +1419,12 @@ const F = {
       priscila_start: v.priscila_start, priscila_end: v.priscila_end, morning_hour: v.morning_hour, lock_minutes: num(v.lock_minutes) || 15, reminder_offsets: offs, priscila_finance: form.priscila_finance.checked,
       notify: Object.fromEntries(['tarefas', 'financeiro', 'campanhas', 'conteudo', 'chat'].map(k => [k, !!form['nf_' + k].checked])) };
     await store.upsertSettings(s); S.set = s; await log('Atualizou os ajustes'); toast('Ajustes salvos', '', 'ok'); armLock(); await refresh();
+  },
+  saveReasons: async v => {
+    const list = [...new Set(String(v.list || '').split('\n').map(x => x.trim()).filter(Boolean))].slice(0, 30);
+    if (!list.length) return toast('Escreva pelo menos um motivo', '', 'warn');
+    const s = { ...S.set, exit_reasons: list }; await store.upsertSettings(s); S.set = s;
+    await log('Atualizou os motivos de saída do cliente'); toast('Motivos salvos', `${list.length} frase(s) prontas.`, 'ok'); await refresh();
   },
   saveRecharge: async (v, fd, form) => {
     const msg = String(v.msg || '').trim(); if (!msg) return toast('Escreva o texto do aviso', '', 'warn');
