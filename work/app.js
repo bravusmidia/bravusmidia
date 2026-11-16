@@ -228,7 +228,8 @@ const walletBtn = c => `<button type="button" class="wsw ${inWallet(c) ? 'on' : 
 const walletChip = c => inWallet(c) ? '<span class="chip ok"><i class="dot on"></i>Online</span>' : '<span class="chip"><i class="dot"></i>Offline</span>';
 
 function invStatus(i) {
-  if (i.status === 'pago' || i.status === 'cancelado') return i.status;
+  if (i.status === 'pago' || i.status === 'cancelado' || i.status === 'atrasado') return i.status; /* atrasado = marcado manualmente */
+  if (i.status === 'areceber') return 'pendente'; /* a receber = marcado manualmente, não vira atraso sozinho */
   return i.due_date < today() ? 'atrasado' : 'pendente';
 }
 function clientFin(c) {
@@ -237,6 +238,9 @@ function clientFin(c) {
   if (inv.some(i => invStatus(i) === 'pendente')) return 'a vencer';
   return inv.length ? 'em dia' : 'sem cobrança';
 }
+/* status de pagamento clicável: Pago · A receber · Em atraso (manual) */
+const monthInv = (c, k = curYM()) => S.d.invoices.filter(i => i.client_id === c.id && ym(i.due_date) === k && i.status !== 'cancelado').sort((a, b) => a.due_date.localeCompare(b.due_date));
+const payBtn = c => { const s = clientFin(c); return `<button type="button" class="chip ${s === 'inadimplente' ? 'bad' : s === 'em dia' ? 'ok' : s === 'a vencer' ? 'warn' : ''}" style="cursor:pointer" data-act="payMenu" data-id="${c.id}" title="Clique para marcar: pago, a receber ou em atraso">${esc(s)} ▾</button>`; };
 const finChip = s => `<span class="chip ${s === 'inadimplente' ? 'bad' : s === 'em dia' ? 'ok' : s === 'a vencer' ? 'warn' : ''}">${esc(s)}</span>`;
 const campsOf = id => S.d.campaigns.filter(c => c.client_id === id);
 /* Conta de anúncios: ok, sem saldo ou com problema (informado pela Meta ou registro manual) */
@@ -423,7 +427,7 @@ async function tick() {
     }
     if (isAdmin()) {
       if (nf.financeiro !== false) for (const i of S.d.invoices) {
-        if (i.status !== 'pendente') continue;
+        if (!['pendente', 'areceber'].includes(i.status)) continue;
         const diff = dayDiff(d, i.due_date);
         if ((S.set.reminder_offsets || []).map(Number).includes(diff)) {
           const t = diff < 0 ? `Cobrança vence em ${-diff} dia(s)` : diff === 0 ? 'Cobrança vence hoje' : `Pagamento atrasado há ${diff} dia(s)`;
@@ -701,7 +705,7 @@ V.clientes = () => {
       <div class="row wrap" style="gap:6px">${(c.services || []).map(s => `<span class="chip blue">${esc(svcName(s))}</span>`).join('') || '<span class="muted small">Sem serviços</span>'}</div>
       <div class="ft"><span class="muted">${esc(c.segment || 'Segmento —')} · vence ${esc(dueTxt(c))}</span>${canFin() ? `<b>${brl(c.contract_value)}</b>` : ''}</div>
       ${!inWallet(c) ? `<div class="small muted">Saiu ${c.end_date ? 'em ' + fdateY(c.end_date) : ''}${c.end_reason ? ' · ' + esc(c.end_reason) : ''}${c.start_date ? ` · cliente desde ${fdateY(c.start_date)}` : ''}</div>` : ''}
-      <div class="row">${canFin() ? finChip(clientFin(c)) : ''}${inWallet(c) ? `${c.op_status !== 'ativo' ? `<span class="chip warn">${esc(c.op_status === 'pausado' ? 'Pausado' : 'Em implantação')}</span>` : ''}${['prob', 'saldo'].includes(adState(c).k) ? adChip(c) : ''}` : ''}<span class="sp"></span><span class="small muted">${esc(firstName(c.owner))}</span></div>
+      <div class="row">${canFin() ? (isAdmin() ? payBtn(c) : finChip(clientFin(c))) : ''}${inWallet(c) ? `${c.op_status !== 'ativo' ? `<span class="chip warn">${esc(c.op_status === 'pausado' ? 'Pausado' : 'Em implantação')}</span>` : ''}${['prob', 'saldo'].includes(adState(c).k) ? adChip(c) : ''}` : ''}<span class="sp"></span><span class="small muted">${esc(firstName(c.owner))}</span></div>
     </div>`).join('') : `<div class="card" style="grid-column:1/-1">${empty(S.d.clients.length ? 'Nenhum cliente neste filtro.' : 'Cadastre seu primeiro cliente no botão “+ Cliente”.')}</div>`}</div>`;
 };
 function clientForm(c = {}) {
@@ -732,7 +736,7 @@ function clientDetail(id) {
   const acts = S.d.activity.filter(a => a.client_id === id).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 15);
   const wa = onlyDigits(c.whatsapp || c.phone);
   const wal = `<div class="card row wrap" style="gap:10px;margin-bottom:12px;padding:12px 14px"><div class="sp"><b>Status na carteira</b><div class="small muted">${inWallet(c) ? 'Cliente ativo na carteira' : `Saiu${c.end_date ? ' em ' + fdateY(c.end_date) : ''}${c.end_reason ? ' · ' + esc(c.end_reason) : ''}`}</div></div><div class="tabs" style="margin:0"><button type="button" class="${inWallet(c) ? 'on' : ''}" data-act="setWallet" data-id="${c.id}" data-on="1" data-from="detail"><i class="dot ${inWallet(c) ? 'on' : ''}"></i> Online</button><button type="button" class="${inWallet(c) ? '' : 'on'}" data-act="setWallet" data-id="${c.id}" data-on="0" data-from="detail"><i class="dot"></i> Offline</button></div></div>`;
-  modal(c.name, `${wal}<div class="row wrap" style="gap:6px;margin-bottom:12px">${walletChip(c)}${inWallet(c) && (c.services || []).includes('trafego') ? adChip(c) : ''}${canFin() ? finChip(clientFin(c)) : ''}${(c.services || []).map(s => `<span class="chip blue">${esc(svcName(s))}</span>`).join('')}</div>
+  modal(c.name, `${wal}<div class="row wrap" style="gap:6px;margin-bottom:12px">${walletChip(c)}${inWallet(c) && (c.services || []).includes('trafego') ? adChip(c) : ''}${canFin() ? (isAdmin() ? payBtn(c) : finChip(clientFin(c))) : ''}${(c.services || []).map(s => `<span class="chip blue">${esc(svcName(s))}</span>`).join('')}</div>
     <div class="grid g2" style="gap:10px">
       <div class="card"><h3>Contato</h3><div class="small" style="display:grid;gap:4px"><span>👤 ${esc(c.contact || '—')}</span><span>📱 ${esc(c.whatsapp || c.phone || '—')}</span><span>✉️ ${esc(c.email || '—')}</span><span>📷 ${esc(c.instagram || '—')}</span><span>🏷️ ${esc(c.segment || '—')}</span><span>🧑‍💼 Responsável: ${esc(pname(c.owner))}</span></div></div>
       <div class="card"><h3>Contrato</h3><div class="small" style="display:grid;gap:4px">${canFin() ? `<span>Valor: <b>${brl(c.contract_value)}</b>/mês</span>` : ''}<span>Vencimento: ${esc(dueTxt(c))}${isSplit(c) && canFin() ? ` · ${parts(c).map(p => brl(p[1])).join(' + ')}` : ''}</span><span>Desde: ${c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}</span><span>Conta de anúncios: ${esc(c.ad_account_id || '—')}</span><span>Saldo: ${c.ad_balance != null && c.ad_balance !== '' ? brl(c.ad_balance) + ` (${esc(c.ad_balance_source || 'manual')})` : 'não informado'}</span>${c.ad_synced_at ? `<span class="muted">Meta sincronizada ${ago(c.ad_synced_at)}</span>` : ''}</div></div>
@@ -785,7 +789,7 @@ function importPreview(list) {
 }
 
 /* ---------- FINANCEIRO ---------- */
-const invChip = i => { const s = invStatus(i); return `<span class="chip ${s === 'pago' ? 'ok' : s === 'atrasado' ? 'bad' : s === 'pendente' ? 'warn' : ''}">${s === 'pago' ? 'Pago' : s === 'atrasado' ? 'Atrasado' : s === 'pendente' ? 'A vencer' : 'Cancelado'}</span>`; };
+const invChip = i => { const s = invStatus(i); return `<span ${isAdmin() && s !== 'cancelado' ? `data-act="invMenu" data-id="${i.id}" style="cursor:pointer" title="Clique para alterar"` : ''} class="chip ${s === 'pago' ? 'ok' : s === 'atrasado' ? 'bad' : s === 'pendente' ? 'warn' : ''}">${s === 'pago' ? 'Pago' : s === 'atrasado' ? 'Atrasado' : s === 'pendente' ? 'A vencer' : 'Cancelado'}</span>`; };
 V.financeiro = () => {
   const k = S.finMonth, fm = finMonth(k);
   const inv = S.d.invoices.filter(i => ym(i.due_date) === k || (invStatus(i) === 'atrasado')).sort((a, b) => a.due_date.localeCompare(b.due_date));
@@ -808,7 +812,7 @@ function invoiceForm(i = {}) {
     ${sel('Cliente *', 'client_id', S.d.clients.map(c => [c.id, c.name]), i.client_id, 'required')}
     <div class="f2">${fld('Valor (R$) *', 'amount', i.amount, 'number', 'step="0.01" min="0.01" required')}${fld('Vencimento *', 'due_date', i.due_date || today(), 'date', 'required')}</div>
     ${fld('Descrição', 'description', i.description || 'Mensalidade')}
-    ${i.id ? sel('Status', 'status', [['pendente', 'Pendente'], ['cancelado', 'Cancelado']].concat(i.status === 'pago' ? [['pago', 'Pago']] : []), i.status) : ''}
+    ${i.id ? sel('Status', 'status', [['pendente', 'Automático (pelo vencimento)'], ['areceber', 'A receber'], ['atrasado', 'Em atraso'], ['cancelado', 'Cancelado']].concat(i.status === 'pago' ? [['pago', 'Pago']] : []), i.status) : ''}
     ${fld('Link de pagamento (opcional)', 'payment_url', i.payment_url, 'url', 'placeholder="https://..."')}
   </div>`, { form: 'saveInvoice', footer: `${i.id ? `<button type="button" class="btn bad" data-act="delInvoice" data-id="${i.id}">${ic('trash')}</button><span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
 }
@@ -1101,6 +1105,31 @@ const A = {
   authChangeEmail: () => { AUTH.stage = 'email'; AUTH.pin = ''; renderAuth(); },
   moreMenu: () => modal('Menu', `<div class="list">${NAV.filter(navOk).map(n => `<a class="li" href="#${n[0]}" data-act="closeModal">${ic(n[2])}<div class="t"><b>${n[1]}</b></div>${n[0] === 'alertas' && unread() ? `<span class="badge">${unread()}</span>` : ''}</a>`).join('')}<button class="li" data-act="logout" style="width:100%">${ic('lock')}<div class="t" style="text-align:left"><b>Bloquear / sair</b></div></button></div>`),
   cliFilter: d => { S.cliFilter = d.f; renderView(); },
+  payMenu: d => {
+    const c = client(d.id); if (!c) return; const k = curYM(); const inv = monthInv(c, k); const late = S.d.invoices.filter(i => i.client_id === c.id && ym(i.due_date) < k && invStatus(i) === 'atrasado');
+    const B = (id, st, cur) => `<div class="row" style="gap:6px">${[['pago', 'Pago', 'ok'], ['areceber', 'A receber', 'warn'], ['atrasado', 'Em atraso', 'bad']].map(o => `<button type="button" class="btn sm ${cur === (o[0] === 'areceber' ? 'pendente' : o[0]) ? o[2] : ''}" data-act="invSet" data-id="${id}" data-s="${o[0]}" data-client="${c.id}">${o[1]}</button>`).join('')}</div>`;
+    const line = i => `<div class="li"><div class="t"><b>${brl(i.amount)} · vence ${fdate(i.due_date)}</b><small>${esc(i.description || 'Mensalidade')}</small></div>${B(i.id, null, invStatus(i))}</div>`;
+    modal(`Pagamento · ${c.name}`, `
+      <div class="sec" style="margin-top:0">${esc(monthName(k))}/${k.slice(0, 4)}</div>
+      ${inv.length ? `<div class="list">${inv.map(line).join('')}</div>` : (+c.contract_value > 0 ? `<p class="small muted" style="margin-bottom:10px">Ainda não tem cobrança deste mês. Escolha o status e eu crio a mensalidade${isSplit(c) ? ' (2 parcelas)' : ''} de ${brl(c.contract_value)}:</p><div class="li"><div class="t"><b>${brl(c.contract_value)}</b><small>vence ${esc(dueTxt(c))}</small></div>${B('new', null, '')}</div>` : `<p class="note">Este cliente está sem valor de contrato. Edite o cliente e informe o valor mensal.</p>`)}
+      ${late.length ? `<div class="sec">Meses anteriores em atraso</div><div class="list">${late.map(line).join('')}</div>` : ''}
+      <p class="note" style="margin-top:12px">Pago entra em “Entrou no mês” do painel na data de hoje. A receber e Em atraso ficam como você marcar, sem mudar sozinhos.</p>`,
+      { footer: `<button type="button" class="btn" data-act="openClient" data-id="${c.id}">Ver cliente</button><span class="sp"></span><button type="button" class="btn" data-act="closeModal">Fechar</button>` });
+  },
+  invMenu: d => { const i = S.d.invoices.find(x => x.id === d.id); if (i) A.payMenu({ id: i.client_id }); },
+  invSet: async d => {
+    const c = client(d.client); if (!c) return; const st = d.s; const nm = { pago: 'pago', areceber: 'a receber', atrasado: 'em atraso' }[st];
+    const patch = st === 'pago' ? { status: 'pago', paid_at: today(), method: 'Manual', confirmed_by: S.me.name } : { status: st, paid_at: null };
+    const fail = e => /check|constraint|status/i.test(e && e.message || '');
+    try {
+      if (d.id === 'new') {
+        const k = curYM(); const [y, m] = k.split('-').map(Number); const last = new Date(y, m, 0).getDate(); const ps = parts(c);
+        for (let j = 0; j < ps.length; j++) await store.insert('invoices', { client_id: c.id, amount: ps[j][1], due_date: `${k}-${pad(Math.min(ps[j][0], last))}`, description: `Mensalidade ${monthName(k)}/${y}${ps.length > 1 ? ` (${j + 1}/2)` : ''}`, ...patch });
+      } else await store.update('invoices', d.id, patch);
+    } catch (e) { if (fail(e)) return toast('O banco ainda não aceita esse status', 'Rode o SQL v1.7 no Supabase.', 'warn'); throw e; }
+    await log(`Marcou ${c.name} como ${nm}`, c.id);
+    toast(`${c.name}: ${nm}`, 'Painel e financeiro atualizados.', 'ok'); await refresh(); renderView(); A.payMenu({ id: c.id });
+  },
   pickReason: (d, el) => { const f = el.closest('form'); if (!f) return; f.end_reason.value = d.v; f.querySelectorAll('[data-act="pickReason"]').forEach(b => b.classList.toggle('blue', b === el)); },
   reasonsReset: () => { const t = $('form[data-form="saveReasons"] textarea[name="list"]'); if (t) t.value = DEFAULT_SETTINGS.exit_reasons.join('\n'); toast('Lista padrão restaurada', 'Clique em salvar para gravar.'); },
   editMeet: d => meetForm(d.id ? S.d.tasks.find(t => t.id === d.id) : (d.client ? { client_id: d.client, meet_type: 'alinhamento' } : {})),
