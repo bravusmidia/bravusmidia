@@ -372,7 +372,7 @@ async function notifyUsers(ids, title, body, type = 'info', key = null, route = 
   }
 }
 const admins = () => team().filter(p => p.role === 'admin').map(p => p.id);
-const finPeople = () => team().filter(p => p.role === 'admin' || S.set.priscila_finance).map(p => p.id);
+const finPeople = () => team().map(p => p.id);
 
 async function systemPop(n) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
@@ -386,9 +386,9 @@ function popNew() {
   const mine = S.d.notifications.filter(n => n.user_id === S.me.id && !n.read && n.created_at >= S.startedAt && !S.popped.has(n.id));
   mine.forEach(n => S.popped.add(n.id));
   if (mine.length > 2) {
-    toast(`${mine.length} novos alertas`, 'Toque no sino para ver todos.', mine.some(n => n.type === 'alerta') ? 'bad' : '');
+    popup(`${mine.length} novos avisos`, mine.slice(0, 3).map(n => n.title).join(' · '), { type: mine.some(n => n.type === 'alerta') ? 'bad' : '', route: 'alertas' });
     systemPop({ title: `Bravus Work · ${mine.length} novos alertas`, body: mine.slice(0, 3).map(n => n.title).join(' · '), key: 'batch', route: 'alertas' });
-  } else mine.forEach(n => { toast(n.title, n.body, n.type === 'alerta' ? 'bad' : n.type === 'pago' ? 'ok' : ''); systemPop(n); });
+  } else mine.forEach(n => { if (n.type === 'chat') return systemPop(n); popup(n.title, n.body, { type: n.type === 'alerta' ? 'bad' : n.type === 'pago' ? 'ok' : '', route: n.route }); systemPop(n); });
 }
 
 /* motor de alertas que roda no aparelho (o servidor também roda via pg_cron) */
@@ -408,6 +408,9 @@ async function tick() {
       if (fu && fu.goal) body += ` ${fu.goal - (fu.count || 0)} follow-ups pendentes.`;
       const dow = new Date().getDay();
       await notifyUsers([me.id], `${dow === 0 || dow === 6 ? 'Bravus Weekend' : (h => h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite')(new Date().getHours())}, ${firstName(me.id)}! Confira sua programação.`, body, 'rotina', `morning:${d}`, 'agenda');
+    }
+    if (nf.tarefas !== false && hm >= '16:00') for (const t of mineToday.filter(t => t.goal && (t.count || 0) < t.goal && t.status !== 'feito')) {
+      await notifyUsers([me.id], `Faltam ${t.goal - (t.count || 0)} para a meta: ${t.title}`, `Você fez ${t.count || 0} de ${t.goal} hoje. Bora fechar o dia! 💪`, 'tarefa', `goal:${t.id}:${d}`, 'agenda');
     }
     if (nf.tarefas !== false) for (const t of mineToday) {
       if (t.status === 'feito' || !t.time) continue;
@@ -539,9 +542,9 @@ async function startSession(userId) {
   }
   await heartbeat(); await log('Entrou no app');
   S.route = (location.hash.replace(/^#\/?/, '') || 'painel').split('?')[0];
-  render(); tick();
+  render(); tick(); setTimeout(releaseNotice, 800); checkVersion();
   timers.forEach(clearInterval);
-  timers = [setInterval(tick, 60000), setInterval(heartbeat, 60000), setInterval(() => { if (!document.hidden && !$('#modal-root').innerHTML && ['painel', 'equipe', 'chat'].includes(S.route)) renderView(); }, 30000)];
+  timers = [setInterval(tick, 60000), setInterval(heartbeat, 60000), setInterval(checkVersion, 30 * 60000), setInterval(() => { if (!document.hidden && !$('#modal-root').innerHTML && ['painel', 'equipe'].includes(S.route)) renderView(); if (CW.open) renderChat(); }, 30000)];
   armLock();
 }
 async function logout(silent) {
@@ -564,7 +567,7 @@ function armLock() {
 const NAV = [
   ['painel', 'Painel', 'grid'], ['clientes', 'Clientes', 'users'],
   ['financeiro', 'Financeiro', 'wallet', 'fin'], ['agenda', 'Agenda', 'cal'], ['reunioes', 'Reuniões', 'meet'], ['metas', 'Metas', 'target'], ['conteudo', 'Conteúdo', 'film'],
-  ['chat', 'Chat', 'chat'], ['equipe', 'Equipe', 'team'], ['alertas', 'Alertas', 'bell'],
+  ['equipe', 'Equipe', 'team'], ['alertas', 'Alertas', 'bell'],
   ['ajustes', 'Ajustes', 'gear', 'admin']
 ];
 const navOk = n => !n[3] || (n[3] === 'fin' ? canFin() : isAdmin());
@@ -587,20 +590,19 @@ function render() {
       <div class="mtop"><img src="icons/icon.svg" alt=""><b>BRAVUS <span>WORK</span></b><a class="btn sm ic" href="#alertas" style="position:relative">${ic('bell')}${unread() ? `<span class="badge" style="position:absolute;top:-6px;right:-6px">${unread()}</span>` : ''}</a><button class="btn sm ic" data-act="logout" title="Bloquear">${ic('lock')}</button></div>
       <div id="view"></div>
     </main>
-    <nav class="bnav">${[['painel', 'Painel', 'grid'], ['clientes', 'Clientes', 'users'], ['agenda', 'Agenda', 'cal'], ['chat', 'Chat', 'chat']].map(n => `<a href="#${n[0]}" class="${S.route === n[0] ? 'on' : ''}">${ic(n[2])}${n[1]}${badge(n[0])}</a>`).join('')}<button data-act="moreMenu">${ic('more')}Mais</button></nav>
+    <button id="cwFab" class="cw-fab" data-act="chatToggle" aria-label="Chat da equipe">${ic('chat')}</button>
+    <section id="cw" class="cw"></section>
+    <nav class="bnav">${[['painel', 'Painel', 'grid'], ['clientes', 'Clientes', 'users'], ['agenda', 'Agenda', 'cal'], ['reunioes', 'Reuniões', 'meet']].map(n => `<a href="#${n[0]}" class="${S.route === n[0] ? 'on' : ''}">${ic(n[2])}${n[1]}${badge(n[0])}</a>`).join('')}<button data-act="moreMenu">${ic('more')}Mais</button></nav>
   </div>`;
-  renderView();
+  renderView(); renderChat(true);
 }
 function renderView() {
   const v = $('#view'); if (!v) return;
+  if (S.route === 'chat') { S.route = 'painel'; history.replaceState(null, '', '#painel'); CW.open = true; CW.tab = 'chat'; lsSet('bw_cw_open', true); setTimeout(() => renderChat(true)); }
   if (!NAV.some(n => n[0] === S.route && navOk(n))) { S.route = 'painel'; if (location.hash !== '#painel') history.replaceState(null, '', '#painel'); }
   const keep = $('#chatInput') && $('#chatInput').value;
   try { v.innerHTML = (V[S.route] || V.painel)(); } catch (e) { console.error(e); v.innerHTML = `<div class="card warnbox">Erro ao montar a tela: ${esc(e.message)}</div>`; }
-  if (S.route === 'chat') {
-    const box = $('.msgs'); if (box) box.scrollTop = box.scrollHeight;
-    if (keep) $('#chatInput').value = keep;
-    lastChatSeen = new Date().toISOString(); lsSet('bw_chat_seen', lastChatSeen);
-  }
+
   document.querySelectorAll('.nav a, .bnav a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + S.route));
 }
 const head = (title, sub = '', actions = '') => `<div class="top"><h1>${esc(title)}${sub ? `<small>${sub}</small>` : ''}</h1>${actions}</div>`;
@@ -954,14 +956,85 @@ function contentForm(c = {}) {
   </div>`, { form: 'saveContent', footer: `${c.id ? `<button type="button" class="btn bad" data-act="delContent" data-id="${c.id}">${ic('trash')}</button><span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
 }
 
-/* ---------- CHAT ---------- */
-V.chat = () => {
-  const ms = S.d.messages.slice().sort((a, b) => a.created_at.localeCompare(b.created_at)).slice(-200);
-  let lastDay = '';
-  return head('Chat da equipe', team().map(p => `<span style="display:inline-flex;align-items:center;gap:5px;margin-right:12px"><i class="dot ${isOnline(p) ? 'on' : ''}"></i>${esc(p.name.split(' ')[0])} ${isOnline(p) ? 'online' : '· ' + ago(p.last_seen)}</span>`).join('')) + `
-  <div class="card chat"><div class="msgs">${ms.length ? ms.map(m => { const day = (m.created_at || '').slice(0, 10); const sep = day !== lastDay ? `<div class="small muted" style="text-align:center;margin:6px 0">${new Date(m.created_at).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })}</div>` : ''; lastDay = day; const mine = m.user_id === S.me.id; return `${sep}<div class="msg ${mine ? 'me' : ''}">${mine ? '' : `<div class="au">${esc(firstName(m.user_id))}</div>`}${esc(m.text)}<small>${ftime(m.created_at)}</small></div>`; }).join('') : empty('Comece a conversa — anotações, recados e combinados ficam salvos aqui.')}</div>
-  <form class="cbox" data-form="sendMsg"><textarea id="chatInput" name="text" placeholder="Mensagem ou anotação…" maxlength="4000" required></textarea><button class="btn pri ic" aria-label="Enviar">${ic('send')}</button></form></div>`;
-};
+/* =====================================================================
+   CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
+   ===================================================================== */
+const RELEASE = { version: '2.0', notes: [
+  'Chat flutuante no canto direito: converse enquanto mexe em qualquer tela.',
+  'Aba Anotações no chat para guardar o que é importante (fixe qualquer mensagem com 📌).',
+  'Confirmação de leitura: ✓ enviado · ✓✓ visto.',
+  'Avisos na tela de tudo: mensagens, cliente novo, pagamentos, vencimentos, reuniões e prospecção.',
+  'Tela de Metas, Reuniões e controle manual de pagamentos.'
+] };
+const CW = { open: lsGet('bw_cw_open', false), tab: 'chat', seenSent: 0 };
+const msgTime = iso => { const d = new Date(iso), h = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); return d.toDateString() === new Date().toDateString() ? h : `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} ${h}`; };
+const seenBy = m => team().filter(p => p.id !== m.user_id && p.chat_seen_at && p.chat_seen_at >= m.created_at);
+function cwShell() {
+  const others = team().filter(p => p.id !== S.me.id);
+  return `<header class="cw-hd"><div class="sp"><b>Chat da equipe</b><small>${others.map(p => `<span><i class="dot ${isOnline(p) ? 'on' : ''}"></i>${esc(firstName(p.id))} ${isOnline(p) ? 'online' : '· ' + ago(p.last_seen)}</span>`).join('')}</small></div>
+      <button class="btn sm ic" data-act="chatToggle" aria-label="Fechar">${ic('x')}</button></header>
+    <div class="cw-tabs"><button class="${CW.tab === 'chat' ? 'on' : ''}" data-act="cwTab" data-t="chat">${ic('chat')}Conversa</button><button class="${CW.tab === 'notas' ? 'on' : ''}" data-act="cwTab" data-t="notas">📌 Anotações <span class="muted">${S.d.messages.filter(m => m.pinned).length || ''}</span></button></div>
+    <div class="cw-list" id="cwList">${cwList()}</div>
+    <form class="cw-form" data-form="${CW.tab === 'chat' ? 'sendMsg' : 'sendNote'}"><textarea id="chatInput" name="text" rows="1" maxlength="4000" placeholder="${CW.tab === 'chat' ? 'Escreva uma mensagem…' : 'Nova anotação importante…'}" required></textarea><button class="btn pri ic" aria-label="Enviar">${ic('send')}</button></form>`;
+}
+function cwList() {
+  if (CW.tab === 'notas') {
+    const ns = S.d.messages.filter(m => m.pinned).sort((a, b) => b.created_at.localeCompare(a.created_at));
+    return ns.length ? ns.map(m => `<div class="cw-note"><div class="row" style="gap:6px"><b class="small">${esc(firstName(m.user_id))}</b><span class="small muted">${msgTime(m.created_at)}</span><span class="sp"></span><button class="btn sm ic" data-act="msgPin" data-id="${m.id}" title="Tirar das anotações">${ic('x')}</button>${m.user_id === S.me.id || isAdmin() ? `<button class="btn sm ic" data-act="msgDel" data-id="${m.id}" title="Apagar">${ic('trash')}</button>` : ''}</div><p>${esc(m.text)}</p></div>`).join('')
+      : `<div class="cw-empty">Nada anotado ainda.<br><span class="small">Escreva abaixo ou toque em 📌 numa mensagem da conversa.</span></div>`;
+  }
+  const ms = S.d.messages.slice().sort((a, b) => a.created_at.localeCompare(b.created_at)).slice(-150);
+  if (!ms.length) return `<div class="cw-empty">Nenhuma mensagem ainda. Diga um oi 👋</div>`;
+  let lastDay = ''; const lastMine = [...ms].reverse().find(m => m.user_id === S.me.id);
+  return ms.map(m => { const mine = m.user_id === S.me.id, day = (m.created_at || '').slice(0, 10);
+    const sep = day !== lastDay ? `<div class="cw-day">${new Date(m.created_at).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })}</div>` : ''; lastDay = day;
+    const sb2 = mine ? seenBy(m) : []; const tick = mine ? (sb2.length ? '<span class="ck2 on" title="Visto">✓✓</span>' : '<span class="ck2" title="Enviado">✓</span>') : '';
+    return `${sep}<div class="cw-m ${mine ? 'me' : ''}">${mine ? '' : `<small class="cw-who">${esc(firstName(m.user_id))}</small>`}<div class="cw-b">${esc(m.text)}<span class="cw-t">${msgTime(m.created_at).slice(-5)} ${tick}</span><button class="cw-pin ${m.pinned ? 'on' : ''}" data-act="msgPin" data-id="${m.id}" title="${m.pinned ? 'Tirar das anotações' : 'Guardar nas anotações'}">📌</button></div>${mine && m === lastMine && sb2.length ? `<small class="cw-seen">Visto por ${sb2.map(p => esc(firstName(p.id))).join(', ')} · ${msgTime(sb2.map(p => p.chat_seen_at).sort().pop())}</small>` : ''}</div>`; }).join('');
+}
+function renderChat(full = false) {
+  const box = $('#cw'), fab = $('#cwFab'); if (!box || !S.me) return;
+  const n = chatUnread(); if (fab) { fab.classList.toggle('hide', CW.open); fab.querySelector('.badge') && fab.querySelector('.badge').remove(); if (n && !CW.open) fab.insertAdjacentHTML('beforeend', `<span class="badge">${n}</span>`); }
+  box.classList.toggle('on', CW.open); if (!CW.open) { box.innerHTML = ''; return; }
+  const list = $('#cwList');
+  if (full || !list) { const draft = $('#chatInput') && $('#chatInput').value; box.innerHTML = cwShell(); if (draft) $('#chatInput').value = draft; }
+  else { const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 60; list.innerHTML = cwList(); if (!atBottom) return markChatSeen(); }
+  const l = $('#cwList'); if (l && CW.tab === 'chat') l.scrollTop = l.scrollHeight;
+  markChatSeen();
+}
+async function markChatSeen() {
+  if (!CW.open || CW.tab !== 'chat' || document.hidden) return;
+  lastChatSeen = new Date().toISOString(); lsSet('bw_chat_seen', lastChatSeen); renderShellBadges();
+  const last = S.d.messages.filter(m => m.user_id !== S.me.id).map(m => m.created_at).sort().pop();
+  if (!last || (S.me.chat_seen_at && S.me.chat_seen_at >= last) || Date.now() - CW.seenSent < 4000) return;
+  CW.seenSent = Date.now(); try { await store.update('profiles', S.me.id, { chat_seen_at: new Date().toISOString() }); } catch {}
+}
+/* popup na tela (estilo PRIBANK): ícone/foto, título, texto, clique abre o lugar certo */
+function popup(title, body = '', { type = '', who = null, route = null, act = null, ms = 7000 } = {}) {
+  const el = document.createElement('div'); el.className = 'toast pop ' + type;
+  el.innerHTML = `${who ? avatar(prof(who), 34) : `<span class="pop-ic">${ic(type === 'bad' ? 'bell' : type === 'ok' ? 'check' : type === 'chat' ? 'chat' : 'spark')}</span>`}<div class="sp"><b>${esc(title)}</b>${body ? `<span class="small muted">${esc(body)}</span>` : ''}</div><button class="pop-x" aria-label="Fechar">×</button>`;
+  el.addEventListener('click', e => { el.remove(); if (e.target.classList.contains('pop-x')) return; if (act) act(); else if (route) location.hash = route; });
+  const box = $('#toasts'); box.appendChild(el); while (box.children.length > 4) box.firstChild.remove(); setTimeout(() => el.remove(), ms);
+}
+const popMsgSeen = new Set();
+function popMsgs() {
+  const fresh = S.d.messages.filter(m => m.user_id !== S.me.id && m.created_at >= S.startedAt && !popMsgSeen.has(m.id));
+  fresh.forEach(m => popMsgSeen.add(m.id));
+  if (CW.open && CW.tab === 'chat' && !document.hidden) return;
+  fresh.slice(-3).forEach(m => popup(`${firstName(m.user_id)}${m.pinned ? ' anotou' : ''}`, m.text.slice(0, 140), { type: 'chat', who: m.user_id, act: () => { CW.open = true; CW.tab = m.pinned ? 'notas' : 'chat'; lsSet('bw_cw_open', true); renderChat(true); } }));
+}
+const notifyTeam = (title, body, type = 'info', key = null, route = null) => notifyUsers(team().filter(p => p.id !== S.me.id).map(p => p.id), title, body, type, key, route);
+/* aviso de versão nova */
+function releaseNotice() {
+  if (lsGet('bw_version_seen', '') === RELEASE.version) return;
+  modal(`Versão ${RELEASE.version}`, `<div style="text-align:center;margin-bottom:14px"><div class="rel-ic">${ic('spark')}</div><p style="font-size:18px;font-weight:700;line-height:1.3">Andrade acabou de atualizar o Bravus Work para a versão ${RELEASE.version}!</p></div>
+    <div class="sec" style="margin-top:0">O que mudou</div><ul class="rel">${RELEASE.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>`, { footer: `<span class="sp"></span><button type="button" class="btn pri" data-act="releaseOk">Entendi</button>` });
+  if (isAdmin()) notifyTeam(`Andrade atualizou o Bravus Work para a versão ${RELEASE.version}`, RELEASE.notes[0], 'info', `release:${RELEASE.version}`, 'painel');
+}
+async function checkVersion() {
+  try { const r = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' }); if (!r.ok) return; const v = (await r.json()).version;
+    if (v && v !== RELEASE.version && !$('#updBar')) document.body.insertAdjacentHTML('beforeend', `<div id="updBar" class="updbar">${ic('spark')}<span>Andrade atualizou o Bravus Work para a versão <b>${esc(v)}</b>.</span><button class="btn sm pri" data-act="updateNow">Atualizar</button></div>`);
+  } catch {}
+}
 
 /* ---------- EQUIPE ---------- */
 V.equipe = () => {
@@ -1040,10 +1113,17 @@ V.metas = () => {
   const g10 = goals().revenue;
   return head('Metas', 'Bravus Goals · acompanhe o mês e o caminho até a meta', isAdmin() ? `<button class="btn pri" data-act="editGoals">${ic('edit')}Editar metas</button>` : '') + `
     <div class="datebar" style="margin-bottom:14px"><button class="btn sm ic" data-act="goalMonth" data-m="${shift(-1)}">${ic('left')}</button><b>${label}</b><button class="btn sm ic" data-act="goalMonth" data-m="${shift(1)}">${ic('right')}</button></div>
-    <div class="grid g3" style="margin-bottom:14px">
-      ${kpi('Metas batidas', `${done}<span class="muted" style="font-size:15px"> / ${rows.length}</span>`, done === rows.length ? 'todas batidas 🎯' : 'no mês', 'hl')}
+    ${canFin() ? (() => { const fm = finMonth(k), prev = fm.recebido + fm.aReceber, nAt = new Set(S.d.invoices.filter(i => invStatus(i) === 'atrasado').map(i => i.client_id)).size; return `<div class="grid g4" style="margin-bottom:14px">
+      ${kpi('Entrou no mês', brl(fm.recebido), `${Math.round(fm.recebido / (g10 || 1) * 100)}% da meta de ${brl(g10)}`, 'hl')}
+      ${kpi('A receber', brl(fm.aReceber), `previsão do mês: ${brl(prev)}`, 'y')}
+      ${kpi('Em atraso', brl(fm.atrasado), `${nAt} cliente(s)`, fm.atrasado ? 'r' : '')}
+      ${kpi('Falta para a meta', brl(Math.max(0, g10 - fm.recebido)), prev >= g10 ? 'se todos pagarem, a meta é batida ✅' : `mesmo se todos pagarem, faltam ${brl(g10 - prev)}`, fm.recebido >= g10 ? 'g' : '')}
+    </div>`; })() : ''}
+    <div class="grid g4" style="margin-bottom:14px">
+      ${kpi('Clientes ativos', `${S.d.clients.filter(inWallet).length}<span class="muted" style="font-size:15px"> / ${goals().clients}</span>`, canFin() ? `receita mensal ${brl(mrr())}` : 'na carteira')}
+      ${kpi('Ticket médio', canFin() ? brl(mrr() / (S.d.clients.filter(inWallet).length || 1)) : '—', canFin() && mrr() < goals().mrr ? `faltam ${Math.ceil((goals().mrr - mrr()) / ((mrr() / (S.d.clients.filter(inWallet).length || 1)) || 697))} cliente(s) nesse valor p/ a meta recorrente` : 'por cliente ativo')}
+      ${kpi('Metas batidas', `${done}<span class="muted" style="font-size:15px"> / ${rows.length}</span>`, done === rows.length ? 'todas batidas 🎯' : 'no mês')}
       ${kpi('Progresso médio', avg + '%', `${pace}% do mês já passou`, avg >= pace ? 'g' : 'y')}
-      ${canFin() ? kpi('Falta para a meta', brl(Math.max(0, g10 - finMonth(k).recebido)), `de faturamento (meta ${brl(g10)})`, finMonth(k).recebido >= g10 ? 'g' : '') : kpi('Dias restantes', Math.max(0, dim - elapsed), 'até o fim do mês')}
     </div>
     <div class="grid g2">${rows.map(r => { const ok = r.goal && r.val >= r.goal; const behind = !ok && k === curYM() && r.pct < pace - 10;
       return `<div class="card goal"><div class="row" style="margin-bottom:10px">${ic(r.icon)}<b class="sp">${esc(r.name)}</b>${ok ? '<span class="chip ok">Batida</span>' : behind ? '<span class="chip warn">Abaixo do ritmo</span>' : '<span class="chip blue">No caminho</span>'}</div>
@@ -1123,6 +1203,12 @@ const A = {
   authChangeEmail: () => { AUTH.stage = 'email'; AUTH.pin = ''; renderAuth(); },
   moreMenu: () => modal('Menu', `<div class="list">${NAV.filter(navOk).map(n => `<a class="li" href="#${n[0]}" data-act="closeModal">${ic(n[2])}<div class="t"><b>${n[1]}</b></div>${n[0] === 'alertas' && unread() ? `<span class="badge">${unread()}</span>` : ''}</a>`).join('')}<button class="li" data-act="logout" style="width:100%">${ic('lock')}<div class="t" style="text-align:left"><b>Bloquear / sair</b></div></button></div>`),
   cliFilter: d => { S.cliFilter = d.f; renderView(); },
+  chatToggle: () => { CW.open = !CW.open; lsSet('bw_cw_open', CW.open); renderChat(true); if (CW.open && innerWidth > 860) setTimeout(() => $('#chatInput') && $('#chatInput').focus(), 50); },
+  cwTab: d => { CW.tab = d.t; renderChat(true); },
+  msgPin: async d => { const m = S.d.messages.find(x => x.id === d.id); if (!m) return; try { await store.update('messages', m.id, { pinned: !m.pinned }); } catch (e) { return toast('Anotações ainda não ativadas no banco', 'Falta rodar o SQL v2.0 no Supabase.', 'warn'); } if (!m.pinned) toast('Guardado nas anotações', '', 'ok'); await loadAll('messages'); renderChat(); },
+  msgDel: d => confirmBox('Apagar anotação?', 'Ela some para todos.', 'Apagar', async () => { await store.remove('messages', d.id); await loadAll('messages'); renderChat(true); }, true),
+  releaseOk: () => { lsSet('bw_version_seen', RELEASE.version); closeModal(); },
+  updateNow: async () => { try { const r = await navigator.serviceWorker?.getRegistration(); await r?.update(); } catch {} location.reload(); },
   setRole: d => { const p = prof(d.id); if (!p || !isAdmin() || p.id === S.me.id) return; const toAdmin = p.role !== 'admin'; const nm = p.name.split(' ')[0];
     confirmBox(toAdmin ? `Dar acesso de administrador a ${nm}?` : `Tirar o acesso de administrador de ${nm}?`, toAdmin ? `${esc(nm)} vai poder <b>cadastrar, editar, ativar e desativar clientes</b>, marcar pagamentos, ver o financeiro, mexer em Ajustes e alterar senhas da equipe — igual a você.` : `${esc(nm)} volta a ser membro: vê os clientes, mas não altera cadastro, status nem pagamentos.`, toAdmin ? 'Dar admin' : 'Tirar admin', async () => {
       await store.update('profiles', p.id, { role: toAdmin ? 'admin' : 'comercial' }); await log(`${toAdmin ? 'Deu' : 'Tirou'} acesso de administrador ${toAdmin ? 'para' : 'de'} ${p.name}`);
@@ -1162,6 +1248,7 @@ const A = {
       } else await store.update('invoices', d.id, patch);
     } catch (e) { if (fail(e)) return toast('O banco ainda não aceita esse status', 'Rode o SQL v1.7 no Supabase.', 'warn'); throw e; }
     await log(`Marcou ${c.name} como ${nm}`, c.id);
+    await notifyTeam(st === 'pago' ? `Pagamento recebido: ${c.name} 💰` : st === 'atrasado' ? `${c.name} está em atraso` : `${c.name}: mensalidade a receber`, `Marcado por ${firstName(S.me.id)}`, st === 'pago' ? 'pago' : st === 'atrasado' ? 'alerta' : 'financeiro', null, 'financeiro');
     toast(`${c.name}: ${nm}`, 'Painel e financeiro atualizados.', 'ok'); await refresh(); renderView(); A.payMenu({ id: c.id });
   },
   pickReason: (d, el) => { const f = el.closest('form'); if (!f) return; f.end_reason.value = d.v; f.querySelectorAll('[data-act="pickReason"]').forEach(b => b.classList.toggle('blue', b === el)); },
@@ -1347,7 +1434,7 @@ const F = {
     const noCol = e => /end_date|end_reason|installments|due_day2|column/i.test(e && e.message || '');
     const save = r => v.id ? store.update('clients', v.id, r) : store.insert('clients', r);
     let saved; try { saved = await save(row); } catch (e) { if (!noCol(e)) throw e; delete row.end_date; delete row.end_reason; delete row.installments; delete row.due_day2; saved = await save(row); toast('Banco ainda sem alguns campos', 'Rode o SQL v1.5 no Supabase para guardar o parcelamento e a saída.', 'warn'); }
-    if (v.id) await log(`Atualizou o cadastro de ${row.name}`, v.id); else await log(`Cadastrou o cliente ${row.name}`, saved && saved.id);
+    if (v.id) await log(`Atualizou o cadastro de ${row.name}`, v.id); else { await log(`Cadastrou o cliente ${row.name}`, saved && saved.id); await notifyTeam(`Cliente novo: ${row.name} 🎉`, `${row.contract_value ? brl(row.contract_value) + '/mês · ' : ''}vence ${dueTxt(row)}`, 'pago', null, 'clientes'); }
     closeModal(); toast('Cliente salvo', '', 'ok'); await refresh();
   },
   saveProfile: async v => {
@@ -1371,6 +1458,7 @@ const F = {
     await log(on ? `${c.name} foi ativado (voltou para a carteira)` : `${c.name} foi desativado (saiu da carteira)${row.end_reason ? ': ' + row.end_reason : ''}${nInv ? ` · ${nInv} cobrança(s) cancelada(s)` : ''}`, c.id);
     closeModal(); await refresh(); renderView();
     toast(on ? `${c.name} ativado` : `${c.name} desativado`, on ? 'Voltou para a carteira (online).' : `Foi para a aba Offline${nInv ? ' e as cobranças em aberto foram canceladas' : ''}.`, 'ok');
+    await notifyTeam(on ? `${c.name} voltou para a carteira` : `${c.name} saiu da carteira`, on ? 'Cliente ativo novamente.' : (row.end_reason || 'Cliente desativado.'), on ? 'pago' : 'alerta', null, 'clientes');
     if (!on && v.send_msg) return noticeModal('shutdown', c.id);
     if (v.from === 'detail') clientDetail(c.id);
   },
@@ -1404,8 +1492,8 @@ const F = {
     const extra = ['contact_name', 'company', 'phone', 'meet_type', 'meet_format', 'outcome'];
     const save = r => v.id ? store.update('tasks', v.id, r) : store.insert('tasks', { ...r, status: 'pendente', count: 0, is_template: false });
     try { await save(row); } catch (e) { if (!/column|contact_name|company|meet_|outcome|phone/i.test(e && e.message || '')) throw e; extra.forEach(x => delete row[x]); await save(row); toast('Reunião salva sem os detalhes', 'O banco ainda não tem os campos de reunião (SQL v1.4).', 'warn'); }
-    if (!v.id) { await log(`Marcou reunião com ${who} · ${fdate(v.date)} ${v.time}`, row.client_id); if (row.assignee !== S.me.id) await notifyUsers([row.assignee], `Nova reunião de ${firstName(S.me.id)}`, `${who} · ${fdate(v.date)} ${v.time}`, 'tarefa', null, 'reunioes'); }
-    else if (v.outcome === 'fechou') await log(`Reunião com ${who}: fechou negócio 🎉`, row.client_id);
+    if (!v.id) { await log(`Marcou reunião com ${who} · ${fdate(v.date)} ${v.time}`, row.client_id); await notifyTeam(`Reunião marcada com ${who}`, `${fdate(v.date)} às ${v.time} · ${firstName(row.assignee)} · por ${firstName(S.me.id)}`, 'tarefa', null, 'reunioes'); }
+    else if (v.outcome === 'fechou') { await log(`Reunião com ${who}: fechou negócio 🎉`, row.client_id); await notifyTeam(`Fechou negócio com ${who}! 🎉`, `Registrado por ${firstName(S.me.id)}`, 'pago', `won:${v.id}`, 'reunioes'); }
     closeModal(); toast(v.id ? 'Reunião atualizada' : 'Reunião marcada', `${who} · ${fdate(v.date)} às ${v.time}`, 'ok'); await refresh();
   },
   saveTask: async (v, fd, form) => {
@@ -1434,9 +1522,17 @@ const F = {
   sendMsg: async (v, fd, form) => {
     const text = (v.text || '').trim(); if (!text) return;
     form.text.value = ''; await store.insert('messages', { user_id: S.me.id, text });
-    if ((S.set.notify || {}).chat !== false) await notifyUsers(team().filter(p => p.id !== S.me.id && !isOnline(p)).map(p => p.id), `Mensagem de ${firstName(S.me.id)}`, text.slice(0, 120), 'chat', null, 'chat');
-    await loadAll('messages'); renderView(); $('#chatInput') && $('#chatInput').focus();
+    if ((S.set.notify || {}).chat !== false) await notifyUsers(team().filter(p => p.id !== S.me.id).map(p => p.id), `Mensagem de ${firstName(S.me.id)}`, text.slice(0, 120), 'chat', null, 'chat');
+    await loadAll('messages'); renderChat(true); $('#chatInput') && $('#chatInput').focus();
   },
+  sendNote: async (v, fd, form) => {
+    const text = (v.text || '').trim(); if (!text) return;
+    form.text.value = '';
+    try { await store.insert('messages', { user_id: S.me.id, text, pinned: true }); } catch (e) { return toast('Anotações ainda não ativadas no banco', 'Falta rodar o SQL v2.0 no Supabase.', 'warn'); }
+    await notifyTeam(`${firstName(S.me.id)} fez uma anotação`, text.slice(0, 120), 'chat', null, 'chat');
+    await loadAll('messages'); renderChat(true);
+  },
+
   saveSettings: async (v, fd, form) => {
     const offs = String(v.reminder_offsets || '').split(/[,; ]+/).filter(x => x !== '').map(Number).filter(n => Number.isFinite(n) && Math.abs(n) <= 60);
     const s = { ...S.set, agency_name: v.agency_name, max_clients: num(v.max_clients) || 20, calls_start: v.calls_start, meetings_start: v.meetings_start, prospect_goal: num(v.prospect_goal) || 0, followup_goal: num(v.followup_goal) || 0,
@@ -1492,7 +1588,7 @@ const F = {
    EVENTOS GLOBAIS
    ===================================================================== */
 let refreshing;
-async function refresh(t) { await loadAll(t); if (S.me) { popNew(); if ($('#modal-root').innerHTML && !t) {} renderShellBadges(); renderView(); } }
+async function refresh(t) { await loadAll(t); if (S.me) { popNew(); popMsgs(); renderShellBadges(); if (!t || t !== 'messages') renderView(); if (!t || ['messages', 'profiles'].includes(t)) renderChat(); } }
 function renderShellBadges() { if (!$('.shell')) return render(); const cur = $('.nav'); if (!cur) return; const u = unread(), c = chatUnread();
   document.querySelectorAll('.nav a, .bnav a').forEach(a => { const k = a.getAttribute('href').slice(1); let b = a.querySelector('.badge'); const n = k === 'alertas' ? u : k === 'chat' && S.route !== 'chat' ? c : 0; if (n) { if (!b) { b = document.createElement('span'); b.className = 'badge'; a.appendChild(b); } b.textContent = n; } else if (b) b.remove(); });
   const mb = $('.mtop a[href="#alertas"]'); if (mb) { let b = mb.querySelector('.badge'); if (u) { if (!b) { b = document.createElement('span'); b.className = 'badge'; b.style.cssText = 'position:absolute;top:-6px;right:-6px'; mb.appendChild(b); } b.textContent = u; } else if (b) b.remove(); } }
