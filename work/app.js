@@ -162,6 +162,8 @@ const pname = id => (prof(id) || {}).name || '—';
 const firstName = id => pname(id).split(' ')[0];
 const client = id => S.d.clients.find(c => c.id === id);
 const cname = id => (client(id) || {}).name || 'Bravus Mídia';
+const cargo = p => (p && p.title) || (p && p.role === 'admin' ? 'Administrador' : 'Comercial · co-founder');
+const CARGOS = ['CEO / Fundador', 'Co-founder', 'Gestor de tráfego', 'Comercial', 'Social media', 'Designer', 'Editor de vídeo', 'Copywriter', 'Atendimento', 'Financeiro', 'Estagiário'];
 const team = () => S.d.profiles.filter(p => p.role === 'admin' || p.role === 'comercial');
 const isOnline = p => p && p.last_seen && (Date.now() - new Date(p.last_seen)) < 150000;
 const avatar = (p, size = 36) => `<span class="av" style="background:${p && p.avatar_url ? `#0b1a3d url('${esc(p.avatar_url)}') center/cover` : esc(p && p.color || '#2f7bff')};width:${size}px;height:${size}px">${p && p.avatar_url ? '' : esc(initials(p && p.name))}<i class="dot ${isOnline(p) ? 'on' : ''}"></i></span>`;
@@ -463,7 +465,7 @@ function renderAuth(lockMsg = '') {
   } else {
     if (!SUPA && !AUTH.user && locals.length === 1) AUTH.user = locals[0].id;
     const users = SUPA ? `<p class="muted small">${esc(AUTH.email)} · <a href="#" data-act="authChangeEmail">trocar</a></p>`
-      : `<div class="users">${locals.map(p => `<button type="button" class="${AUTH.user === p.id ? 'on' : ''}" data-act="authPick" data-id="${p.id}">${avatar(p, 54)}<b>${esc(p.name.split(' ')[0])}</b><small class="muted">${p.role === 'admin' ? 'Administrador' : 'Comercial · co-founder'}</small></button>`).join('')}</div>`;
+      : `<div class="users">${locals.map(p => `<button type="button" class="${AUTH.user === p.id ? 'on' : ''}" data-act="authPick" data-id="${p.id}">${avatar(p, 54)}<b>${esc(p.name.split(' ')[0])}</b><small class="muted">${esc(cargo(p))}</small></button>`).join('')}</div>`;
     const lk = lockedFor();
     body = `${users}${lockMsg ? `<p class="small" style="margin-top:10px;color:var(--warn)">${esc(lockMsg)}</p>` : ''}
       ${lk ? `<div class="warnbox" style="margin-top:16px">Muitas tentativas. Aguarde ${Math.ceil(lk / 60000)} min.</div>` : (AUTH.user || SUPA) ? `
@@ -567,7 +569,7 @@ function render() {
     <aside class="side">
       <div class="brand"><img src="icons/icon.svg" alt=""><div><b>BRAVUS <span>WORK</span></b><small>Organize. Execute. Evolua.</small></div></div>
       <nav class="nav">${nav.map(n => `<a href="#${n[0]}" class="${S.route === n[0] ? 'on' : ''}">${ic(n[2])}${n[1]}${badge(n[0])}</a>`).join('')}</nav>
-      <div class="me"><span data-act="editProfile" data-id="${S.me.id}" style="cursor:pointer" title="Editar meu perfil">${avatar(S.me)}</span><div class="who" data-act="editProfile" data-id="${S.me.id}" style="cursor:pointer" title="Editar meu perfil"><b>${esc(S.me.name)}</b><small>${esc(S.me.title || (isAdmin() ? 'Administrador' : 'Comercial'))}</small></div><button class="btn sm ic" title="Bloquear" data-act="logout">${ic('lock')}</button></div>
+      <div class="me"><span data-act="editProfile" data-id="${S.me.id}" style="cursor:pointer" title="Editar meu perfil">${avatar(S.me)}</span><div class="who" data-act="editProfile" data-id="${S.me.id}" style="cursor:pointer" title="Editar meu perfil"><b>${esc(S.me.name)}</b><small>${esc(cargo(S.me))}</small></div><button class="btn sm ic" title="Bloquear" data-act="logout">${ic('lock')}</button></div>
     </aside>
     <main class="main">
       <div class="mtop"><img src="icons/icon.svg" alt=""><b>BRAVUS <span>WORK</span></b><a class="btn sm ic" href="#alertas" style="position:relative">${ic('bell')}${unread() ? `<span class="badge" style="position:absolute;top:-6px;right:-6px">${unread()}</span>` : ''}</a><button class="btn sm ic" data-act="logout" title="Bloquear">${ic('lock')}</button></div>
@@ -928,7 +930,7 @@ V.equipe = () => {
     const late = mine.filter(isLate).length;
     const goals = td.filter(t => t.goal);
     const acts = S.d.activity.filter(a => a.user_id === p.id).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 6);
-    return `<div class="card"><div class="row" style="margin-bottom:14px"><span data-act="editProfile" data-id="${p.id}" style="cursor:pointer">${avatar(p, 48)}</span><div class="sp" data-act="editProfile" data-id="${p.id}" style="cursor:pointer"><b style="font-size:16px">${esc(p.name)}</b><div class="small muted">${p.role === 'admin' ? 'Administrador' : 'Comercial · co-founder'} · ${isOnline(p) ? '<span style="color:var(--ok)">online agora</span>' : 'offline · último acesso ' + ago(p.last_seen)}</div></div>${p.id === S.me.id || isAdmin() ? `<label class="btn sm" title="Trocar foto">${ic('plus')}Foto<input type="file" accept="image/*" data-act-change="setPhoto" data-id="${p.id}" hidden></label>` : ''}</div>
+    return `<div class="card"><div class="row" style="margin-bottom:14px"><span data-act="editProfile" data-id="${p.id}" style="cursor:pointer">${avatar(p, 48)}</span><div class="sp" data-act="editProfile" data-id="${p.id}" style="cursor:pointer"><b style="font-size:16px">${esc(p.name)}</b><div class="small muted">${esc(cargo(p))} · ${isOnline(p) ? '<span style="color:var(--ok)">online agora</span>' : 'offline · último acesso ' + ago(p.last_seen)}</div></div>${p.id === S.me.id || isAdmin() ? `<label class="btn sm" title="Trocar foto">${ic('plus')}Foto<input type="file" accept="image/*" data-act-change="setPhoto" data-id="${p.id}" hidden></label>` : ''}</div>
       <div class="grid g3" style="grid-template-columns:repeat(3,1fr);gap:8px">${kpi('Hoje', `${tdn}/${td.length}`)}${kpi('Semana', w.length ? Math.round(wdn / w.length * 100) + '%' : '—')}${kpi('Atrasadas', late, '', late ? 'r' : 'g')}</div>
       ${goals.map(g => `<div style="margin-top:10px"><div class="row small"><span>${esc(g.title)}</span><span class="sp"></span><b>${g.count || 0}/${g.goal}</b></div><div class="prog" style="margin-top:4px"><i style="width:${Math.min(100, (g.count || 0) / g.goal * 100)}%"></i></div></div>`).join('')}
       <div class="sec" style="margin-top:16px">Atividades recentes</div><div class="list">${acts.length ? acts.map(a => `<div class="li"><div class="t"><b style="font-weight:500">${esc(a.action)}</b><small>${ago(a.created_at)}</small></div></div>`).join('') : empty('Sem atividades.')}</div></div>`;
@@ -1030,7 +1032,7 @@ V.ajustes = () => {
     ${integ('Instagram, RD Station, ClickUp', false, 'Preparados para a próxima etapa; enquanto isso, registro manual.')}
   </div></div>
   <div class="card" style="margin-top:14px"><h3>${ic('down')}Backup</h3><div class="row wrap"><button class="btn" data-act="backup">${ic('down')}Baixar backup (JSON)</button>${!SUPA ? `<label class="btn">Restaurar backup<input type="file" accept="application/json" data-act-change="restore" hidden></label>` : ''}</div><p class="note" style="margin-top:8px">O backup contém dados de clientes: guarde em local seguro (ex.: pasta privada no Drive).</p></div>
-  <div class="card" style="margin-top:14px"><h3>${ic('users')}Equipe</h3><div class="list">${team().map(p => `<div class="li">${avatar(p)}<div class="t" data-act="editProfile" data-id="${p.id}" style="cursor:pointer"><b>${esc(p.name)}</b><small>${p.role === 'admin' ? 'Administrador' : 'Comercial / co-founder'}${p.email ? ' · ' + esc(p.email) : ''}</small></div>${p.id === S.me.id || isAdmin() ? `<label class="btn sm" title="Trocar foto">${ic('plus')}Foto<input type="file" accept="image/*" data-act-change="setPhoto" data-id="${p.id}" hidden></label>` : ''}${!SUPA || p.id === S.me.id ? `<button class="btn sm" data-act="changePin" data-id="${p.id}">Trocar senha</button>` : ''}</div>`).join('')}</div>
+  <div class="card" style="margin-top:14px"><h3>${ic('users')}Equipe</h3><div class="list">${team().map(p => `<div class="li">${avatar(p)}<div class="t" data-act="editProfile" data-id="${p.id}" style="cursor:pointer"><b>${esc(p.name)}</b><small>${esc(cargo(p))}${p.email ? ' · ' + esc(p.email) : ''}</small></div>${p.id === S.me.id || isAdmin() ? `<label class="btn sm" title="Trocar foto">${ic('plus')}Foto<input type="file" accept="image/*" data-act-change="setPhoto" data-id="${p.id}" hidden></label>` : ''}${!SUPA || p.id === S.me.id ? `<button class="btn sm" data-act="changePin" data-id="${p.id}">Trocar senha</button>` : ''}</div>`).join('')}</div>
   ${SUPA ? '<p class="note" style="margin-top:8px">Novos usuários são criados no painel do Supabase (Authentication → Add user) — veja o README.</p>' : ''}</div>
   <p class="note" style="margin-top:14px;text-align:center">Bravus Work v${VERSION} · ${SUPA ? 'Supabase' : 'modo local'}</p>`;
 };
@@ -1049,13 +1051,13 @@ const A = {
   editProfile: d => {
     const p = prof(d.id); if (!p) return;
     const mine = p.id === S.me.id, can = mine || isAdmin();
-    const role = p.role === 'admin' ? 'Administrador' : 'Comercial · co-founder';
-    if (!can) return modal(p.name, `<div class="row" style="gap:14px;margin-bottom:12px">${avatar(p, 72)}<div><b style="font-size:17px">${esc(p.name)}</b><div class="small muted">${esc(p.title || role)}</div></div></div>
+    const role = 'Acesso: ' + (p.role === 'admin' ? 'administrador' : 'comercial');
+    if (!can) return modal(p.name, `<div class="row" style="gap:14px;margin-bottom:12px">${avatar(p, 72)}<div><b style="font-size:17px">${esc(p.name)}</b><div class="small muted">${esc(cargo(p))}</div></div></div>
       <div class="small" style="display:grid;gap:6px">${p.phone ? `<span>📱 ${esc(p.phone)}</span>` : ''}${p.birth_date ? `<span>🎂 ${fdateY(p.birth_date)}</span>` : ''}${p.bio ? `<span>${esc(p.bio)}</span>` : ''}</div>`);
     modal(mine ? 'Meu perfil' : `Perfil de ${p.name.split(' ')[0]}`, `<div class="f">
       <input type="hidden" name="id" value="${p.id}">
       <div class="row" style="gap:14px">${avatar(p, 72)}<div class="row wrap" style="gap:8px"><label class="btn sm">${ic('plus')}${p.avatar_url ? 'Trocar foto' : 'Adicionar foto'}<input type="file" accept="image/*" data-act-change="setPhoto" data-id="${p.id}" data-reopen="1" hidden></label>${p.avatar_url ? `<button type="button" class="btn sm" data-act="removePhoto" data-id="${p.id}">Remover foto</button>` : ''}<div class="small muted" style="width:100%">${role}${p.email ? ' · ' + esc(p.email) : ''}</div></div></div>
-      <div class="f2">${fld('Nome *', 'name', p.name, 'text', 'required maxlength="80"')}${fld('Cargo / função', 'title', p.title, 'text', 'maxlength="60" placeholder="ex.: Gestor de tráfego"')}</div>
+      <div class="f2">${fld('Nome *', 'name', p.name, 'text', 'required maxlength="80"')}${isAdmin() ? `${fld('Cargo', 'title', p.title, 'text', 'maxlength="60" list="cargos" placeholder="escolha ou digite"')}<datalist id="cargos">${CARGOS.map(c => `<option value="${esc(c)}">`).join('')}</datalist>` : `<label class="fl">Cargo<input value="${esc(cargo(p))}" disabled title="Só o administrador define o cargo"></label>`}</div>
       <div class="f2">${fld('Data de nascimento', 'birth_date', p.birth_date, 'date')}${fld('WhatsApp', 'phone', p.phone, 'tel', 'placeholder="(85) 9 9999-9999"')}</div>
       ${area('Sobre / detalhes', 'bio', p.bio)}
       <label class="fl">Cor do perfil (quando sem foto)<input type="color" name="color" value="${esc(p.color || '#2f7bff')}" style="height:40px;padding:4px"></label>
@@ -1218,9 +1220,12 @@ const F = {
   },
   saveProfile: async v => {
     if (!(v.name || '').trim()) return toast('Informe o nome', '', 'bad');
-    const row = { name: v.name.trim(), title: (v.title || '').trim() || null, birth_date: v.birth_date || null, phone: (v.phone || '').trim() || null, bio: (v.bio || '').trim() || null, color: v.color || null };
+    const row = { name: v.name.trim(), birth_date: v.birth_date || null, phone: (v.phone || '').trim() || null, bio: (v.bio || '').trim() || null, color: v.color || null };
+    if (isAdmin()) row.title = (v.title || '').trim() || null;
+    const before = prof(v.id);
     try { await store.update('profiles', v.id, row); }
     catch (e) { if (!/title|birth_date|phone|bio|column/i.test(e && e.message || '')) throw e; await store.update('profiles', v.id, { name: row.name, color: row.color }); toast('Nome salvo, detalhes ainda não', 'Rode o SQL v1.2 no Supabase para guardar cargo, nascimento, WhatsApp e detalhes.', 'warn'); closeModal(); await refresh(); renderView(); return; }
+    if (isAdmin() && before && (before.title || null) !== (row.title || null) && v.id !== S.me.id) await log(`Definiu o cargo de ${row.name}: ${row.title || cargo({ role: before.role })}`);
     closeModal(); toast('Perfil atualizado', '', 'ok'); await refresh(); renderView();
   },
   walletSave: async v => {
