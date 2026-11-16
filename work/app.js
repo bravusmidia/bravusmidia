@@ -160,7 +160,7 @@ Caso deseje manter os serviços ativos, solicitamos a regularização do saldo p
 
 *Esta é uma mensagem automática do sistema.*`;
 const S = { me: null, route: 'painel', d: {}, set: { ...DEFAULT_SETTINGS }, agendaDate: today(), agendaWho: null,
-  finMonth: curYM(), meetMonth: curYM(), meetWho: '', cliFilter: 'online', campFilter: 'todas', contentWeek: null, popped: new Set(), startedAt: new Date().toISOString() };
+  finMonth: curYM(), meetMonth: curYM(), meetWho: '', cliFilter: 'online', contentWeek: null, popped: new Set(), startedAt: new Date().toISOString() };
 TABLES.forEach(t => S.d[t] = []);
 let store, sb;
 
@@ -239,16 +239,14 @@ function clientFin(c) {
 }
 const finChip = s => `<span class="chip ${s === 'inadimplente' ? 'bad' : s === 'em dia' ? 'ok' : s === 'a vencer' ? 'warn' : ''}">${esc(s)}</span>`;
 const campsOf = id => S.d.campaigns.filter(c => c.client_id === id);
-/* Online = cliente ativo, com campanha ativa e sem bloqueio/saldo zerado informado pela Meta ou registro manual */
+/* Conta de anúncios: ok, sem saldo ou com problema (informado pela Meta ou registro manual) */
 function adState(c) {
   if (!(c.services || []).includes('trafego')) return { k: 'na', label: 'Sem tráfego', cls: '' };
-  const cs = campsOf(c.id); const act = cs.filter(x => x.status === 'ativa');
+  if (c.op_status === 'cancelado') return { k: 'off', label: 'Inativo', cls: '' };
   const blocked = c.ad_account_status && !/^(1|ACTIVE|ativa)$/i.test(String(c.ad_account_status));
-  if (c.op_status === 'cancelado') return { k: 'off', label: 'Cancelado', cls: 'bad' };
-  if (blocked || cs.some(x => x.status === 'problema')) return { k: 'prob', label: 'Problema na conta', cls: 'bad' };
+  if (blocked) return { k: 'prob', label: 'Problema na conta', cls: 'bad' };
   if (c.ad_balance != null && c.ad_balance !== '' && Number(c.ad_balance) <= 0) return { k: 'saldo', label: 'Sem saldo', cls: 'warn' };
-  if (act.length) return { k: 'on', label: `Anunciando · ${act.length}`, cls: 'ok' };
-  return { k: 'off', label: 'Sem campanha ativa', cls: '' };
+  return { k: 'on', label: 'Conta ok', cls: 'ok' };
 }
 /* ---------- avisos por WhatsApp (recarga e desligamento) ---------- */
 const NOTICE = {
@@ -561,7 +559,7 @@ function armLock() {
    LAYOUT
    ===================================================================== */
 const NAV = [
-  ['painel', 'Painel', 'grid'], ['clientes', 'Clientes', 'users'], ['campanhas', 'Campanhas', 'target'],
+  ['painel', 'Painel', 'grid'], ['clientes', 'Clientes', 'users'],
   ['financeiro', 'Financeiro', 'wallet', 'fin'], ['agenda', 'Agenda', 'cal'], ['reunioes', 'Reuniões', 'meet'], ['conteudo', 'Conteúdo', 'film'],
   ['chat', 'Chat', 'chat'], ['equipe', 'Equipe', 'team'], ['alertas', 'Alertas', 'bell'],
   ['relatorios', 'Relatórios', 'file'], ['boas-praticas', 'Boas práticas', 'shield'], ['ajustes', 'Ajustes', 'gear', 'admin']
@@ -619,8 +617,7 @@ V.painel = () => {
   const novos = cl.filter(c => ym(c.start_date || c.created_at) === k);
   const inad = cl.filter(c => clientFin(c) === 'inadimplente');
   const traf = cl.filter(c => (c.services || []).includes('trafego') && c.op_status !== 'cancelado');
-  const on = traf.filter(c => adState(c).k === 'on'), off = traf.filter(c => adState(c).k !== 'on');
-  const cs = S.d.campaigns;
+  const semSaldo = traf.filter(c => adState(c).k === 'saldo'), probl = traf.filter(c => adState(c).k === 'prob');
   const tasks = realTasks().filter(t => t.date === d && (isAdmin() || t.assignee === S.me.id));
   const done = tasks.filter(t => t.status === 'feito');
   const meets = realTasks().filter(t => t.kind === 'reuniao' && ym(t.date) === k);
@@ -634,16 +631,13 @@ V.painel = () => {
   // Assistente Bravus: prioridades calculadas (sem IA paga)
   const prio = [];
   if (isAdmin()) shutDue().forEach(c => prio.push(['bad', `Enviar comunicado de desligamento: ${c.name}`, nReason('shutdown', c), 'clientes', { act: 'noticeOpen', k: 'shutdown', id: c.id }]));
-  if (isAdmin()) nDue('recharge').forEach(c => prio.push(['warn', `Enviar aviso de recarga: ${c.name}`, 'Campanhas sem saldo', 'clientes', { act: 'noticeOpen', k: 'recharge', id: c.id }]));
+  if (isAdmin()) nDue('recharge').forEach(c => prio.push(['warn', `Enviar aviso de recarga: ${c.name}`, 'Conta de anúncios sem saldo', 'clientes', { act: 'noticeOpen', k: 'recharge', id: c.id }]));
   const recharging = new Set(isAdmin() ? nDue('recharge').map(c => c.id) : []);
   inad.forEach(c => prio.push(['bad', `Cobrar ${c.name}`, 'Pagamento em atraso', 'financeiro']));
-  traf.filter(c => adState(c).k === 'prob').forEach(c => prio.push(['bad', `Verificar conta de anúncios de ${c.name}`, 'Problema reportado', 'campanhas']));
-  traf.filter(c => adState(c).k === 'saldo' && !recharging.has(c.id)).forEach(c => prio.push(['warn', `${c.name} está sem saldo`, 'Avisar o cliente para recarregar', 'campanhas']));
+  traf.filter(c => adState(c).k === 'prob').forEach(c => prio.push(['bad', `Verificar conta de anúncios de ${c.name}`, 'Problema reportado', 'clientes']));
+  traf.filter(c => adState(c).k === 'saldo' && !recharging.has(c.id)).forEach(c => prio.push(['warn', `${c.name} está sem saldo`, 'Avisar o cliente para recarregar', 'clientes']));
   realTasks().filter(t => isLate(t) && (isAdmin() || t.assignee === S.me.id)).slice(0, 5).forEach(t => prio.push(['warn', t.title, `Atrasada · ${firstName(t.assignee)} · ${fdate(t.date)}`, 'agenda']));
   if (S.d.content.some(c => c.status === 'aprovacao')) prio.push(['blue', `${S.d.content.filter(c => c.status === 'aprovacao').length} publicação(ões) aguardando aprovação`, 'Conteúdo', 'conteudo']);
-  const camps30 = cs.filter(c => c.status === 'ativa' && +c.spend > 0);
-  const worst = camps30.map(c => ({ c, m: metrics(c) })).filter(x => isFinite(x.m.ctr) && x.m.ctr < 0.8).slice(0, 3);
-  worst.forEach(x => prio.push(['warn', `CTR baixo em "${x.c.name}" (${pct(x.m.ctr)})`, cname(x.c.client_id) + ' — revisar criativo', 'campanhas']));
 
   return head(`${greet}, ${firstName(S.me.id)}`, fdateL(d), `<button class="btn pri" data-act="newTask">${ic('plus')}Tarefa</button>`) + `
   ${canFin() ? `<div class="grid g4">
@@ -655,15 +649,15 @@ V.painel = () => {
   <div class="sec">Clientes e anúncios</div>
   <div class="grid g4">
     ${kpi('Clientes ativos', `${ativos.length}<span class="muted" style="font-size:15px"> / ${S.set.max_clients}</span>`, `<a href="#clientes" data-act="cliFilterGo" data-f="offline">${cancel.length} inativo(s)</a> · ${novos.length} novo(s) no mês`)}
-    ${kpi('Anunciando agora', `<span style="color:var(--ok)">${on.length}</span>`, 'online: campanha ativa e conta ok')}
-    ${kpi('Parados', off.length, 'offline, sem saldo ou com problema', off.length ? 'y' : '')}
-    ${kpi('Campanhas', `${cs.filter(c => c.status === 'ativa').length} <span class="muted" style="font-size:14px">ativas</span>`, `${cs.filter(c => c.status === 'pausada').length} pausadas · ${cs.filter(c => ['problema', 'sem_entrega'].includes(c.status)).length} com problema`)}
+    ${kpi('Clientes de tráfego', traf.length, 'com gestão de tráfego pago ativa')}
+    ${kpi('Sem saldo', semSaldo.length, 'conta de anúncios zerada', semSaldo.length ? 'y' : '')}
+    ${kpi('Conta com problema', probl.length, 'bloqueio ou pagamento na Meta', probl.length ? 'r' : '')}
   </div>
   <div class="grid g2" style="margin-top:14px">
     <div class="card"><h3>${ic('spark')}Prioridades de hoje<span class="sp"></span><span class="chip blue">Assistente Bravus</span></h3>
       <div class="list">${prio.length ? prio.slice(0, 8).map(p => `<a class="li" href="#${p[3]}"${p[4] ? ` data-act="${p[4].act}" data-k="${p[4].k}" data-id="${p[4].id}"` : ''}><i class="dot ${p[0] === 'bad' ? 'bad' : p[0] === 'warn' ? 'warn' : 'on'}"></i><div class="t"><b>${esc(p[1])}</b><small>${esc(p[2])}</small></div>${ic('right')}</a>`).join('') : empty('Tudo em ordem por aqui. ✅')}</div>
     </div>
-    <div class="card"><h3>${ic('target')}Status dos clientes de tráfego<span class="sp"></span><a class="small" href="#campanhas">ver tudo</a></h3>
+    <div class="card"><h3>${ic('target')}Contas de anúncios dos clientes<span class="sp"></span><a class="small" href="#clientes">ver clientes</a></h3>
       <div class="list">${traf.length ? traf.slice().sort((a, b) => adState(a).k.localeCompare(adState(b).k)).slice(0, 8).map(c => `<div class="li" data-act="openClient" data-id="${c.id}" style="cursor:pointer"><div class="t"><b>${esc(c.name)}</b><small>${c.ad_balance != null && c.ad_balance !== '' ? `Saldo: ${brl(c.ad_balance)} (${esc(c.ad_balance_source || 'manual')})` : 'Saldo não informado'}</small></div>${adChip(c)}</div>`).join('') : empty('Nenhum cliente com tráfego pago cadastrado.')}</div>
     </div>
   </div>
@@ -707,7 +701,7 @@ V.clientes = () => {
       <div class="row wrap" style="gap:6px">${(c.services || []).map(s => `<span class="chip blue">${esc(svcName(s))}</span>`).join('') || '<span class="muted small">Sem serviços</span>'}</div>
       <div class="ft"><span class="muted">${esc(c.segment || 'Segmento —')} · vence ${esc(dueTxt(c))}</span>${canFin() ? `<b>${brl(c.contract_value)}</b>` : ''}</div>
       ${!inWallet(c) ? `<div class="small muted">Saiu ${c.end_date ? 'em ' + fdateY(c.end_date) : ''}${c.end_reason ? ' · ' + esc(c.end_reason) : ''}${c.start_date ? ` · cliente desde ${fdateY(c.start_date)}` : ''}</div>` : ''}
-      <div class="row">${canFin() ? finChip(clientFin(c)) : ''}${inWallet(c) ? `${c.op_status !== 'ativo' ? `<span class="chip warn">${esc(c.op_status === 'pausado' ? 'Pausado' : 'Em implantação')}</span>` : ''}${(c.services || []).includes('trafego') ? adChip(c) : ''}` : ''}<span class="sp"></span><span class="small muted">${esc(firstName(c.owner))}</span></div>
+      <div class="row">${canFin() ? finChip(clientFin(c)) : ''}${inWallet(c) ? `${c.op_status !== 'ativo' ? `<span class="chip warn">${esc(c.op_status === 'pausado' ? 'Pausado' : 'Em implantação')}</span>` : ''}${['prob', 'saldo'].includes(adState(c).k) ? adChip(c) : ''}` : ''}<span class="sp"></span><span class="small muted">${esc(firstName(c.owner))}</span></div>
     </div>`).join('') : `<div class="card" style="grid-column:1/-1">${empty(S.d.clients.length ? 'Nenhum cliente neste filtro.' : 'Cadastre seu primeiro cliente no botão “+ Cliente”.')}</div>`}</div>`;
 };
 function clientForm(c = {}) {
@@ -735,7 +729,7 @@ function clientForm(c = {}) {
 function clientDetail(id) {
   const c = client(id); if (!c) return;
   const inv = S.d.invoices.filter(i => i.client_id === id).sort((a, b) => b.due_date.localeCompare(a.due_date));
-  const cs = campsOf(id); const acts = S.d.activity.filter(a => a.client_id === id).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 15);
+  const acts = S.d.activity.filter(a => a.client_id === id).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 15);
   const wa = onlyDigits(c.whatsapp || c.phone);
   const wal = `<div class="card row wrap" style="gap:10px;margin-bottom:12px;padding:12px 14px"><div class="sp"><b>Status na carteira</b><div class="small muted">${inWallet(c) ? 'Cliente ativo na carteira' : `Saiu${c.end_date ? ' em ' + fdateY(c.end_date) : ''}${c.end_reason ? ' · ' + esc(c.end_reason) : ''}`}</div></div><div class="tabs" style="margin:0"><button type="button" class="${inWallet(c) ? 'on' : ''}" data-act="setWallet" data-id="${c.id}" data-on="1" data-from="detail"><i class="dot ${inWallet(c) ? 'on' : ''}"></i> Online</button><button type="button" class="${inWallet(c) ? '' : 'on'}" data-act="setWallet" data-id="${c.id}" data-on="0" data-from="detail"><i class="dot"></i> Offline</button></div></div>`;
   modal(c.name, `${wal}<div class="row wrap" style="gap:6px;margin-bottom:12px">${walletChip(c)}${inWallet(c) && (c.services || []).includes('trafego') ? adChip(c) : ''}${canFin() ? finChip(clientFin(c)) : ''}${(c.services || []).map(s => `<span class="chip blue">${esc(svcName(s))}</span>`).join('')}</div>
@@ -743,8 +737,6 @@ function clientDetail(id) {
       <div class="card"><h3>Contato</h3><div class="small" style="display:grid;gap:4px"><span>👤 ${esc(c.contact || '—')}</span><span>📱 ${esc(c.whatsapp || c.phone || '—')}</span><span>✉️ ${esc(c.email || '—')}</span><span>📷 ${esc(c.instagram || '—')}</span><span>🏷️ ${esc(c.segment || '—')}</span><span>🧑‍💼 Responsável: ${esc(pname(c.owner))}</span></div></div>
       <div class="card"><h3>Contrato</h3><div class="small" style="display:grid;gap:4px">${canFin() ? `<span>Valor: <b>${brl(c.contract_value)}</b>/mês</span>` : ''}<span>Vencimento: ${esc(dueTxt(c))}${isSplit(c) && canFin() ? ` · ${parts(c).map(p => brl(p[1])).join(' + ')}` : ''}</span><span>Desde: ${c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}</span><span>Conta de anúncios: ${esc(c.ad_account_id || '—')}</span><span>Saldo: ${c.ad_balance != null && c.ad_balance !== '' ? brl(c.ad_balance) + ` (${esc(c.ad_balance_source || 'manual')})` : 'não informado'}</span>${c.ad_synced_at ? `<span class="muted">Meta sincronizada ${ago(c.ad_synced_at)}</span>` : ''}</div></div>
     </div>
-    <div class="sec">Campanhas</div>
-    <div class="list">${cs.length ? cs.map(x => `<div class="li"><div class="t"><b>${esc(x.name)}</b><small>Investido ${brl(x.spend)} · ${int(x.leads)} leads · CTR ${pct(metrics(x).ctr)}</small></div>${campChip(x.status)}</div>`).join('') : empty('Sem campanhas registradas.')}</div>
     ${canFin() ? `<div class="sec">Cobranças</div><div class="list">${inv.length ? inv.slice(0, 8).map(i => `<div class="li"><div class="t"><b>${brl(i.amount)} · ${fdate(i.due_date)}</b><small>${esc(i.description || 'Mensalidade')}</small></div>${invChip(i)}</div>`).join('') : empty('Nenhuma cobrança.')}</div>` : ''}
     <div class="sec">Histórico de atividades</div>
     <div class="list">${acts.length ? acts.map(a => `<div class="li"><div class="t"><b style="font-weight:500">${esc(a.action)}</b><small>${esc(firstName(a.user_id))} · ${new Date(a.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</small></div></div>`).join('') : empty('Sem registros ainda.')}</div>
@@ -790,35 +782,6 @@ function importPreview(list) {
     <div class="list">${list.map(c => `<div class="li" style="${c._skip ? 'opacity:.45' : ''}"><div class="t"><b>${esc(c.name)}</b><small>${esc(c.contact || '—')} · ${c.services.map(svcName).join(', ') || 'sem serviço'}${c.contract_value ? ' · ' + brl(c.contract_value) : ''}</small></div>${c._skip ? `<span class="chip">${esc(c._skip)}</span>` : '<span class="chip ok">novo</span>'}</div>`).join('')}</div>
     ${ok.length > free ? `<p class="warnbox" style="margin-top:10px">Só cabem mais ${free} cliente(s) no limite atual. Aumente em Ajustes se precisar.</p>` : ''}`,
     { footer: `<button type="button" class="btn" data-act="closeModal">Cancelar</button><button type="button" class="btn pri" data-act="importDo" ${!ok.length || ok.length > free ? 'disabled' : ''}>${ic('check')}Importar ${ok.length}</button>` });
-}
-
-/* ---------- CAMPANHAS ---------- */
-V.campanhas = () => {
-  const f = S.campFilter; let cs = S.d.campaigns.slice();
-  if (f !== 'todas') cs = cs.filter(c => f === 'problema' ? ['problema', 'sem_entrega'].includes(c.status) : c.status === f);
-  cs.sort((a, b) => cname(a.client_id).localeCompare(cname(b.client_id)));
-  const tot = cs.reduce((a, c) => ({ spend: a.spend + +c.spend, leads: a.leads + +c.leads, clicks: a.clicks + +c.clicks, impressions: a.impressions + +c.impressions }), { spend: 0, leads: 0, clicks: 0, impressions: 0 });
-  const m = metrics(tot);
-  const lastSync = S.d.clients.map(c => c.ad_synced_at).filter(Boolean).sort().pop();
-  return head('Campanhas', `Ads Monitor · ${lastSync ? 'Meta sincronizada ' + ago(lastSync) : 'Meta ainda não conectada — registros manuais'}`,
-    `<button class="btn" data-act="metaSync">${ic('sync')}<span class="hide-m">Sincronizar Meta</span></button><button class="btn pri" data-act="editCamp">${ic('plus')}Campanha</button>`) + `
-    <div class="grid g4">${kpi('Investido', brl(tot.spend))}${kpi('Leads', int(tot.leads), `Custo/lead ${isFinite(m.cpl) ? brl(m.cpl) : '—'}`)}${kpi('CTR', pct(m.ctr), `CPC ${isFinite(m.cpc) ? brl(m.cpc) : '—'}`)}${kpi('CPM', isFinite(m.cpm) ? brl(m.cpm) : '—', `${int(tot.impressions)} impressões`)}</div>
-    <div class="tabs" style="margin:16px 0 12px">${[['todas', 'Todas'], ['ativa', 'Ativas'], ['pausada', 'Pausadas'], ['problema', 'Com problema']].map(t => `<button data-act="campFilter" data-f="${t[0]}" class="${f === t[0] ? 'on' : ''}">${t[1]}</button>`).join('')}</div>
-    <div class="card"><div class="tw"><table><thead><tr><th>Cliente / campanha</th><th>Status</th><th class="right">Investido</th><th class="right hide-m">Impr.</th><th class="right hide-m">Cliques</th><th class="right">CTR</th><th class="right hide-m">CPC</th><th class="right">Leads</th><th class="right">CPL</th><th></th></tr></thead><tbody>
-    ${cs.length ? cs.map(c => { const x = metrics(c); return `<tr><td><b>${esc(c.name)}</b><div class="small muted">${esc(cname(c.client_id))} · ${c.source === 'meta' ? 'Meta' : 'manual'}${c.period ? ' · ' + esc(c.period) : ''}</div></td><td>${campChip(c.status)}</td><td class="right num">${brl(c.spend)}</td><td class="right num hide-m">${int(c.impressions)}</td><td class="right num hide-m">${int(c.clicks)}</td><td class="right num">${pct(x.ctr)}</td><td class="right num hide-m">${isFinite(x.cpc) ? brl(x.cpc) : '—'}</td><td class="right num">${int(c.leads)}</td><td class="right num">${isFinite(x.cpl) ? brl(x.cpl) : '—'}</td><td><button class="btn sm ic" data-act="editCamp" data-id="${c.id}">${ic('edit')}</button></td></tr>`; }).join('') : `<tr><td colspan="10">${empty('Nenhuma campanha. Sincronize com a Meta ou registre manualmente.')}</td></tr>`}
-    </tbody></table></div></div>
-    <p class="note" style="margin-top:10px">Saldo e situação das contas vêm somente da Meta (quando conectada) ou do que você registrar no cadastro do cliente — o app nunca estima saldo.</p>`;
-};
-function campForm(c = {}) {
-  modal(c.id ? 'Editar campanha' : 'Nova campanha', `<div class="f"><input type="hidden" name="id" value="${esc(c.id || '')}">
-    ${sel('Cliente *', 'client_id', S.d.clients.filter(x => x.op_status !== 'cancelado' || x.id === c.client_id).map(x => [x.id, x.name]), c.client_id, 'required')}
-    <div class="f2">${fld('Nome da campanha *', 'name', c.name, 'text', 'required')}${sel('Status', 'status', CAMP_ST, c.status || 'ativa')}</div>
-    <div class="f2">${fld('Orçamento diário (R$)', 'daily_budget', c.daily_budget, 'number', 'step="0.01"')}${fld('Período dos números', 'period', c.period || 'Últimos 30 dias')}</div>
-    <div class="f2">${fld('Investido (R$)', 'spend', c.spend, 'number', 'step="0.01"')}${fld('Alcance', 'reach', c.reach, 'number')}</div>
-    <div class="f2">${fld('Impressões', 'impressions', c.impressions, 'number')}${fld('Cliques', 'clicks', c.clicks, 'number')}</div>
-    <div class="f2">${fld('Leads', 'leads', c.leads, 'number')}${fld('Conversões', 'conversions', c.conversions, 'number')}</div>
-    ${c.source === 'meta' ? '<p class="infobox">Esta campanha vem da Meta. Edições manuais serão substituídas na próxima sincronização.</p>' : ''}
-  </div>`, { form: 'saveCamp', footer: `${c.id && isAdmin() ? `<button type="button" class="btn bad" data-act="delCamp" data-id="${c.id}">${ic('trash')}</button><span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
 }
 
 /* ---------- FINANCEIRO ---------- */
@@ -1085,7 +1048,7 @@ V.ajustes = () => {
     <p class="note">Negativo = antes do vencimento · 0 = no dia · positivo = depois.</p>
     <label class="sw"><input type="checkbox" name="priscila_finance" ${s.priscila_finance ? 'checked' : ''}> Priscila pode ver o financeiro</label>
     <div class="sec" style="margin:4px 0 0">Tipos de notificação</div>
-    <div class="cks">${[['tarefas', 'Tarefas e reuniões'], ['financeiro', 'Cobranças'], ['campanhas', 'Campanhas'], ['conteudo', 'Conteúdo'], ['chat', 'Chat']].map(n => `<label><input type="checkbox" name="nf_${n[0]}" ${(s.notify || {})[n[0]] !== false ? 'checked' : ''}>${n[1]}</label>`).join('')}</div>
+    <div class="cks">${[['tarefas', 'Tarefas e reuniões'], ['financeiro', 'Cobranças'], ['campanhas', 'Contas de anúncios'], ['conteudo', 'Conteúdo'], ['chat', 'Chat']].map(n => `<label><input type="checkbox" name="nf_${n[0]}" ${(s.notify || {})[n[0]] !== false ? 'checked' : ''}>${n[1]}</label>`).join('')}</div>
     <div><button class="btn pri">Salvar ajustes</button></div>
   </form>
   <form class="card f" data-form="saveReasons" style="margin-top:14px"><h3>${ic('users')}Motivos de saída do cliente</h3>
@@ -1178,7 +1141,7 @@ const A = {
       ${open.length && canFin() ? `<label class="cklbl"><input type="checkbox" name="cancel_inv" value="1" checked> Cancelar ${open.length} cobrança(s) em aberto (${brl(open.reduce((a, i) => a + +i.amount, 0))})</label>` : ''}
       ${isAdmin() && c.whatsapp ? `<label class="cklbl"><input type="checkbox" name="send_msg" value="1"> Enviar comunicado de desligamento no WhatsApp (opcional)</label>` : ''}
     </div>`, { form: 'walletSave', footer: `<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn bad">Desativar</button>` });
-  }, campFilter: d => { S.campFilter = d.f; renderView(); },
+  },
   importDo: async (d, el) => {
     el.disabled = true; let n = 0;
     for (const c of IMPORT.filter(c => !c._skip)) { const { _skip, ...row } = c; const r = await store.insert('clients', row); n++; await log(`Importou o cliente ${row.name}`, r && r.id); }
@@ -1196,12 +1159,10 @@ const A = {
     closeModal(); toast(`${NOTICE[k].name} aberto no WhatsApp`, pause ? 'Cliente marcado como Pausado.' : 'Registrado no histórico.', 'ok'); await refresh();
   },
   noticeReset: d => { const t = $(`form[data-form="${d.k === 'recharge' ? 'saveRecharge' : 'saveShutdown'}"] textarea[name="msg"]`); if (t) t.value = NOTICE[d.k].def(); toast('Texto padrão restaurado', 'Clique em salvar para gravar.'); },
-  delClient: d => confirmBox('Excluir cliente?', 'Isto apaga o cliente, as campanhas e as cobranças ligadas a ele. Para manter o histórico, prefira marcar como “Cancelado”.', 'Excluir', async () => {
+  delClient: d => confirmBox('Excluir cliente?', 'Isto apaga o cliente e as cobranças ligadas a ele. Para manter o histórico, prefira marcar como “Cancelado”.', 'Excluir', async () => {
     const c = client(d.id); for (const t of ['campaigns', 'invoices']) for (const r of S.d[t].filter(x => x.client_id === d.id)) await store.remove(t, r.id);
     await store.remove('clients', d.id); await log(`Excluiu o cliente ${c && c.name}`); toast('Cliente excluído', '', 'ok'); await refresh(); }, true),
   clientReport: d => clientReport(d.id), print: () => EMBED ? toast('Disponível no app publicado', 'Na versão instalada, este botão salva o relatório em PDF.', 'warn') : window.print(),
-  editCamp: d => { if (!S.d.clients.length) return toast('Cadastre um cliente primeiro', '', 'warn'); campForm(d.id ? S.d.campaigns.find(c => c.id === d.id) : {}); },
-  delCamp: d => confirmBox('Excluir campanha?', 'Esta ação não pode ser desfeita.', 'Excluir', async () => { await store.remove('campaigns', d.id); await refresh(); }, true),
   metaSync: async (d, el) => {
     el.disabled = true;
     try { const r = await store.invoke('meta-sync'); toast('Meta sincronizada', `${r.accounts || 0} contas · ${r.campaigns || 0} campanhas`, 'ok'); await log('Sincronizou a Meta Ads'); await refresh(); }
@@ -1355,14 +1316,7 @@ const F = {
     if (v.from === 'detail') clientDetail(c.id);
   },
   clientNote: async v => { if (!v.text.trim()) return; await store.insert('activity', { user_id: S.me.id, action: v.text.trim(), client_id: v.id }); await refresh(); clientDetail(v.id); },
-  saveCamp: async v => {
-    const row = { client_id: v.client_id, name: v.name.trim(), status: v.status, daily_budget: num(v.daily_budget), period: v.period, spend: num(v.spend) || 0, reach: num(v.reach) || 0, impressions: num(v.impressions) || 0, clicks: num(v.clicks) || 0, leads: num(v.leads) || 0, conversions: num(v.conversions) || 0, updated_at: new Date().toISOString() };
-    const prev = v.id && S.d.campaigns.find(c => c.id === v.id);
-    if (v.id) await store.update('campaigns', v.id, row); else await store.insert('campaigns', { ...row, source: 'manual' });
-    if (prev && prev.status !== row.status) await log(`Campanha “${row.name}”: ${prev.status} → ${row.status}`, row.client_id); else if (!v.id) await log(`Registrou a campanha “${row.name}”`, row.client_id);
-    if (['problema', 'sem_entrega'].includes(row.status) && (!prev || prev.status !== row.status)) await notifyUsers(team().map(p => p.id), 'Campanha com problema', `${cname(row.client_id)} — ${row.name}`, 'alerta', `camp:${v.id || row.name}:${row.status}:${today()}`, 'campanhas');
-    closeModal(); toast('Campanha salva', '', 'ok'); await refresh();
-  },
+
   saveInvoice: async v => {
     const row = { client_id: v.client_id, amount: num(v.amount), due_date: v.due_date, description: v.description, payment_url: v.payment_url || null };
     if (!row.amount || row.amount <= 0) return toast('Informe um valor válido', '', 'bad');
