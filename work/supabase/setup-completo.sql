@@ -24,6 +24,7 @@ create table if not exists profiles (
   role text not null default 'comercial' check (role in ('admin','comercial','cliente')),
   client_id uuid, -- preenchido só para login de cliente (Bravus Client, próxima etapa)
   color text default '#2f7bff',
+  avatar_url text,
   last_seen timestamptz,
   created_at timestamptz default now()
 );
@@ -66,7 +67,7 @@ create table if not exists clients (
   contract_value numeric(12,2) default 0, start_date date, due_day int check (due_day between 1 and 31),
   owner uuid references profiles(id), op_status text default 'ativo',
   ad_account_id text, ad_balance numeric(12,2), ad_balance_source text, ad_account_status text, ad_synced_at timestamptz,
-  asaas_customer_id text, notes text,
+  asaas_customer_id text, notes text, end_date date, end_reason text,
   created_at timestamptz default now()
 );
 

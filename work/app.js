@@ -20,6 +20,7 @@ const nowHM = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d
 const brl = n => (Number(n) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const int = n => (Number(n) || 0).toLocaleString('pt-BR');
 const pct = n => isFinite(n) ? n.toFixed(2).replace('.', ',') + '%' : '—';
+const fdateY = s => s ? new Date(s + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
 const fdate = s => s ? new Date(s.length > 10 ? s : s + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—';
 const fdateL = s => s ? new Date(s + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }) : '';
 const ftime = s => s ? new Date(s).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
@@ -150,7 +151,7 @@ Caso deseje manter os serviços ativos, solicitamos a regularização do saldo p
 
 *Esta é uma mensagem automática do sistema.*`;
 const S = { me: null, route: 'painel', d: {}, set: { ...DEFAULT_SETTINGS }, agendaDate: today(), agendaWho: null,
-  finMonth: curYM(), cliFilter: 'todos', campFilter: 'todas', contentWeek: null, popped: new Set(), startedAt: new Date().toISOString() };
+  finMonth: curYM(), cliFilter: 'online', campFilter: 'todas', contentWeek: null, popped: new Set(), startedAt: new Date().toISOString() };
 TABLES.forEach(t => S.d[t] = []);
 let store, sb;
 
@@ -163,7 +164,7 @@ const client = id => S.d.clients.find(c => c.id === id);
 const cname = id => (client(id) || {}).name || 'Bravus Mídia';
 const team = () => S.d.profiles.filter(p => p.role === 'admin' || p.role === 'comercial');
 const isOnline = p => p && p.last_seen && (Date.now() - new Date(p.last_seen)) < 150000;
-const avatar = (p, size = 36) => `<span class="av" style="background:${esc(p && p.color || '#2f7bff')};width:${size}px;height:${size}px">${esc(initials(p && p.name))}<i class="dot ${isOnline(p) ? 'on' : ''}"></i></span>`;
+const avatar = (p, size = 36) => `<span class="av" style="background:${p && p.avatar_url ? `#0b1a3d url('${esc(p.avatar_url)}') center/cover` : esc(p && p.color || '#2f7bff')};width:${size}px;height:${size}px">${p && p.avatar_url ? '' : esc(initials(p && p.name))}<i class="dot ${isOnline(p) ? 'on' : ''}"></i></span>`;
 
 async function loadAll(only) {
   const ts = only ? [only] : TABLES;
@@ -209,7 +210,9 @@ const clientOpts = (none = 'Bravus Mídia (interno)') => [['', none], ...S.d.cli
    ===================================================================== */
 const SERVICES = [['trafego', 'Tráfego pago'], ['social', 'Social media'], ['site', 'Site'], ['landing', 'Landing page'], ['automacao', 'Automação'], ['mentoria', 'Mentoria']];
 const svcName = k => (SERVICES.find(s => s[0] === k) || [k, k])[1];
-const OP = [['ativo', 'Ativo'], ['pausado', 'Pausado'], ['onboarding', 'Em implantação'], ['cancelado', 'Cancelado']];
+const OP = [['ativo', 'Ativo'], ['pausado', 'Pausado'], ['onboarding', 'Em implantação'], ['cancelado', 'Saiu da carteira (offline)']];
+const inWallet = c => c.op_status !== 'cancelado';
+const walletChip = c => inWallet(c) ? '<span class="chip ok"><i class="dot on"></i>Online</span>' : '<span class="chip"><i class="dot"></i>Offline</span>';
 
 function invStatus(i) {
   if (i.status === 'pago' || i.status === 'cancelado') return i.status;
@@ -678,19 +681,20 @@ function weekChart() {
 V.clientes = () => {
   const f = S.cliFilter; let cl = S.d.clients.slice().sort((a, b) => a.name.localeCompare(b.name));
   const ativos = S.d.clients.filter(c => c.op_status !== 'cancelado').length;
-  if (f === 'online') cl = cl.filter(c => adState(c).k === 'on');
-  if (f === 'offline') cl = cl.filter(c => (c.services || []).includes('trafego') && adState(c).k !== 'on');
+  const nOff = S.d.clients.length - ativos;
+  if (f === 'online') cl = cl.filter(inWallet);
+  if (f === 'offline') cl = cl.filter(c => !inWallet(c)).sort((a, b) => String(b.end_date || '').localeCompare(String(a.end_date || '')));
   if (f === 'inad') cl = cl.filter(c => clientFin(c) === 'inadimplente');
-  if (f === 'cancel') cl = cl.filter(c => c.op_status === 'cancelado'); else if (f === 'todos') cl = cl.filter(c => c.op_status !== 'cancelado');
-  const tabs = [['todos', 'Ativos'], ['online', 'Online'], ['offline', 'Offline'], ['inad', 'Inadimplentes'], ['cancel', 'Cancelados']];
+  const tabs = [['online', `Online · ${ativos}`], ['offline', `Offline · ${nOff}`], ['inad', 'Inadimplentes'], ['todos', `Todos · ${S.d.clients.length}`]];
   return head('Clientes', `${ativos} de ${S.set.max_clients} vagas usadas`, `${isAdmin() ? `<label class="btn" title="Importar planilha (ex.: Metrifiquei)">${ic('down')}<span class="hide-m">Importar</span><input type="file" accept=".csv,text/csv" data-act-change="importCsv" hidden></label>` : ''}<button class="btn pri" data-act="editClient">${ic('plus')}Cliente</button>`) +
     (isAdmin() ? ['recharge', 'shutdown'].filter(k => nDue(k).length).map(k => `<div class="card" style="margin-bottom:14px;border-color:${k === 'shutdown' ? 'rgba(255,107,122,.45)' : 'rgba(255,190,80,.45)'}"><h3>${ic(NOTICE[k].icon)}${k === 'shutdown' ? 'Comunicados de desligamento' : 'Avisos de recarga'} pendentes<span class="sp"></span><a class="small" href="#ajustes">editar texto</a></h3><div class="list">${nDue(k).map(c => `<div class="li"><div class="t"><b>${esc(c.name)}</b><small>${esc(nReason(k, c))}</small></div><button class="btn sm ${k === 'shutdown' ? 'bad' : 'pri'}" data-act="noticeOpen" data-k="${k}" data-id="${c.id}">${ic('wa')}Enviar</button></div>`).join('')}</div></div>`).join('') : '') +
     `<div class="tabs" style="margin-bottom:14px">${tabs.map(t => `<button data-act="cliFilter" data-f="${t[0]}" class="${f === t[0] ? 'on' : ''}">${t[1]}</button>`).join('')}</div>
     <div class="grid g3">${cl.length ? cl.map(c => `<div class="ccard" data-act="openClient" data-id="${c.id}">
-      <div class="hd"><span class="av" style="background:linear-gradient(135deg,#1c5fe6,#0b1a3d)">${esc(initials(c.name))}</span><b>${esc(c.name)}</b>${adChip(c)}</div>
+      <div class="hd"><span class="av" style="background:linear-gradient(135deg,#1c5fe6,#0b1a3d)">${esc(initials(c.name))}</span><b>${esc(c.name)}</b>${walletChip(c)}</div>
       <div class="row wrap" style="gap:6px">${(c.services || []).map(s => `<span class="chip blue">${esc(svcName(s))}</span>`).join('') || '<span class="muted small">Sem serviços</span>'}</div>
       <div class="ft"><span class="muted">${esc(c.segment || 'Segmento —')} · vence dia ${esc(c.due_day || '—')}</span>${canFin() ? `<b>${brl(c.contract_value)}</b>` : ''}</div>
-      <div class="row">${canFin() ? finChip(clientFin(c)) : ''}<span class="chip">${esc((OP.find(o => o[0] === c.op_status) || ['', c.op_status])[1])}</span><span class="sp"></span><span class="small muted">${esc(firstName(c.owner))}</span></div>
+      ${!inWallet(c) ? `<div class="small muted">Saiu ${c.end_date ? 'em ' + fdateY(c.end_date) : ''}${c.end_reason ? ' · ' + esc(c.end_reason) : ''}${c.start_date ? ` · cliente desde ${fdateY(c.start_date)}` : ''}</div>` : ''}
+      <div class="row">${canFin() ? finChip(clientFin(c)) : ''}${inWallet(c) ? `<span class="chip">${esc((OP.find(o => o[0] === c.op_status) || ['', c.op_status])[1])}</span>${(c.services || []).includes('trafego') ? adChip(c) : ''}` : ''}<span class="sp"></span><span class="small muted">${esc(firstName(c.owner))}</span></div>
     </div>`).join('') : `<div class="card" style="grid-column:1/-1">${empty(S.d.clients.length ? 'Nenhum cliente neste filtro.' : 'Cadastre seu primeiro cliente no botão “+ Cliente”.')}</div>`}</div>`;
 };
 function clientForm(c = {}) {
@@ -703,12 +707,12 @@ function clientForm(c = {}) {
     <div class="f2">${fld('Segmento', 'segment', c.segment)}${sel('Responsável interno', 'owner', teamOpts(), c.owner || S.me.id)}</div>
     <label class="fl">Serviços contratados<div class="cks">${SERVICES.map(s => `<label><input type="checkbox" name="services" value="${s[0]}" ${svcs.includes(s[0]) ? 'checked' : ''}>${s[1]}</label>`).join('')}</div></label>
     <div class="f2">${fld('Valor mensal do contrato (R$)', 'contract_value', c.contract_value, 'number', 'step="0.01" min="0"')}${fld('Dia de vencimento', 'due_day', c.due_day || 10, 'number', 'min="1" max="31"')}</div>
-    <div class="f2">${fld('Data de contratação', 'start_date', c.start_date || today(), 'date')}${sel('Status operacional', 'op_status', OP, c.op_status || 'ativo')}</div>
+    <div class="f2">${fld('Data de contratação', 'start_date', c.start_date || today(), 'date')}${sel('Status na carteira', 'op_status', OP, c.op_status || 'ativo')}</div>
+    <div class="f2">${fld('Data de saída (se saiu)', 'end_date', c.end_date, 'date')}${fld('Motivo da saída', 'end_reason', c.end_reason, 'text', 'placeholder="ex.: encerrou contrato, sem verba"')}</div>
     <div class="sec" style="margin:6px 0 0">Anúncios (Meta)</div>
     <div class="f2">${fld('ID da conta de anúncios', 'ad_account_id', c.ad_account_id, 'text', 'placeholder="act_123456789"')}${fld('Saldo na conta (R$) — manual', 'ad_balance', c.ad_balance, 'number', 'step="0.01" placeholder="deixe vazio se não souber"')}</div>
     ${sel('Situação da conta de anúncios', 'ad_account_status', [['', 'Não informado'], ['ativa', 'Ativa'], ['bloqueada', 'Bloqueada / restrita'], ['pagamento', 'Problema de pagamento']], c.ad_account_status)}
     <p class="note">Com a Meta conectada, saldo e situação são atualizados automaticamente e o registro manual é substituído pelos dados oficiais.</p>
-    ${fld('ID do cliente no Asaas (opcional)', 'asaas_customer_id', c.asaas_customer_id, 'text', 'placeholder="cus_..."')}
     ${area('Observações', 'notes', c.notes)}
   </div>`, { form: 'saveClient', footer: `${c.id && isAdmin() ? `<button type="button" class="btn bad" data-act="delClient" data-id="${c.id}">${ic('trash')}</button><span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
 }
@@ -808,16 +812,16 @@ V.financeiro = () => {
   const exp = S.d.expenses.filter(e => ym(e.date) === k).sort((a, b) => b.date.localeCompare(a.date));
   const label = (l => l[0].toUpperCase() + l.slice(1))(new Date(k + '-15T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
   const shift = n => { const d = new Date(k + '-15T12:00:00'); d.setMonth(d.getMonth() + n); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
-  return head('Financeiro', 'Bravus Finance · entradas, saídas e cobranças', isAdmin() ? `${SUPA ? `<button class="btn" data-act="asaasSync">${ic('sync')}<span class="hide-m">Sincronizar Asaas</span></button>` : ''}<button class="btn" data-act="genInvoices" data-m="${k}">${ic('sync')}<span class="hide-m">Gerar mensalidades</span></button><button class="btn pri" data-act="newInvoice">${ic('plus')}Cobrança</button>` : '') + `
+  return head('Financeiro', 'Bravus Finance · entradas, saídas e cobranças', isAdmin() ? `<button class="btn" data-act="genInvoices" data-m="${k}">${ic('sync')}<span class="hide-m">Gerar mensalidades</span></button><button class="btn pri" data-act="newInvoice">${ic('plus')}Cobrança</button>` : '') + `
     <div class="datebar" style="margin-bottom:14px"><button class="btn sm ic" data-act="finMonth" data-m="${shift(-1)}">${ic('left')}</button><b>${label}</b><button class="btn sm ic" data-act="finMonth" data-m="${shift(1)}">${ic('right')}</button></div>
     <div class="grid g4">${kpi('Entrou', brl(fm.recebido), 'confirmado', 'hl')}${kpi('A receber', brl(fm.aReceber), '', 'y')}${kpi('Atrasado (total)', brl(fm.atrasado), '', fm.atrasado ? 'r' : '')}${kpi('Saiu', brl(fm.saidas), `saldo do mês ${brl(fm.saldo)}`, fm.saidas ? 'r' : '')}</div>
     <div class="card" style="margin-top:14px"><h3>${ic('wallet')}Cobranças<span class="sp"></span><span class="small muted">${inv.length}</span></h3>
-      <div class="list">${inv.length ? inv.map(i => { const c = client(i.client_id) || {}; const s = invStatus(i); return `<div class="li"><div class="t"><b>${esc(c.name || '—')} · ${brl(i.amount)}</b><small>${esc(i.description || 'Mensalidade')} · vence ${fdate(i.due_date)}${i.status === 'pago' ? ` · pago em ${fdate(i.paid_at)} (${esc(i.method || '')})` : ''}${i.asaas_id ? ' · Asaas' : ''}</small></div>${invChip(i)}
-        ${isAdmin() && s !== 'pago' && s !== 'cancelado' ? `<button class="btn sm ok" data-act="payInvoice" data-id="${i.id}">${ic('check')}<span class="hide-m">Recebido</span></button><a class="btn sm ic" title="Cobrar no WhatsApp" href="${waCharge(i)}" target="_blank" rel="noopener" data-act="chargeWa" data-id="${i.id}">${ic('wa')}</a>${SUPA ? `<button class="btn sm ic" title="Gerar no Asaas" data-act="asaasCharge" data-id="${i.id}">${ic('send')}</button>` : ''}` : ''}
+      <div class="list">${inv.length ? inv.map(i => { const c = client(i.client_id) || {}; const s = invStatus(i); return `<div class="li"><div class="t"><b>${esc(c.name || '—')} · ${brl(i.amount)}</b><small>${esc(i.description || 'Mensalidade')} · vence ${fdate(i.due_date)}${i.status === 'pago' ? ` · pago em ${fdate(i.paid_at)} (${esc(i.method || '')})` : ''}</small></div>${invChip(i)}
+        ${isAdmin() && s !== 'pago' && s !== 'cancelado' ? `<button class="btn sm ok" data-act="payInvoice" data-id="${i.id}">${ic('check')}<span class="hide-m">Recebido</span></button><a class="btn sm ic" title="Cobrar no WhatsApp" href="${waCharge(i)}" target="_blank" rel="noopener" data-act="chargeWa" data-id="${i.id}">${ic('wa')}</a>` : ''}
         ${isAdmin() ? `<button class="btn sm ic" data-act="editInvoice" data-id="${i.id}">${ic('edit')}</button>` : ''}</div>`; }).join('') : empty('Sem cobranças neste mês. Use “Gerar mensalidades” para criar a partir dos contratos.')}</div></div>
     <div class="card" style="margin-top:14px"><h3>${ic('down')}Saídas / despesas<span class="sp"></span>${isAdmin() ? `<button class="btn sm" data-act="newExpense">${ic('plus')}Despesa</button>` : ''}</h3>
       <div class="list">${exp.length ? exp.map(e => `<div class="li"><div class="t"><b>${esc(e.description)}</b><small>${esc(e.category || 'Geral')} · ${fdate(e.date)}</small></div><b class="num" style="color:var(--bad)">− ${brl(e.amount)}</b>${isAdmin() ? `<button class="btn sm ic" data-act="delExpense" data-id="${e.id}">${ic('trash')}</button>` : ''}</div>`).join('') : empty('Nenhuma despesa registrada no mês.')}</div></div>
-    <p class="note" style="margin-top:10px">Uma cobrança só fica “Paga” com confirmação: pelo Asaas (automático) ou quando você confirmar que o dinheiro caiu na conta. Clientes cobrados pelo Asaas (assinaturas) entram pelo botão “Sincronizar Asaas” e se atualizam sozinhos.</p>`;
+    <p class="note" style="margin-top:10px">Uma cobrança só fica “Paga” quando você confirmar que o dinheiro caiu na conta.</p>`;
 };
 function invoiceForm(i = {}) {
   modal(i.id ? 'Editar cobrança' : 'Nova cobrança', `<div class="f"><input type="hidden" name="id" value="${esc(i.id || '')}">
@@ -923,7 +927,7 @@ V.equipe = () => {
     const late = mine.filter(isLate).length;
     const goals = td.filter(t => t.goal);
     const acts = S.d.activity.filter(a => a.user_id === p.id).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 6);
-    return `<div class="card"><div class="row" style="margin-bottom:14px">${avatar(p, 48)}<div class="sp"><b style="font-size:16px">${esc(p.name)}</b><div class="small muted">${p.role === 'admin' ? 'Administrador' : 'Comercial · co-founder'} · ${isOnline(p) ? '<span style="color:var(--ok)">online agora</span>' : 'offline · último acesso ' + ago(p.last_seen)}</div></div></div>
+    return `<div class="card"><div class="row" style="margin-bottom:14px">${avatar(p, 48)}<div class="sp"><b style="font-size:16px">${esc(p.name)}</b><div class="small muted">${p.role === 'admin' ? 'Administrador' : 'Comercial · co-founder'} · ${isOnline(p) ? '<span style="color:var(--ok)">online agora</span>' : 'offline · último acesso ' + ago(p.last_seen)}</div></div>${p.id === S.me.id || isAdmin() ? `<label class="btn sm" title="Trocar foto">${ic('plus')}Foto<input type="file" accept="image/*" data-act-change="setPhoto" data-id="${p.id}" hidden></label>` : ''}</div>
       <div class="grid g3" style="grid-template-columns:repeat(3,1fr);gap:8px">${kpi('Hoje', `${tdn}/${td.length}`)}${kpi('Semana', w.length ? Math.round(wdn / w.length * 100) + '%' : '—')}${kpi('Atrasadas', late, '', late ? 'r' : 'g')}</div>
       ${goals.map(g => `<div style="margin-top:10px"><div class="row small"><span>${esc(g.title)}</span><span class="sp"></span><b>${g.count || 0}/${g.goal}</b></div><div class="prog" style="margin-top:4px"><i style="width:${Math.min(100, (g.count || 0) / g.goal * 100)}%"></i></div></div>`).join('')}
       <div class="sec" style="margin-top:16px">Atividades recentes</div><div class="list">${acts.length ? acts.map(a => `<div class="li"><div class="t"><b style="font-weight:500">${esc(a.action)}</b><small>${ago(a.created_at)}</small></div></div>`).join('') : empty('Sem atividades.')}</div></div>`;
@@ -972,7 +976,7 @@ V['boas-praticas'] = () => {
   ${B('Saúde das contas de anúncios', ['Use Business Manager com verificação da empresa e autenticação em dois fatores para todos.', 'Mantenha formas de pagamento válidas e em nome do responsável; falhas de pagamento travam a entrega.', 'Escale orçamento aos poucos em contas novas.', 'Cada cliente com sua própria conta de anúncios e acesso concedido pelo próprio cliente (parceiro no BM).', 'Quando houver reprovação, peça revisão pelo canal oficial — não recrie o mesmo anúncio em massa.'])}
   ${B('Instagram (rotina da Priscila)', ['Seguir e deixar de seguir sempre de forma manual e em ritmo natural, distribuído ao longo do dia.', 'Nada de apps ou robôs de seguir/curtir/comentar em massa — violam os termos e derrubam o alcance.', 'Interaja de verdade: comente e responda com conteúdo relevante.', 'Ao receber aviso de “ação bloqueada”, pare as ações por alguns dias.'])}
   ${B('WhatsApp Business', ['Envie mensagens só para quem deu permissão (cliente ativo ou contato que pediu informação).', 'Na API oficial, mensagens fora da janela de 24h só com modelos aprovados.', 'Ofereça uma forma simples de a pessoa parar de receber mensagens.', 'Evite disparos em massa por números pessoais; isso leva a banimento.', 'Cobranças: tom respeitoso, com dados corretos e link oficial de pagamento.'])}
-  ${B('Segurança e dados (LGPD)', ['Cada pessoa tem login próprio — nunca compartilhe a senha.', 'Tokens da Meta, Asaas e WhatsApp ficam só no servidor (Supabase), nunca no app ou no GitHub.', 'Colete só os dados necessários dos clientes e apague o que não usa mais.', 'Faça backup mensal em Ajustes > Backup.'])}
+  ${B('Segurança e dados (LGPD)', ['Cada pessoa tem login próprio — nunca compartilhe a senha.', 'Tokens da Meta e do WhatsApp ficam só no servidor (Supabase), nunca no app ou no GitHub.', 'Colete só os dados necessários dos clientes e apague o que não usa mais.', 'Faça backup mensal em Ajustes > Backup.'])}
   </div>`;
 };
 
@@ -981,7 +985,7 @@ V.ajustes = () => {
   const s = S.set; const tpls = S.d.tasks.filter(t => t.is_template).sort((a, b) => firstName(a.assignee).localeCompare(firstName(b.assignee)) || (a.time || '').localeCompare(b.time || ''));
   const DN = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
   const integ = (n, st, how) => `<div class="li"><div class="t"><b>${n}</b><small>${how}</small></div><span class="chip ${st ? 'ok' : ''}">${st ? 'Conectado' : 'Pendente'}</span></div>`;
-  const metaOn = S.d.clients.some(c => c.ad_synced_at); const asaasOn = S.d.invoices.some(i => i.asaas_id);
+  const metaOn = S.d.clients.some(c => c.ad_synced_at);
   return head('Ajustes', 'Somente o administrador vê esta tela') + `
   <form class="card f" data-form="saveSettings"><h3>${ic('gear')}Operação</h3>
     <div class="f2">${fld('Nome da agência', 'agency_name', s.agency_name)}${fld('Limite de clientes', 'max_clients', s.max_clients, 'number', 'min="1" max="500"')}</div>
@@ -1019,14 +1023,13 @@ V.ajustes = () => {
   <div class="card" style="margin-top:14px"><h3>${ic('sync')}Integrações oficiais</h3><div class="list">
     ${integ('Banco de dados (Supabase)', SUPA, SUPA ? 'Dados na nuvem, criptografados e com backup diário do Supabase.' : 'Modo local: dados só neste aparelho. Siga o README para conectar.')}
     ${integ('Meta Ads (Marketing API)', metaOn, 'Campanhas, métricas, saldo e situação das contas. Token fica no servidor.')}
-    ${integ('Asaas', asaasOn, 'Cobranças, assinaturas e baixa automática por webhook.')}
     ${integ('Push com app fechado', !!CFG.VAPID_PUBLIC_KEY && SUPA, 'Chaves VAPID + função send-push no Supabase.')}
     ${integ('WhatsApp Business Platform', false, 'Hoje: botões que abrem o WhatsApp com a mensagem pronta. API oficial: próxima etapa (exige modelos aprovados).')}
     ${integ('Google Calendar / iPhone / Android', true, 'Botão “Calendário” em cada tarefa gera o evento (.ics) compatível com todos.')}
     ${integ('Instagram, RD Station, ClickUp', false, 'Preparados para a próxima etapa; enquanto isso, registro manual.')}
   </div></div>
   <div class="card" style="margin-top:14px"><h3>${ic('down')}Backup</h3><div class="row wrap"><button class="btn" data-act="backup">${ic('down')}Baixar backup (JSON)</button>${!SUPA ? `<label class="btn">Restaurar backup<input type="file" accept="application/json" data-act-change="restore" hidden></label>` : ''}</div><p class="note" style="margin-top:8px">O backup contém dados de clientes: guarde em local seguro (ex.: pasta privada no Drive).</p></div>
-  <div class="card" style="margin-top:14px"><h3>${ic('users')}Equipe</h3><div class="list">${team().map(p => `<div class="li">${avatar(p)}<div class="t"><b>${esc(p.name)}</b><small>${p.role === 'admin' ? 'Administrador' : 'Comercial / co-founder'}${p.email ? ' · ' + esc(p.email) : ''}</small></div>${!SUPA || p.id === S.me.id ? `<button class="btn sm" data-act="changePin" data-id="${p.id}">Trocar senha</button>` : ''}</div>`).join('')}</div>
+  <div class="card" style="margin-top:14px"><h3>${ic('users')}Equipe</h3><div class="list">${team().map(p => `<div class="li">${avatar(p)}<div class="t"><b>${esc(p.name)}</b><small>${p.role === 'admin' ? 'Administrador' : 'Comercial / co-founder'}${p.email ? ' · ' + esc(p.email) : ''}</small></div>${p.id === S.me.id || isAdmin() ? `<label class="btn sm" title="Trocar foto">${ic('plus')}Foto<input type="file" accept="image/*" data-act-change="setPhoto" data-id="${p.id}" hidden></label>` : ''}${!SUPA || p.id === S.me.id ? `<button class="btn sm" data-act="changePin" data-id="${p.id}">Trocar senha</button>` : ''}</div>`).join('')}</div>
   ${SUPA ? '<p class="note" style="margin-top:8px">Novos usuários são criados no painel do Supabase (Authentication → Add user) — veja o README.</p>' : ''}</div>
   <p class="note" style="margin-top:14px;text-align:center">Bravus Work v${VERSION} · ${SUPA ? 'Supabase' : 'modo local'}</p>`;
 };
@@ -1045,7 +1048,7 @@ const A = {
   importDo: async (d, el) => {
     el.disabled = true; let n = 0;
     for (const c of IMPORT.filter(c => !c._skip)) { const { _skip, ...row } = c; const r = await store.insert('clients', row); n++; await log(`Importou o cliente ${row.name}`, r && r.id); }
-    closeModal(); toast(`${n} cliente(s) importado(s)`, 'Complete valor e vencimento de cada um.', 'ok'); S.cliFilter = 'todos'; await refresh();
+    closeModal(); toast(`${n} cliente(s) importado(s)`, 'Complete valor e vencimento de cada um.', 'ok'); S.cliFilter = 'online'; await refresh();
   },
   editClient: d => { if (!d.id && S.d.clients.filter(c => c.op_status !== 'cancelado').length >= S.set.max_clients) return toast('Limite de clientes atingido', `Seu espaço comporta ${S.set.max_clients} clientes. Aumente em Ajustes.`, 'warn'); clientForm(d.id ? client(d.id) : {}); },
   openClient: d => clientDetail(d.id),
@@ -1077,23 +1080,13 @@ const A = {
   delInvoice: d => confirmBox('Excluir cobrança?', 'Prefira “Cancelado” para manter o histórico.', 'Excluir', async () => { await store.remove('invoices', d.id); await refresh(); }, true),
   genInvoices: async d => {
     const k = d.m; let n = 0;
-    for (const c of S.d.clients.filter(c => c.op_status !== 'cancelado' && +c.contract_value > 0 && !c.asaas_customer_id)) { // cobrados pelo Asaas entram pela sincronização
-      if (S.d.invoices.some(i => i.client_id === c.id && ym(i.due_date) === k && /mensalidade/i.test(i.description || ''))) continue;
+    for (const c of S.d.clients.filter(c => c.op_status !== 'cancelado' && +c.contract_value > 0)) {
+      if (S.d.invoices.some(i => i.client_id === c.id && ym(i.due_date) === k && (/mensalidade/i.test(i.description || '') || i.asaas_id))) continue;
       const [y, m] = k.split('-').map(Number); const last = new Date(y, m, 0).getDate();
       const due = `${k}-${pad(Math.min(+c.due_day || 10, last))}`;
       await store.insert('invoices', { client_id: c.id, amount: +c.contract_value, due_date: due, description: `Mensalidade ${monthName(k)}/${y}`, status: 'pendente' }); n++;
     }
     await log(`Gerou ${n} mensalidade(s) de ${k}`); toast(n ? `${n} mensalidade(s) criada(s)` : 'Tudo já estava gerado', '', 'ok'); await refresh();
-  },
-  asaasSync: async (d, el) => {
-    el.disabled = true; toast('Sincronizando com o Asaas…', 'Isso leva alguns segundos.');
-    try {
-      const r = await store.invoke('asaas-sync');
-      toast('Asaas sincronizado', `${r.linked} cliente(s) ligados · ${r.created} cobrança(s) nova(s) · ${r.updated} atualizada(s)`, 'ok');
-      if (r.unmatched && r.unmatched.length) toast('Clientes do Asaas sem cadastro no app', r.unmatched.join(', '), 'warn');
-      await refresh();
-    } catch (e) { toast('Não foi possível sincronizar', e.message, 'warn'); }
-    el.disabled = false;
   },
   payInvoice: d => {
     const i = S.d.invoices.find(x => x.id === d.id);
@@ -1102,7 +1095,6 @@ const A = {
       <label class="sw"><input type="checkbox" name="confirm" required> Confirmo que o valor entrou na conta</label></div>`, { form: 'confirmPay', footer: `<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn ok">${ic('check')}Confirmar</button>` });
   },
   chargeWa: d => { const i = S.d.invoices.find(x => x.id === d.id); log('Abriu lembrete de cobrança no WhatsApp', i && i.client_id); },
-  asaasCharge: async (d, el) => { el.disabled = true; try { const r = await store.invoke('asaas-charge', { invoice_id: d.id }); toast('Cobrança criada no Asaas', r.invoiceUrl || '', 'ok'); await refresh(); } catch (e) { toast('Asaas', e.message, 'warn'); } el.disabled = false; },
   newExpense: () => modal('Nova despesa', `<div class="f">${fld('Descrição *', 'description', '', 'text', 'required')}<div class="f2">${fld('Valor (R$) *', 'amount', '', 'number', 'step="0.01" min="0.01" required')}${fld('Data', 'date', today(), 'date', 'required')}</div>${sel('Categoria', 'category', ['Ferramentas', 'Equipe', 'Impostos', 'Anúncios próprios', 'Equipamentos', 'Outros'])}</div>`, { form: 'saveExpense', footer: `<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` }),
   delExpense: d => confirmBox('Excluir despesa?', 'Esta ação não pode ser desfeita.', 'Excluir', async () => { await store.remove('expenses', d.id); await refresh(); }, true),
   newTask: () => taskForm({}), editTask: d => taskForm(S.d.tasks.find(t => t.id === d.id)),
@@ -1187,11 +1179,16 @@ const F = {
     if (!v.name.trim()) return toast('Informe o nome da empresa', '', 'bad');
     const row = { name: v.name.trim(), contact: v.contact, whatsapp: v.whatsapp, phone: v.phone, email: v.email, instagram: v.instagram, segment: v.segment, owner: v.owner || null,
       services: fd.getAll('services'), contract_value: num(v.contract_value) || 0, due_day: num(v.due_day), start_date: v.start_date || null, op_status: v.op_status,
-      ad_account_id: v.ad_account_id.trim() || null, asaas_customer_id: v.asaas_customer_id.trim() || null, notes: v.notes, ad_account_status: v.ad_account_status || null };
+      ad_account_id: v.ad_account_id.trim() || null, notes: v.notes, ad_account_status: v.ad_account_status || null };
     const old = v.id && client(v.id);
+    if (row.op_status === 'cancelado') { row.end_date = v.end_date || (old && old.end_date) || today(); row.end_reason = (v.end_reason || '').trim() || null; }
+    else { row.end_date = null; row.end_reason = null; }
+    if (old && inWallet(old) !== inWallet(row)) await log(inWallet(row) ? `${row.name} voltou para a carteira (online)` : `${row.name} saiu da carteira (offline)${row.end_reason ? ': ' + row.end_reason : ''}`, v.id);
     if (!old || !old.ad_synced_at || v.ad_balance !== String(old.ad_balance ?? '')) { row.ad_balance = num(v.ad_balance); row.ad_balance_source = row.ad_balance == null ? null : 'manual'; }
-    if (v.id) { await store.update('clients', v.id, row); await log(`Atualizou o cadastro de ${row.name}`, v.id); }
-    else { const c = await store.insert('clients', row); await log(`Cadastrou o cliente ${row.name}`, c.id); }
+    const noCol = e => /end_date|end_reason|column/i.test(e && e.message || '');
+    const save = r => v.id ? store.update('clients', v.id, r) : store.insert('clients', r);
+    let saved; try { saved = await save(row); } catch (e) { if (!noCol(e)) throw e; delete row.end_date; delete row.end_reason; saved = await save(row); toast('Banco ainda sem os campos de saída', 'Rode o SQL v1.1 no Supabase para guardar data e motivo.', 'warn'); }
+    if (v.id) await log(`Atualizou o cadastro de ${row.name}`, v.id); else await log(`Cadastrou o cliente ${row.name}`, saved && saved.id);
     closeModal(); toast('Cliente salvo', '', 'ok'); await refresh();
   },
   clientNote: async v => { if (!v.text.trim()) return; await store.insert('activity', { user_id: S.me.id, action: v.text.trim(), client_id: v.id }); await refresh(); clientDetail(v.id); },
@@ -1304,6 +1301,18 @@ document.addEventListener('change', async e => {
     try { const f = e.target.files[0]; if (!f) return; const list = csvToClients(parseCsv(await f.text())); e.target.value = '';
       if (!list.length) throw new Error('Não encontrei a coluna "Nome" na planilha.'); importPreview(list);
     } catch (err) { toast('Não foi possível ler a planilha', err.message, 'bad'); }
+    return;
+  }
+  if (e.target.dataset.actChange === 'setPhoto') {
+    const f = e.target.files[0], id = e.target.dataset.id; e.target.value = ''; if (!f) return;
+    try {
+      const img = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => no(new Error('Imagem inválida')); i.src = URL.createObjectURL(f); });
+      const n = 256, cv = document.createElement('canvas'); cv.width = cv.height = n; const k = Math.min(img.width, img.height);
+      cv.getContext('2d').drawImage(img, (img.width - k) / 2, (img.height - k) / 2, k, k, 0, 0, n, n);
+      await store.update('profiles', id, { avatar_url: cv.toDataURL('image/jpeg', 0.82) });
+      if (id === S.me.id) S.me.avatar_url = cv.toDataURL('image/jpeg', 0.82);
+      toast('Foto atualizada', '', 'ok'); await refresh(); renderView();
+    } catch (err) { toast('Não foi possível salvar a foto', err.message, 'bad'); }
     return;
   }
   if (e.target.dataset.actChange === 'restore') {

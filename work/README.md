@@ -14,7 +14,7 @@ App leve (PWA): abre no navegador do computador e instala no celular (Android e 
 | **Assistente Bravus** | Lista de prioridades do dia calculada automaticamente (inadimplentes, contas com problema, sem saldo, tarefas atrasadas, CTR baixo, conteúdo para aprovar). Não usa IA paga. |
 | **Clientes** | Cadastro completo, serviços (tráfego, social media, site, landing page, automação, mentoria), limite de 20 clientes (ajustável), filtros Online / Offline / Inadimplentes, histórico de atividades, botão de WhatsApp. |
 | **Campanhas (Ads Monitor)** | Investimento, alcance, impressões, cliques, CTR, CPC, CPM, leads, CPL, conversões. Registro manual hoje; automático quando a Meta for conectada. |
-| **Financeiro** | Gera as mensalidades do mês a partir dos contratos, confirma recebimento (só com confirmação), despesas, saldo, cobrança pelo WhatsApp com mensagem pronta, envio para o Asaas. |
+| **Financeiro** | Gera as mensalidades do mês a partir dos contratos, confirma recebimento (só com confirmação), despesas, saldo, cobrança pelo WhatsApp com mensagem pronta. |
 | **Agenda — Bravus Daily** | Rotina diária criada sozinha para Andrade e Priscila, metas com contador (+1/+5), ligações a partir das 12h, **reuniões só a partir das 18h30** (exceção só pelo admin), botão para mandar ao Google Calendar / iPhone / Android. |
 | **Bravus Weekend** | Sábado: gravação e planejamento. Domingo: edição, Feed, Stories e programação da semana. |
 | **Conteúdo** | Calendário editorial em quadro: Ideia → Gravado → Editado → **Aprovação** → Agendado → Publicado. Nada vai ao ar sem passar pela aprovação. |
@@ -61,15 +61,12 @@ Instale o Supabase CLI e, na pasta do projeto:
 ```bash
 supabase login
 supabase link --project-ref SEU_PROJETO
-supabase secrets set META_ACCESS_TOKEN=... ASAAS_API_KEY=... ASAAS_ENV=sandbox ASAAS_WEBHOOK_TOKEN=... \
+supabase secrets set META_ACCESS_TOKEN=... \
   VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=mailto:bravusmidiaoficial@gmail.com PUSH_WEBHOOK_SECRET=...
 supabase functions deploy meta-sync
-supabase functions deploy asaas-charge
-supabase functions deploy asaas-webhook --no-verify-jwt
 supabase functions deploy send-push --no-verify-jwt
 ```
 - **Meta Ads**: no Business Manager, crie um *Usuário do sistema* com permissão `ads_read` nas contas dos clientes e gere o token. No cadastro de cada cliente, preencha o **ID da conta de anúncios** (`act_...`). O botão *Sincronizar Meta* traz campanhas, métricas dos últimos 30 dias, situação da conta e o saldo **somente quando a Meta informa** (saldo pré-pago ou limite de gastos).
-- **Asaas**: comece com `ASAAS_ENV=sandbox`. No Asaas, cadastre o webhook apontando para `https://SEU_PROJETO.supabase.co/functions/v1/asaas-webhook` com o mesmo token. Preencha o **ID do cliente no Asaas** (`cus_...`) no cadastro do cliente.
 
 ### 4. Publicar em app.bravusmidia.com.br
 - **Cloudflare Pages** (recomendado, gratuito): suba a pasta para um repositório no GitHub (`bravusmidia/bravus-work`, **privado**) → Cloudflare Pages → conectar o repo → sem comando de build, pasta de saída `/`. Em *Custom domains*, adicione `app.bravusmidia.com.br` e crie o CNAME no Registro.br conforme o Cloudflare indicar. O arquivo `_headers` já aplica cabeçalhos de segurança.
@@ -83,7 +80,6 @@ supabase functions deploy send-push --no-verify-jwt
 
 ## Segurança
 - Regras de acesso no banco (RLS) em todas as tabelas: cada agência só vê os próprios dados; financeiro só para o admin (ou Priscila, se liberado).
-- Tokens da Meta, Asaas e WhatsApp ficam **apenas** nos secrets do Supabase.
 - Webhooks validados por token; chamadas às funções exigem login da equipe.
 - PIN com bloqueio progressivo, sessão bloqueada por inatividade, CSP e cabeçalhos de segurança.
 - Instagram: o app **organiza e registra** as ações de seguir/deixar de seguir — nada é automatizado, conforme as regras da plataforma.
