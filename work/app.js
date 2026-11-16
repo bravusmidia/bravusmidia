@@ -130,6 +130,9 @@ const DEFAULT_SETTINGS = {
   recharge: { auto: false, repeat: 3, msg: '' },
   exit_reasons: ['Inadimplência', 'Cancelamento', 'Término de contrato', 'Falta de pagamento', 'Sem verba para anúncios', 'Insatisfação com os resultados', 'Pausou o negócio', 'Mudou de agência']
 };
+const isSplit = c => +c.installments === 2 && c.due_day2;
+const dueTxt = c => isSplit(c) ? `dia ${c.due_day || '—'} e ${c.due_day2} (2x)` : `dia ${c.due_day || '—'}`;
+const parts = c => { const t = Math.round((+c.contract_value || 0) * 100); if (!isSplit(c)) return [[+c.due_day || 10, t / 100]]; const a = Math.ceil(t / 2); return [[+c.due_day || 10, a / 100], [+c.due_day2, (t - a) / 100]]; };
 const exitReasons = () => (Array.isArray(S.set.exit_reasons) ? S.set.exit_reasons : DEFAULT_SETTINGS.exit_reasons).filter(Boolean);
 /* campo de motivo: lista pronta (editável em Ajustes) + texto livre */
 const reasonField = (v = '') => `<label class="fl">Motivo da saída<input name="end_reason" value="${esc(v || '')}" maxlength="120" list="exitR" placeholder="escolha abaixo ou digite"><datalist id="exitR">${exitReasons().map(r => `<option value="${esc(r)}">`).join('')}</datalist></label>
@@ -194,11 +197,12 @@ function toast(title, body = '', type = '') {
   el.innerHTML = `<b>${esc(title)}</b>${body ? `<span class="small muted">${esc(body)}</span>` : ''}`;
   const box = $('#toasts'); box.appendChild(el); while (box.children.length > 3) box.firstChild.remove(); setTimeout(() => el.remove(), 4200);
 }
-function modal(title, body, { footer = '', wide = false, form = '', cls = '' } = {}) {
+function modal(title, body, { footer = '', wide = false, form = '', cls = '', onOpen = null } = {}) {
   const root = $('#modal-root');
   const inner = `<header><h2>${esc(title)}</h2><button class="btn sm ic" data-act="closeModal" aria-label="Fechar">${ic('x')}</button></header><div class="bd ${cls}">${body}</div>${footer ? `<footer>${footer}</footer>` : ''}`;
   root.innerHTML = `<div class="ov" data-ov="1">${form ? `<form class="mo ${wide ? 'wide' : ''}" data-form="${form}" novalidate>${inner}</form>` : `<div class="mo ${wide ? 'wide' : ''}">${inner}</div>`}</div>`;
   const first = root.querySelector('input:not([type=hidden]),select,textarea'); if (first && innerWidth > 860) first.focus();
+  if (onOpen) onOpen(root.querySelector('form') || root);
 }
 const closeModal = () => { $('#modal-root').innerHTML = ''; };
 function confirmBox(title, text, okLabel, onOk, danger = false) {
@@ -701,7 +705,7 @@ V.clientes = () => {
     <div class="grid g3">${cl.length ? cl.map(c => `<div class="ccard" data-act="openClient" data-id="${c.id}">
       <div class="hd"><span class="av" style="background:linear-gradient(135deg,#1c5fe6,#0b1a3d)">${esc(initials(c.name))}</span><b>${esc(c.name)}</b>${walletBtn(c)}</div>
       <div class="row wrap" style="gap:6px">${(c.services || []).map(s => `<span class="chip blue">${esc(svcName(s))}</span>`).join('') || '<span class="muted small">Sem serviços</span>'}</div>
-      <div class="ft"><span class="muted">${esc(c.segment || 'Segmento —')} · vence dia ${esc(c.due_day || '—')}</span>${canFin() ? `<b>${brl(c.contract_value)}</b>` : ''}</div>
+      <div class="ft"><span class="muted">${esc(c.segment || 'Segmento —')} · vence ${esc(dueTxt(c))}</span>${canFin() ? `<b>${brl(c.contract_value)}</b>` : ''}</div>
       ${!inWallet(c) ? `<div class="small muted">Saiu ${c.end_date ? 'em ' + fdateY(c.end_date) : ''}${c.end_reason ? ' · ' + esc(c.end_reason) : ''}${c.start_date ? ` · cliente desde ${fdateY(c.start_date)}` : ''}</div>` : ''}
       <div class="row">${canFin() ? finChip(clientFin(c)) : ''}${inWallet(c) ? `${c.op_status !== 'ativo' ? `<span class="chip warn">${esc(c.op_status === 'pausado' ? 'Pausado' : 'Em implantação')}</span>` : ''}${(c.services || []).includes('trafego') ? adChip(c) : ''}` : ''}<span class="sp"></span><span class="small muted">${esc(firstName(c.owner))}</span></div>
     </div>`).join('') : `<div class="card" style="grid-column:1/-1">${empty(S.d.clients.length ? 'Nenhum cliente neste filtro.' : 'Cadastre seu primeiro cliente no botão “+ Cliente”.')}</div>`}</div>`;
@@ -715,7 +719,9 @@ function clientForm(c = {}) {
     <div class="f2">${fld('E-mail', 'email', c.email, 'email')}${fld('Instagram', 'instagram', c.instagram, 'text', 'placeholder="@perfil"')}</div>
     <div class="f2">${fld('Segmento', 'segment', c.segment)}${sel('Responsável interno', 'owner', teamOpts(), c.owner || S.me.id)}</div>
     <label class="fl">Serviços contratados<div class="cks">${SERVICES.map(s => `<label><input type="checkbox" name="services" value="${s[0]}" ${svcs.includes(s[0]) ? 'checked' : ''}>${s[1]}</label>`).join('')}</div></label>
-    <div class="f2">${fld('Valor mensal do contrato (R$)', 'contract_value', c.contract_value, 'number', 'step="0.01" min="0"')}${fld('Dia de vencimento', 'due_day', c.due_day || 10, 'number', 'min="1" max="31"')}</div>
+    <div class="f2">${fld('Valor mensal do contrato (R$)', 'contract_value', c.contract_value, 'number', 'step="0.01" min="0"')}${sel('Forma de pagamento', 'installments', [['1', 'À vista (1 vencimento)'], ['2', 'Parcelado em 2x']], String(c.installments || 1))}</div>
+    <div class="f2">${fld('1º vencimento (dia)', 'due_day', c.due_day || 10, 'number', 'min="1" max="31"')}<div id="dd2" style="${+c.installments === 2 ? '' : 'visibility:hidden'}">${fld('2º vencimento (dia)', 'due_day2', c.due_day2 || '', 'number', 'min="1" max="31" placeholder="ex.: 20"')}</div></div>
+    <p class="note" id="ddNote" style="${+c.installments === 2 ? '' : 'display:none'};margin-top:-6px">Parcelado: o valor mensal é dividido em 2 cobranças iguais, uma em cada dia. Máximo 2x.</p>
     <div class="f2">${fld('Data de contratação', 'start_date', c.start_date || today(), 'date')}${sel('Status na carteira', 'op_status', OP, c.op_status || 'ativo')}</div>
     ${fld('Data de saída (se saiu)', 'end_date', c.end_date, 'date')}
     ${reasonField(c.end_reason)}
@@ -724,7 +730,7 @@ function clientForm(c = {}) {
     ${sel('Situação da conta de anúncios', 'ad_account_status', [['', 'Não informado'], ['ativa', 'Ativa'], ['bloqueada', 'Bloqueada / restrita'], ['pagamento', 'Problema de pagamento']], c.ad_account_status)}
     <p class="note">Com a Meta conectada, saldo e situação são atualizados automaticamente e o registro manual é substituído pelos dados oficiais.</p>
     ${area('Observações', 'notes', c.notes)}
-  </div>`, { form: 'saveClient', footer: `${c.id && isAdmin() ? `<button type="button" class="btn bad" data-act="delClient" data-id="${c.id}">${ic('trash')}</button><span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
+  </div>`, { form: 'saveClient', onOpen: f => { const sl = f.installments; sl.addEventListener('change', () => { const two = sl.value === '2'; $('#dd2').style.visibility = two ? '' : 'hidden'; $('#ddNote').style.display = two ? '' : 'none'; if (two) f.due_day2.focus(); }); }, footer: `${c.id && isAdmin() ? `<button type="button" class="btn bad" data-act="delClient" data-id="${c.id}">${ic('trash')}</button><span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
 }
 function clientDetail(id) {
   const c = client(id); if (!c) return;
@@ -735,7 +741,7 @@ function clientDetail(id) {
   modal(c.name, `${wal}<div class="row wrap" style="gap:6px;margin-bottom:12px">${walletChip(c)}${inWallet(c) && (c.services || []).includes('trafego') ? adChip(c) : ''}${canFin() ? finChip(clientFin(c)) : ''}${(c.services || []).map(s => `<span class="chip blue">${esc(svcName(s))}</span>`).join('')}</div>
     <div class="grid g2" style="gap:10px">
       <div class="card"><h3>Contato</h3><div class="small" style="display:grid;gap:4px"><span>👤 ${esc(c.contact || '—')}</span><span>📱 ${esc(c.whatsapp || c.phone || '—')}</span><span>✉️ ${esc(c.email || '—')}</span><span>📷 ${esc(c.instagram || '—')}</span><span>🏷️ ${esc(c.segment || '—')}</span><span>🧑‍💼 Responsável: ${esc(pname(c.owner))}</span></div></div>
-      <div class="card"><h3>Contrato</h3><div class="small" style="display:grid;gap:4px">${canFin() ? `<span>Valor: <b>${brl(c.contract_value)}</b>/mês</span>` : ''}<span>Vencimento: dia ${esc(c.due_day || '—')}</span><span>Desde: ${c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}</span><span>Conta de anúncios: ${esc(c.ad_account_id || '—')}</span><span>Saldo: ${c.ad_balance != null && c.ad_balance !== '' ? brl(c.ad_balance) + ` (${esc(c.ad_balance_source || 'manual')})` : 'não informado'}</span>${c.ad_synced_at ? `<span class="muted">Meta sincronizada ${ago(c.ad_synced_at)}</span>` : ''}</div></div>
+      <div class="card"><h3>Contrato</h3><div class="small" style="display:grid;gap:4px">${canFin() ? `<span>Valor: <b>${brl(c.contract_value)}</b>/mês</span>` : ''}<span>Vencimento: ${esc(dueTxt(c))}${isSplit(c) && canFin() ? ` · ${parts(c).map(p => brl(p[1])).join(' + ')}` : ''}</span><span>Desde: ${c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}</span><span>Conta de anúncios: ${esc(c.ad_account_id || '—')}</span><span>Saldo: ${c.ad_balance != null && c.ad_balance !== '' ? brl(c.ad_balance) + ` (${esc(c.ad_balance_source || 'manual')})` : 'não informado'}</span>${c.ad_synced_at ? `<span class="muted">Meta sincronizada ${ago(c.ad_synced_at)}</span>` : ''}</div></div>
     </div>
     <div class="sec">Campanhas</div>
     <div class="list">${cs.length ? cs.map(x => `<div class="li"><div class="t"><b>${esc(x.name)}</b><small>Investido ${brl(x.spend)} · ${int(x.leads)} leads · CTR ${pct(metrics(x).ctr)}</small></div>${campChip(x.status)}</div>`).join('') : empty('Sem campanhas registradas.')}</div>
@@ -1209,10 +1215,13 @@ const A = {
   genInvoices: async d => {
     const k = d.m; let n = 0;
     for (const c of S.d.clients.filter(c => c.op_status !== 'cancelado' && +c.contract_value > 0)) {
-      if (S.d.invoices.some(i => i.client_id === c.id && ym(i.due_date) === k && (/mensalidade/i.test(i.description || '') || i.asaas_id))) continue;
+      const have = S.d.invoices.filter(i => i.client_id === c.id && ym(i.due_date) === k && (/mensalidade/i.test(i.description || '') || i.asaas_id));
+      const ps = parts(c); if (have.length >= ps.length) continue;
       const [y, m] = k.split('-').map(Number); const last = new Date(y, m, 0).getDate();
-      const due = `${k}-${pad(Math.min(+c.due_day || 10, last))}`;
-      await store.insert('invoices', { client_id: c.id, amount: +c.contract_value, due_date: due, description: `Mensalidade ${monthName(k)}/${y}`, status: 'pendente' }); n++;
+      for (let j = have.length; j < ps.length; j++) {
+        const due = `${k}-${pad(Math.min(ps[j][0], last))}`;
+        await store.insert('invoices', { client_id: c.id, amount: ps[j][1], due_date: due, description: `Mensalidade ${monthName(k)}/${y}${ps.length > 1 ? ` (${j + 1}/2)` : ''}`, status: 'pendente' }); n++;
+      }
     }
     await log(`Gerou ${n} mensalidade(s) de ${k}`); toast(n ? `${n} mensalidade(s) criada(s)` : 'Tudo já estava gerado', '', 'ok'); await refresh();
   },
@@ -1306,16 +1315,18 @@ const F = {
   saveClient: async (v, fd) => {
     if (!v.name.trim()) return toast('Informe o nome da empresa', '', 'bad');
     const row = { name: v.name.trim(), contact: v.contact, whatsapp: v.whatsapp, phone: v.phone, email: v.email, instagram: v.instagram, segment: v.segment, owner: v.owner || null,
-      services: fd.getAll('services'), contract_value: num(v.contract_value) || 0, due_day: num(v.due_day), start_date: v.start_date || null, op_status: v.op_status,
+      services: fd.getAll('services'), contract_value: num(v.contract_value) || 0, due_day: num(v.due_day), installments: v.installments === '2' ? 2 : 1, due_day2: v.installments === '2' ? num(v.due_day2) : null, start_date: v.start_date || null, op_status: v.op_status,
       ad_account_id: v.ad_account_id.trim() || null, notes: v.notes, ad_account_status: v.ad_account_status || null };
+    if (row.installments === 2 && (!row.due_day2 || row.due_day2 < 1 || row.due_day2 > 31)) return toast('Informe o dia do 2º vencimento', 'Parcelado aceita até 2x.', 'warn');
+    if (row.installments === 2 && row.due_day2 === row.due_day) return toast('Os dois vencimentos estão no mesmo dia', 'Escolha dias diferentes ou use À vista.', 'warn');
     const old = v.id && client(v.id);
     if (row.op_status === 'cancelado') { row.end_date = v.end_date || (old && old.end_date) || today(); row.end_reason = (v.end_reason || '').trim() || null; }
     else { row.end_date = null; row.end_reason = null; }
     if (old && inWallet(old) !== inWallet(row)) await log(inWallet(row) ? `${row.name} voltou para a carteira (online)` : `${row.name} saiu da carteira (offline)${row.end_reason ? ': ' + row.end_reason : ''}`, v.id);
     if (!old || !old.ad_synced_at || v.ad_balance !== String(old.ad_balance ?? '')) { row.ad_balance = num(v.ad_balance); row.ad_balance_source = row.ad_balance == null ? null : 'manual'; }
-    const noCol = e => /end_date|end_reason|column/i.test(e && e.message || '');
+    const noCol = e => /end_date|end_reason|installments|due_day2|column/i.test(e && e.message || '');
     const save = r => v.id ? store.update('clients', v.id, r) : store.insert('clients', r);
-    let saved; try { saved = await save(row); } catch (e) { if (!noCol(e)) throw e; delete row.end_date; delete row.end_reason; saved = await save(row); toast('Banco ainda sem os campos de saída', 'Rode o SQL v1.1 no Supabase para guardar data e motivo.', 'warn'); }
+    let saved; try { saved = await save(row); } catch (e) { if (!noCol(e)) throw e; delete row.end_date; delete row.end_reason; delete row.installments; delete row.due_day2; saved = await save(row); toast('Banco ainda sem alguns campos', 'Rode o SQL v1.5 no Supabase para guardar o parcelamento e a saída.', 'warn'); }
     if (v.id) await log(`Atualizou o cadastro de ${row.name}`, v.id); else await log(`Cadastrou o cliente ${row.name}`, saved && saved.id);
     closeModal(); toast('Cliente salvo', '', 'ok'); await refresh();
   },
