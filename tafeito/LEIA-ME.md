@@ -21,7 +21,7 @@ Se quiser só olhar antes, abra o endereço e toque em **"Abrir modo demonstraç
 1. No seu celular, abra **https://www.bravusmidia.com.br/tafeito/**
 2. Cole a URL e a chave e toque em **Conectar**.
 3. Toque em **Criar conta do Pai** e informe nome, e-mail e senha.
-4. As tarefas do Henrique já vêm cadastradas: quarto, guarda-roupa, mesa, afastar a cama, varrer, pano, louça, lixo, banheiro (sábado), estudo e dever. Também vêm 2 trabalhos de exemplo e 5 missões. Edite tudo do seu jeito. O Lorenzo aparece só com o nome, sem tarefas.
+4. As tarefas do Henrique já vêm cadastradas: quarto, guarda-roupa, mesa, afastar a cama, varrer, pano, louça, lixo, banheiro (sábado). Também vêm 2 trabalhos de exemplo e 4 missões. (A parte de estudo foi retirada do app.) Edite tudo do seu jeito. O Lorenzo aparece só com o nome, sem tarefas.
 5. Instale o app: no Chrome, menu ⋮ → **Instalar app**.
 
 ## 3. Liberar o Henrique

@@ -3,11 +3,13 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '1.1.0';
+const VERSAO = '1.2.0';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
-const CATS = { casa: { nome: 'Casa', icone: '🏠' }, estudo: { nome: 'Estudo', icone: '📚' }, trabalho: { nome: 'Work', icone: '💼' } };
+const CATS = { casa: { nome: 'Casa', icone: '🏠' }, trabalho: { nome: 'Work', icone: '💼' } };
+// Estudo saiu do app (o filho já cuida disso sozinho): tarefas e missões antigas de estudo ficam ocultas.
+const SEM_ESTUDO = { tarefas: t => t.categoria !== 'estudo', missoes: m => !(m.tipo === 'categoria' && m.categoria === 'estudo') };
 const PATENTES = ['Recruta', 'Soldado', 'Cabo', '3º Sargento', '2º Sargento', '1º Sargento', 'Suboficial', 'Aspirante', 'Tenente', 'Capitão', 'Major', 'Tenente-Coronel', 'Coronel', 'Brigadeiro'];
 const DSEM = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const RRDIA = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
@@ -160,8 +162,6 @@ function sementes(filhoId) {
     T('🍽️', 'Lavar a louça', 'casa', '13:00', { descricao: 'Louça lavada, escorrida e pia limpa.' }),
     T('🗑️', 'Tirar o lixo', 'casa', '19:00', { descricao: 'Esvaziar as 3 lixeiras e colocar saco novo. Marque cada uma.', itens: LIXEIRAS.slice() }),
     T('🚿', 'Lavar o banheiro', 'casa', '10:00', { dias: [6], descricao: 'Vaso, pia, box e chão. (Sábado)', xp: 30 }),
-    T('📖', 'Estudar 1 hora', 'estudo', '15:00', { dias: [1, 2, 3, 4, 5], descricao: 'Foto do caderno antes e depois do estudo.', xp: 15 }),
-    T('✏️', 'Dever de casa', 'estudo', '16:00', { dias: [1, 2, 3, 4, 5], descricao: 'Foto do dever antes e depois de feito.', xp: 15 }),
     T('🖼️', 'Tarefas de imagem', 'trabalho', '', { recorrencia: 'unica', data_unica: hojeISO(), valor: 10, xp: 20, descricao: 'O pai explica no chat o que fazer.' }),
     T('📲', 'Deixar de seguir perfis no Instagram', 'trabalho', '', { recorrencia: 'unica', data_unica: hojeISO(), valor: 5, xp: 20, descricao: 'Manual, um por um, da lista que o pai passar.' })
   ];
@@ -169,7 +169,6 @@ function sementes(filhoId) {
   const missoes = [
     M('🔥', 'Semana de ouro', 'sequencia', 7, { descricao: '7 dias seguidos com todas as tarefas feitas.', premio: '+2h de jogo no fim de semana', valor: 10, xp: 100 }),
     M('🧹', 'Faxineiro de elite', 'categoria', 30, { categoria: 'casa', descricao: '30 tarefas de casa concluídas.', premio: 'Escolher o lanche do sábado', valor: 20, xp: 100 }),
-    M('🧠', 'Cérebro afiado', 'categoria', 10, { categoria: 'estudo', descricao: '10 tarefas de estudo concluídas.', premio: 'Escolher o filme da família', xp: 80 }),
     M('💼', 'Trabalhador', 'categoria', 5, { categoria: 'trabalho', descricao: '5 trabalhos concluídos.', premio: 'Bônus em dinheiro', valor: 15, xp: 80 }),
     M('🎖️', 'Primeira patente', 'total', 20, { descricao: '20 tarefas concluídas no total.', premio: 'Medalha de Cabo', xp: 50 })
   ];
@@ -404,7 +403,7 @@ async function abrirApp() {
 
 async function carregarTudo() {
   const res = await Promise.all(TABELAS.map(t => DB.listar(t).catch(e => { console.warn(t, e); return null; })));
-  TABELAS.forEach((t, i) => { if (res[i]) S.dados[t] = res[i]; });
+  TABELAS.forEach((t, i) => { if (res[i]) S.dados[t] = SEM_ESTUDO[t] ? res[i].filter(SEM_ESTUDO[t]) : res[i]; });
   S.config = S.dados.config.find(c => c.id == 1) || {};
 }
 
@@ -599,16 +598,15 @@ function bannerPermissoes() {
 
 /* ---------- telas do FILHO ---------- */
 function telaHoje() {
-  const dia = hojeISO(); const tars = tarefasDoDia(dia, ['casa', 'estudo']);
+  const dia = hojeISO(); const tars = tarefasDoDia(dia, ['casa']);
   const st = statusDia(dia);
-  const casa = tars.filter(t => t.categoria === 'casa'), est = tars.filter(t => t.categoria === 'estudo');
+  const casa = tars.filter(t => t.categoria === 'casa');
   const pct = st.total ? Math.round(st.feitas / st.total * 100) : 0;
   return `${avisoNotificacao()}${bannerPermissoes()}
     <div class="card"><div class="linha"><div class="esp"><b>Missões de hoje</b><br><span class="mut peq">${new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</span></div><b style="font-size:1.4rem">${st.feitas}/${st.total}</b></div>
     <div class="barra" style="margin-top:10px"><i style="width:${pct}%"></i></div></div>
-    ${!tars.length ? `<div class="vazio"><span class="e">🎉</span>Nenhuma tarefa de casa ou estudo hoje.</div>` : ''}
+    ${!tars.length ? `<div class="vazio"><span class="e">🎉</span>Nenhuma tarefa de casa hoje.</div>` : ''}
     ${casa.length ? `<div class="secao">🏠 Casa</div>${casa.map(t => cardTarefaFilho(t, dia)).join('')}` : ''}
-    ${est.length ? `<div class="secao">📚 Estudo</div>${est.map(t => cardTarefaFilho(t, dia)).join('')}` : ''}
     ${pode('tarefas') ? `<button class="btn ghost" data-act="novaTarefa" data-cat="casa">＋ Nova tarefa</button>` : `<button class="btn ghost sm" style="width:100%" data-act="pedir" data-area="tarefas">✋ Pedir permissão para ajustar tarefas</button>`}
     <div class="secao">🏆 Prêmio do dia</div>${cardPremio(dia)}
     <p class="rodape">Desenvolvido por Andrade</p>`;
@@ -686,9 +684,9 @@ function listaGerenciar(cats) {
 }
 
 function telaTarefasPai() {
-  return `<div class="linha" style="margin-bottom:6px"><div class="esp"><h2 style="margin:0">Tarefas de ${esc(filhoAtual().nome)}</h2><span class="mut peq">Casa e estudo</span></div>
+  return `<div class="linha" style="margin-bottom:6px"><div class="esp"><h2 style="margin:0">Tarefas de ${esc(filhoAtual().nome)}</h2><span class="mut peq">Tarefas de casa</span></div>
     <button class="btn pri sm" data-act="novaTarefa" data-cat="casa">＋ Nova</button></div>
-    ${listaGerenciar(['casa', 'estudo'])}`;
+    ${listaGerenciar(['casa'])}`;
 }
 
 function telaWorkPai() {
