@@ -623,7 +623,9 @@ function renderView(keepScroll) {
   document.querySelectorAll('.nav a, .bnav a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + S.route));
 }
 const head = (title, sub = '', actions = '') => `<div class="top"><h1>${esc(title)}${sub ? `<small>${sub}</small>` : ''}</h1>${actions}</div>`;
-const kpi = (label, val, sub = '', cls = '') => `<div class="kpi ${cls}"><small>${esc(label)}</small><b>${val}</b>${sub ? `<em>${sub}</em>` : ''}</div>`;
+const kpi = (label, val, sub = '', cls = '', go) => go
+  ? `<div class="kpi go ${cls}" role="button" tabindex="0" title="Abrir ${esc(label)}" data-act="kpiGo" data-r="${go[0]}" data-f="${go[1] || ''}" data-s="${go[2] || ''}"><small>${esc(label)}</small><b>${val}</b>${sub ? `<em>${sub}</em>` : ''}<i class="kgo">${ic('right')}</i></div>`
+  : `<div class="kpi ${cls}"><small>${esc(label)}</small><b>${val}</b>${sub ? `<em>${sub}</em>` : ''}</div>`;
 const empty = t => `<div class="empty">${t}</div>`;
 
 /* =====================================================================
@@ -658,17 +660,17 @@ V.painel = () => {
 
   return head(`${greet}, ${firstName(S.me.id)}`, fdateL(d), isAdmin() ? `<button class="btn pri" data-act="newTask">${ic('plus')}Tarefa</button>` : `<button class="btn pri" data-act="editMeet">${ic('plus')}Reunião</button>`) + `
   ${canFin() ? `<div class="grid g4">
-    ${kpi('Entrou no mês', brl(fm.recebido), 'pagamentos confirmados', 'hl')}
-    ${kpi('A receber', brl(fm.aReceber), 'vencimentos do mês', 'y')}
-    ${kpi('Em atraso', brl(fm.atrasado), `${inad.length} cliente(s) inadimplente(s)`, fm.atrasado ? 'r' : '')}
-    ${kpi('Saldo do mês', brl(fm.saldo), `saídas ${brl(fm.saidas)}`, fm.saldo >= 0 ? 'g' : 'r')}
+    ${kpi('Entrou no mês', brl(fm.recebido), 'pagamentos confirmados', 'hl', ['financeiro', 'pago', 'fin-cob'])}
+    ${kpi('A receber', brl(fm.aReceber), 'vencimentos do mês', 'y', ['financeiro', 'pendente', 'fin-cob'])}
+    ${kpi('Em atraso', brl(fm.atrasado), `${inad.length} cliente(s) inadimplente(s)`, fm.atrasado ? 'r' : '', ['financeiro', 'atrasado', 'fin-cob'])}
+    ${kpi('Saldo do mês', brl(fm.saldo), `saídas ${brl(fm.saidas)}`, fm.saldo >= 0 ? 'g' : 'r', ['financeiro', 'todos', 'fin-saidas'])}
   </div>` : ''}
   <div class="sec">Clientes<span class="sp"></span><a class="small" href="#metas" style="text-transform:none;letter-spacing:0">ver metas do mês →</a></div>
   <div class="grid g4">
-    ${kpi('Clientes ativos', `${ativos.length}<span class="muted" style="font-size:15px"> / ${S.set.max_clients}</span>`, `<a href="#clientes" data-act="cliFilterGo" data-f="offline">${cancel.length} inativo(s)</a> · ${novos.length} novo(s) no mês`)}
-    ${kpi('Inadimplentes', inad.length, inad.length ? 'clique no cliente para cobrar' : 'ninguém em atraso', inad.length ? 'r' : '')}
-    ${kpi('Reuniões no mês', meets.length, `${meets.filter(t => t.status === 'feito').length} realizadas · ${meets.filter(t => t.outcome === 'fechou').length} fecharam`)}
-    ${canFin() ? kpi('Receita mensal', brl(mrr()), 'soma dos contratos ativos', 'g') : kpi('Novos no mês', novos.length)}
+    ${kpi('Clientes ativos', `${ativos.length}<span class="muted" style="font-size:15px"> / ${S.set.max_clients}</span>`, `<a href="#clientes" data-act="cliFilterGo" data-f="offline">${cancel.length} inativo(s)</a> · ${novos.length} novo(s) no mês`, '', ['clientes', 'online'])}
+    ${kpi('Inadimplentes', inad.length, inad.length ? 'clique no cliente para cobrar' : 'ninguém em atraso', inad.length ? 'r' : '', ['clientes', 'inad'])}
+    ${kpi('Reuniões no mês', meets.length, `${meets.filter(t => t.status === 'feito').length} realizadas · ${meets.filter(t => t.outcome === 'fechou').length} fecharam`, '', ['reunioes'])}
+    ${canFin() ? kpi('Receita mensal', brl(mrr()), 'soma dos contratos ativos', 'g', ['clientes', 'online']) : kpi('Novos no mês', novos.length, '', '', ['clientes', 'todos'])}
   </div>
   <div class="grid g2" style="margin-top:14px">
     <div class="card"><h3>${ic('spark')}Prioridades de hoje<span class="sp"></span><span class="chip blue">Assistente Bravus</span></h3>
@@ -685,7 +687,7 @@ V.painel = () => {
       <p class="small muted" style="margin-top:8px">Receita recorrente (contratos ativos): <b style="color:var(--tx)">${brl(mrr())}</b>/mês</p></div>` : ''}
     <div class="card"><h3>${ic('cal')}Hoje<span class="sp"></span><a class="small" href="#agenda">agenda</a></h3>
       <div class="grid g3" style="grid-template-columns:repeat(3,1fr);gap:8px">
-        ${kpi('Pendentes', tasks.length - done.length)}${kpi('Concluídas', done.length, '', 'g')}${kpi('Reuniões', meets.filter(t => t.date === d).length)}
+        ${kpi('Pendentes', tasks.length - done.length, '', '', ['agenda'])}${kpi('Concluídas', done.length, '', 'g', ['agenda'])}${kpi('Reuniões', meets.filter(t => t.date === d).length, '', '', ['reunioes'])}
       </div>
       <div style="margin-top:12px"><div class="row small"><span class="muted">Produtividade do dia</span><span class="sp"></span><b>${tasks.length ? Math.round(done.length / tasks.length * 100) : 0}%</b></div><div class="prog" style="margin-top:6px"><i style="width:${tasks.length ? done.length / tasks.length * 100 : 0}%"></i></div></div>
       <div class="row small" style="margin-top:12px;gap:16px;flex-wrap:wrap"><a class="muted" href="#reunioes">Reuniões no mês: <b style="color:var(--tx)">${meets.length}</b> (${meets.filter(t => t.status === 'feito').length} realizadas · ${meets.filter(t => t.outcome === 'fechou').length} fecharam)</a><span class="muted">Publicações pendentes: <b style="color:var(--tx)">${contentPend.length}</b></span></div>
@@ -802,18 +804,21 @@ function importPreview(list) {
 const invChip = i => { const s = invStatus(i); return `<span ${isAdmin() && s !== 'cancelado' ? `data-act="invMenu" data-id="${i.id}" style="cursor:pointer" title="Clique para alterar"` : ''} class="chip ${s === 'pago' ? 'ok' : s === 'atrasado' ? 'bad' : s === 'pendente' ? 'warn' : ''}">${s === 'pago' ? 'Pago' : s === 'atrasado' ? 'Atrasado' : s === 'pendente' ? 'A vencer' : 'Cancelado'}</span>`; };
 V.financeiro = () => {
   const k = S.finMonth, fm = finMonth(k);
-  const inv = S.d.invoices.filter(i => i.status !== 'cancelado' && inWallet(client(i.client_id) || { op_status: 'cancelado' }) && (ym(i.due_date) === k || invStatus(i) === 'atrasado')).sort((a, b) => a.due_date.localeCompare(b.due_date));
+  const invAll = S.d.invoices.filter(i => i.status !== 'cancelado' && inWallet(client(i.client_id) || { op_status: 'cancelado' }) && (ym(i.due_date) === k || invStatus(i) === 'atrasado')).sort((a, b) => a.due_date.localeCompare(b.due_date));
+  const ff = S.finFilter || 'todos'; const inv = ff === 'todos' ? invAll : invAll.filter(i => invStatus(i) === ff);
+  const fTabs = [['todos', 'Todas'], ['pago', 'Pagas'], ['pendente', 'A receber'], ['atrasado', 'Em atraso']].map(t => [t[0], `${t[1]} · ${t[0] === 'todos' ? invAll.length : invAll.filter(i => invStatus(i) === t[0]).length}`]);
   const exp = S.d.expenses.filter(e => ym(e.date) === k).sort((a, b) => b.date.localeCompare(a.date));
   const label = (l => l[0].toUpperCase() + l.slice(1))(new Date(k + '-15T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
   const shift = n => { const d = new Date(k + '-15T12:00:00'); d.setMonth(d.getMonth() + n); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
   return head('Financeiro', 'Bravus Finance · entradas, saídas e cobranças', isAdmin() ? `<button class="btn" data-act="genInvoices" data-m="${k}">${ic('sync')}<span class="hide-m">Gerar mensalidades</span></button><button class="btn pri" data-act="newInvoice">${ic('plus')}Cobrança</button>` : '') + `
     <div class="datebar" style="margin-bottom:14px"><button class="btn sm ic" data-act="finMonth" data-m="${shift(-1)}">${ic('left')}</button><b>${label}</b><button class="btn sm ic" data-act="finMonth" data-m="${shift(1)}">${ic('right')}</button></div>
-    <div class="grid g4">${kpi('Entrou', brl(fm.recebido), 'confirmado', 'hl')}${kpi('A receber', brl(fm.aReceber), '', 'y')}${kpi('Atrasado (total)', brl(fm.atrasado), '', fm.atrasado ? 'r' : '')}${kpi('Saiu', brl(fm.saidas), `saldo do mês ${brl(fm.saldo)}`, fm.saidas ? 'r' : '')}</div>
-    <div class="card" style="margin-top:14px"><h3>${ic('wallet')}Cobranças<span class="sp"></span><span class="small muted">${inv.length}</span></h3>
+    <div class="grid g4">${kpi('Entrou', brl(fm.recebido), 'confirmado', 'hl', ['financeiro', 'pago', 'fin-cob'])}${kpi('A receber', brl(fm.aReceber), '', 'y', ['financeiro', 'pendente', 'fin-cob'])}${kpi('Atrasado (total)', brl(fm.atrasado), '', fm.atrasado ? 'r' : '', ['financeiro', 'atrasado', 'fin-cob'])}${kpi('Saiu', brl(fm.saidas), `saldo do mês ${brl(fm.saldo)}`, fm.saidas ? 'r' : '', ['financeiro', 'todos', 'fin-saidas'])}</div>
+    <div class="card" id="fin-cob" style="margin-top:14px"><h3>${ic('wallet')}Cobranças<span class="sp"></span><span class="small muted">${inv.length}</span></h3>
+      <div class="tabs" style="margin-bottom:10px">${fTabs.map(t => `<button data-act="finFilter" data-f="${t[0]}" class="${ff === t[0] ? 'on' : ''}">${t[1]}</button>`).join('')}</div>
       <div class="list">${inv.length ? inv.map(i => { const c = client(i.client_id) || {}; const s = invStatus(i); return `<div class="li"><div class="t"><b>${esc(c.name || '—')} · ${brl(i.amount)}</b><small>${esc(i.description || 'Mensalidade')} · vence ${fdate(i.due_date)}${i.status === 'pago' ? ` · pago em ${fdate(i.paid_at)} (${esc(i.method || '')})` : ''}</small></div>${invChip(i)}
         ${isAdmin() && s !== 'pago' && s !== 'cancelado' ? `<button class="btn sm ok" data-act="payInvoice" data-id="${i.id}">${ic('check')}<span class="hide-m">Recebido</span></button><a class="btn sm ic" title="Cobrar no WhatsApp" href="${waCharge(i)}" target="_blank" rel="noopener" data-act="chargeWa" data-id="${i.id}">${ic('wa')}</a>` : ''}
-        ${isAdmin() ? `<button class="btn sm ic" data-act="editInvoice" data-id="${i.id}">${ic('edit')}</button>` : ''}</div>`; }).join('') : empty('Sem cobranças de clientes ativos neste mês. Use “Gerar mensalidades” ou marque o pagamento direto no cliente.')}</div></div>
-    <div class="card" style="margin-top:14px"><h3>${ic('down')}Saídas / despesas<span class="sp"></span>${isAdmin() ? `<button class="btn sm" data-act="newExpense">${ic('plus')}Despesa</button>` : ''}</h3>
+        ${isAdmin() ? `<button class="btn sm ic" data-act="editInvoice" data-id="${i.id}">${ic('edit')}</button>` : ''}</div>`; }).join('') : empty(ff !== 'todos' && invAll.length ? 'Nenhuma cobrança nesse filtro.' : 'Sem cobranças de clientes ativos neste mês. Use “Gerar mensalidades” ou marque o pagamento direto no cliente.')}</div></div>
+    <div class="card" id="fin-saidas" style="margin-top:14px"><h3>${ic('down')}Saídas / despesas<span class="sp"></span>${isAdmin() ? `<button class="btn sm" data-act="newExpense">${ic('plus')}Despesa</button>` : ''}</h3>
       <div class="list">${exp.length ? exp.map(e => `<div class="li"><div class="t"><b>${esc(e.description)}</b><small>${esc(e.category || 'Geral')} · ${fdate(e.date)}</small></div><b class="num" style="color:var(--bad)">− ${brl(e.amount)}</b>${isAdmin() ? `<button class="btn sm ic" data-act="delExpense" data-id="${e.id}">${ic('trash')}</button>` : ''}</div>`).join('') : empty('Nenhuma despesa registrada no mês.')}</div></div>
     <p class="note" style="margin-top:10px">Uma cobrança só fica “Paga” quando você confirmar que o dinheiro caiu na conta.</p>`;
 };
@@ -1007,7 +1012,9 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.2.0', notes: [
+const RELEASE = { version: '2.3.0', notes: [
+  'Painel: toque em qualquer card (Entrou no mês, A receber, Em atraso, Saldo, Clientes, Inadimplentes, Reuniões, Receita) e vá direto para a aba certa, já filtrada.',
+  'Financeiro: filtro de cobranças (Todas, Pagas, A receber, Em atraso).',
   'Reuniões: menu da semana (Hoje, Amanhã, Qua, Qui…) mostrando só se há horário livre ou lotado; toque num horário livre para marcar.',
   'Horário das reuniões em destaque na lista.',
   'Celular: a tela de Alertas (e as outras) não volta mais para o topo enquanto você rola; avisos aparecem com o texto completo.',
@@ -1172,13 +1179,13 @@ V.metas = () => {
   return head('Metas', 'Bravus Goals · acompanhe o mês e o caminho até a meta', isAdmin() ? `<button class="btn pri" data-act="editGoals">${ic('edit')}Editar metas</button>` : '') + `
     <div class="datebar" style="margin-bottom:14px"><button class="btn sm ic" data-act="goalMonth" data-m="${shift(-1)}">${ic('left')}</button><b>${label}</b><button class="btn sm ic" data-act="goalMonth" data-m="${shift(1)}">${ic('right')}</button></div>
     ${canFin() ? (() => { const fm = finMonth(k), prev = fm.recebido + fm.aReceber, nAt = new Set(S.d.invoices.filter(i => invStatus(i) === 'atrasado').map(i => i.client_id)).size; return `<div class="grid g4" style="margin-bottom:14px">
-      ${kpi('Entrou no mês', brl(fm.recebido), `${Math.round(fm.recebido / (g10 || 1) * 100)}% da meta de ${brl(g10)}`, 'hl')}
-      ${kpi('A receber', brl(fm.aReceber), `previsão do mês: ${brl(prev)}`, 'y')}
-      ${kpi('Em atraso', brl(fm.atrasado), `${nAt} cliente(s)`, fm.atrasado ? 'r' : '')}
+      ${kpi('Entrou no mês', brl(fm.recebido), `${Math.round(fm.recebido / (g10 || 1) * 100)}% da meta de ${brl(g10)}`, 'hl', ['financeiro', 'pago', 'fin-cob'])}
+      ${kpi('A receber', brl(fm.aReceber), `previsão do mês: ${brl(prev)}`, 'y', ['financeiro', 'pendente', 'fin-cob'])}
+      ${kpi('Em atraso', brl(fm.atrasado), `${nAt} cliente(s)`, fm.atrasado ? 'r' : '', ['financeiro', 'atrasado', 'fin-cob'])}
       ${kpi('Falta para a meta', brl(Math.max(0, g10 - fm.recebido)), prev >= g10 ? 'se todos pagarem, a meta é batida ✅' : `mesmo se todos pagarem, faltam ${brl(g10 - prev)}`, fm.recebido >= g10 ? 'g' : '')}
     </div>`; })() : ''}
     <div class="grid g4" style="margin-bottom:14px">
-      ${kpi('Clientes ativos', `${S.d.clients.filter(inWallet).length}<span class="muted" style="font-size:15px"> / ${goals().clients}</span>`, canFin() ? `receita mensal ${brl(mrr())}` : 'na carteira')}
+      ${kpi('Clientes ativos', `${S.d.clients.filter(inWallet).length}<span class="muted" style="font-size:15px"> / ${goals().clients}</span>`, canFin() ? `receita mensal ${brl(mrr())}` : 'na carteira', '', ['clientes', 'online'])}
       ${kpi('Ticket médio', canFin() ? brl(mrr() / (S.d.clients.filter(inWallet).length || 1)) : '—', canFin() && mrr() < goals().mrr ? `faltam ${Math.ceil((goals().mrr - mrr()) / ((mrr() / (S.d.clients.filter(inWallet).length || 1)) || 697))} cliente(s) nesse valor p/ a meta recorrente` : 'por cliente ativo')}
       ${kpi('Metas batidas', `${done}<span class="muted" style="font-size:15px"> / ${rows.length}</span>`, done === rows.length ? 'todas batidas 🎯' : 'no mês')}
       ${kpi('Progresso médio', avg + '%', `${pace}% do mês já passou`, avg >= pace ? 'g' : 'y')}
@@ -1334,6 +1341,16 @@ const A = {
     window.open(waTo({ whatsapp: ph }, `Olá${t.contact_name ? ', ' + t.contact_name.split(' ')[0] : ''}! Passando para confirmar nossa reunião ${dia} às ${t.time}${t.meet_format === 'meet' ? ' pelo Google Meet' : t.meet_format === 'presencial' ? '' : t.meet_format === 'ligacao' ? ' por ligação' : ' por vídeo no WhatsApp'}. Posso confirmar? 😊`), '_blank', 'noopener'); log(`Enviou confirmação de reunião para ${meetWho(t)}`, t.client_id); },
   meetToClient: d => { const t = S.d.tasks.find(x => x.id === d.id); if (!t) return; closeModal(); clientForm({ name: t.company || t.contact_name || '', contact: t.contact_name || '', whatsapp: t.phone || '', services: ['trafego'], notes: t.description || '' }); },
   cliFilterGo: d => { S.cliFilter = d.f; location.hash = 'clientes'; renderView(); },
+  finFilter: d => { S.finFilter = d.f; renderView(true); },
+  kpiGo: d => {
+    const r = d.r;
+    if (r === 'clientes' && d.f) S.cliFilter = d.f;
+    if (r === 'financeiro') { if (S.route !== 'financeiro') S.finMonth = curYM(); S.finFilter = d.f || 'todos'; S.keepFin = true; }
+    if (r === 'reunioes' && S.route !== 'reunioes') S.meetMonth = curYM();
+    if (r === 'agenda' && S.route !== 'agenda') S.agendaDate = today();
+    const go = () => { if (d.s) { const t = document.getElementById(d.s); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); } };
+    if (S.route === r) { renderView(true); setTimeout(go, 30); } else { location.hash = r; setTimeout(go, 120); }
+  },
   editProfile: d => {
     const p = prof(d.id); if (!p) return;
     const mine = p.id === S.me.id, can = mine || isAdmin();
@@ -1723,7 +1740,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeModal();
   if (e.key === 'Enter' && !e.shiftKey && e.target.id === 'chatInput') { e.preventDefault(); e.target.form.requestSubmit(); }
 });
-addEventListener('hashchange', () => { S.route = (location.hash.replace(/^#\/?/, '') || 'painel').split('?')[0]; if (S.me) { closeModal(); renderView(); renderShellBadges(); window.scrollTo(0, 0); } });
+addEventListener('hashchange', () => { S.route = (location.hash.replace(/^#\/?/, '') || 'painel').split('?')[0]; if (S.route === 'financeiro' && !S.keepFin) S.finFilter = 'todos'; S.keepFin = false; if (S.me) { closeModal(); renderView(); renderShellBadges(); window.scrollTo(0, 0); } });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && S.me) { heartbeat(); refresh(); tick(); } });
 
 /* =====================================================================
