@@ -893,7 +893,7 @@ const acoes = {
     if (S.modo === 'online') { try { await DB.sb.auth.signOut(); } catch { } }
     location.reload();
   },
-  foto: d => { fotoAlvo = { tarefa: d.id, tipo: d.tipo }; const i = $('#inputFoto'); i.value = ''; i.click(); },
+  foto: d => { fotoAlvo = { tarefa: d.id, tipo: d.tipo }; abrirCamera(d.tipo); },
   concluir: async d => {
     const t = tarefaPorId(d.id); const dia = hojeISO(); const r0 = regDe(t, dia) || novoReg(t, dia);
     if (t.foto && !(r0.foto_antes && r0.foto_depois)) return toast('Tire a foto ANTES e DEPOIS primeiro.', 'bad');
@@ -1176,8 +1176,43 @@ async function salvarReg(r) {
 }
 
 let fotoAlvo = null;
-$('#inputFoto').addEventListener('change', async e => {
-  const arq = e.target.files && e.target.files[0]; if (!arq || !fotoAlvo) return;
+/* Câmera dentro do app: não abre o app de câmera do celular, então o Android
+   não fecha o navegador por falta de memória (o que fazia a foto se perder). */
+let camStream = null;
+function pararCamera() { if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; } }
+function escolherGaleria() { pararCamera(); fecharTopo(); const i = $('#inputGaleria'); i.value = ''; i.click(); }
+async function abrirCamera(tipo) {
+  const rot = tipo === 'antes' ? 'ANTES' : 'DEPOIS';
+  const el = modal(`<h3 style="margin:0 0 10px">📷 Foto ${rot}</h3>
+    <div class="cam"><video playsinline autoplay muted></video><p class="mut peq cam-msg">Abrindo a câmera…</p></div>
+    <div class="acoes" style="margin-top:12px"><button class="btn pri" data-cam="tirar" disabled>📸 Tirar foto</button></div>
+    <div class="acoes" style="margin-top:8px"><button class="btn ghost sm" data-cam="galeria">🖼️ Escolher da galeria</button><button class="btn ghost sm" data-cam="sair">Cancelar</button></div>`, 'alerta');
+  const video = el.querySelector('video'), msg = el.querySelector('.cam-msg'), btn = el.querySelector('[data-cam=tirar]');
+  el.querySelector('[data-cam=sair]').onclick = () => { pararCamera(); fotoAlvo = null; el.remove(); };
+  el.querySelector('[data-cam=galeria]').onclick = escolherGaleria;
+  btn.onclick = () => {
+    if (!video.videoWidth) return;
+    const c = document.createElement('canvas'); c.width = video.videoWidth; c.height = video.videoHeight;
+    c.getContext('2d').drawImage(video, 0, 0);
+    pararCamera(); el.remove();
+    c.toBlob(b => { if (b) processarFoto(b); else toast('Não deu para capturar. Tente de novo.', 'bad'); }, 'image/jpeg', .92);
+  };
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('sem camera');
+    pararCamera();
+    camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 1280 } }, audio: false });
+    if (!el.isConnected) return pararCamera();
+    video.srcObject = camStream; await video.play().catch(() => {});
+    msg.textContent = ''; btn.disabled = false;
+  } catch (e) {
+    console.warn('camera', e);
+    msg.innerHTML = 'Não consegui abrir a câmera aqui.<br>Permita o acesso à câmera para o TáFeito ou use <b>Escolher da galeria</b> (tire a foto com a câmera do celular antes).';
+  }
+}
+$('#inputGaleria').addEventListener('change', e => { const arq = e.target.files && e.target.files[0]; if (arq) processarFoto(arq); });
+$('#inputFoto').addEventListener('change', e => { const arq = e.target.files && e.target.files[0]; if (arq) processarFoto(arq); });
+async function processarFoto(arq) {
+  if (!arq || !fotoAlvo) return;
   const t = tarefaPorId(fotoAlvo.tarefa); const tipo = fotoAlvo.tipo; fotoAlvo = null;
   carregando(true, 'Enviando foto…');
   try {
@@ -1190,7 +1225,7 @@ $('#inputFoto').addEventListener('change', async e => {
     carregando(false);
     if (await salvarReg(r)) toast(tipo === 'antes' ? '📷 Foto ANTES salva. Agora faça a tarefa!' : '📷 Foto DEPOIS salva. Agora marque como feita!', 'ok');
   } catch (err) { carregando(false); toast(msgErro(err), 'bad'); }
-});
+}
 
 async function prepararFoto(arq, rotulo, titulo) {
   const max = S.modo === 'local' ? 520 : 1280;
