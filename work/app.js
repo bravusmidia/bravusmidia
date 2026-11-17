@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.3.3';
+const VERSION = '2.4.0';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -434,6 +434,7 @@ async function tick() {
         }
       }
       for (const c of shutDue()) await notifyUsers(admins(), `Comunicado de desligamento pronto: ${c.name}`, nReason('shutdown', c) + ' · toque para enviar no WhatsApp', 'alerta', `shut:${c.id}:${curYM()}`, 'clientes');
+      for (const x of upcomingDates(7)) await notifyUsers(admins(), `${x.hol ? 'Feriado' : 'Data comercial'} ${x.i === 0 ? 'hoje' : x.i === 1 ? 'amanhã' : `em ${x.i} dias`}: ${x.name} (${fdate(x.ds)})`, 'Hora de criar panfleto, flyer e pensar em desconto para a Bravus e os clientes.', 'conteudo', `hol:${x.ds}:${x.name}`, 'conteudo');
       const appr = S.d.content.filter(c => c.status === 'aprovacao').length;
       if (appr && nf.conteudo !== false && hm >= S.set.morning_hour) await notifyUsers([me.id], appr === 1 ? 'Existe 1 publicação aguardando aprovação' : `Existem ${appr} publicações aguardando aprovação`, 'Revise antes de publicar.', 'conteudo', `appr:${d}:${appr}`, 'conteudo');
     }
@@ -678,6 +679,8 @@ V.painel = () => {
   const tasks = realTasks().filter(t => t.date === d && (isAdmin() || t.assignee === S.me.id));
   const done = tasks.filter(t => t.status === 'feito');
   const meets = realTasks().filter(t => t.kind === 'reuniao' && ym(t.date) === k);
+  const mFeitas = meets.filter(t => t.status === 'feito'), mFaltas = meets.filter(t => t.status === 'noshow'), mWon = meets.filter(t => t.outcome === 'fechou');
+  const mWait = meetings().filter(t => t.status === 'pendente' && isLate(t));
   const contentPend = S.d.content.filter(c => !['publicado'].includes(c.status));
   const fm = finMonth(k);
   const months = lastMonths(6); const fms = months.map(finMonth);
@@ -690,6 +693,8 @@ V.painel = () => {
   if (isAdmin()) shutDue().forEach(c => prio.push(['bad', `Enviar comunicado de desligamento: ${c.name}`, nReason('shutdown', c), 'clientes', { act: 'noticeOpen', k: 'shutdown', id: c.id }]));
   inad.forEach(c => prio.push(['bad', `Cobrar ${c.name}`, 'Pagamento em atraso', 'financeiro']));
   realTasks().filter(t => isLate(t) && (isAdmin() || t.assignee === S.me.id)).slice(0, 5).forEach(t => prio.push(['warn', t.title, `Atrasada · ${firstName(t.assignee)} · ${fdate(t.date)}`, 'agenda']));
+  if (isAdmin()) upcomingDates(7).forEach(x => prio.push(['blue', `${x.hol ? 'Feriado' : 'Data comercial'} ${x.i === 0 ? 'hoje' : x.i === 1 ? 'amanhã' : `em ${x.i} dias`}: ${x.name}`, `${fdate(x.ds)} · crie panfleto, flyer e desconto`, 'conteudo']));
+  mWait.slice(0, 5).forEach(t => prio.push(['warn', `Como foi a reunião com ${meetWho(t)}?`, `${fdate(t.date)} às ${t.time || '--:--'} · toque e marque Realizada ou Faltou`, 'reunioes', { act: 'editMeet', k: '', id: t.id }]));
   if (S.d.content.some(c => c.status === 'aprovacao')) prio.push(['blue', `${S.d.content.filter(c => c.status === 'aprovacao').length} publicação(ões) aguardando aprovação`, 'Conteúdo', 'conteudo']);
 
   return head(`${greet}, ${firstName(S.me.id)}`, fdateL(d), isAdmin() ? `<button class="btn pri" data-act="newTask">${ic('plus')}Tarefa</button>` : `<button class="btn pri" data-act="editMeet">${ic('plus')}Reunião</button>`) + `
@@ -703,7 +708,7 @@ V.painel = () => {
   <div class="grid g4">
     ${kpi('Clientes ativos', `${ativos.length}<span class="muted" style="font-size:15px"> / ${S.set.max_clients}</span>`, `<a href="#clientes" data-act="cliFilterGo" data-f="offline">${cancel.length} inativo(s)</a> · ${novos.length} novo(s) no mês`, '', ['clientes', 'online'])}
     ${kpi('Inadimplentes', inad.length, inad.length ? 'clique no cliente para cobrar' : 'ninguém em atraso', inad.length ? 'r' : '', ['clientes', 'inad'])}
-    ${kpi('Reuniões no mês', meets.length, `${meets.filter(t => t.status === 'feito').length} realizadas · ${meets.filter(t => t.outcome === 'fechou').length} fecharam`, '', ['reunioes'])}
+    ${kpi('Reuniões no mês', meets.length, `${mFeitas.length} realizadas · ${mFaltas.length} faltas · ${mWon.length} fecharam${mWait.length ? ` · <b style="color:var(--warn,#ffbe50)">${mWait.length} sem resultado</b>` : ''}`, mWait.length ? 'y' : '', ['reunioes'])}
     ${canFin() ? kpi('Receita mensal', brl(mrr()), 'soma dos contratos ativos', 'g', ['clientes', 'online']) : kpi('Novos no mês', novos.length, '', '', ['clientes', 'todos'])}
   </div>
   <div class="grid g2" style="margin-top:14px">
@@ -724,13 +729,43 @@ V.painel = () => {
         ${kpi('Pendentes', tasks.length - done.length, '', '', ['agenda'])}${kpi('Concluídas', done.length, '', 'g', ['agenda'])}${kpi('Reuniões', meets.filter(t => t.date === d).length, '', '', ['reunioes'])}
       </div>
       <div style="margin-top:12px"><div class="row small"><span class="muted">Produtividade do dia</span><span class="sp"></span><b>${tasks.length ? Math.round(done.length / tasks.length * 100) : 0}%</b></div><div class="prog" style="margin-top:6px"><i style="width:${tasks.length ? done.length / tasks.length * 100 : 0}%"></i></div></div>
-      <div class="row small" style="margin-top:12px;gap:16px;flex-wrap:wrap"><a class="muted" href="#reunioes">Reuniões no mês: <b style="color:var(--tx)">${meets.length}</b> (${meets.filter(t => t.status === 'feito').length} realizadas · ${meets.filter(t => t.outcome === 'fechou').length} fecharam)</a><span class="muted">Publicações pendentes: <b style="color:var(--tx)">${contentPend.length}</b></span></div>
+      <div class="row small" style="margin-top:12px;gap:16px;flex-wrap:wrap"><a class="muted" href="#reunioes">Reuniões no mês: <b style="color:var(--tx)">${meets.length}</b> (${mFeitas.length} realizadas · ${mWon.length} fecharam)</a><span class="muted">Publicações pendentes: <b style="color:var(--tx)">${contentPend.length}</b></span></div>
       ${weekChart()}
     </div>
   </div>
+  ${monthSummary(k)}
+  ${datesCard()}
   <div class="sec">Equipe</div>
   <div class="grid g2">${team().map(p => { const tt = realTasks().filter(t => t.assignee === p.id && t.date === d); const dn = tt.filter(t => t.status === 'feito').length; return `<div class="card row">${avatar(p, 44)}<div class="sp"><b>${esc(p.name)}</b><div class="small muted">${isOnline(p) ? '<span style="color:var(--ok)">online agora</span>' : 'offline · ' + ago(p.last_seen)}</div><div class="prog" style="margin-top:8px"><i style="width:${tt.length ? dn / tt.length * 100 : 0}%"></i></div></div><b class="num">${dn}/${tt.length}</b></div>`; }).join('')}</div>`;
 };
+/* Resumo do mês: junta todas as áreas do Bravus Work num lugar só */
+function datesCard() {
+  const up = upcomingDates(60);
+  return `<div class="card" style="margin-top:14px"><h3>${ic('cal')}Feriados e datas comerciais (próximos 60 dias)<span class="sp"></span><a class="small" href="${GCAL_HOL}" target="_blank" rel="noopener">abrir no Google Agenda</a></h3>
+    <div class="list">${up.length ? up.slice(0, 10).map(x => `<div class="li"><div class="mtime ${x.i <= 7 ? 'hj' : ''}"><b>${fdate(x.ds)}</b><small>${WD[new Date(x.ds + 'T12:00:00').getDay()]}</small></div><div class="t"><b>${esc(x.name)}</b><small>${x.i === 0 ? 'hoje' : x.i === 1 ? 'amanhã' : `em ${x.i} dias`}${x.i <= 7 ? ' · hora do flyer / desconto' : ''}</small></div><span class="chip ${x.hol ? 'warn' : 'blue'}">${x.hol ? 'Feriado' : 'Comercial'}</span></div>`).join('') : empty('Nenhuma data nos próximos 60 dias.')}</div>
+    <p class="note" style="margin-top:8px">Mesmos feriados do Google Agenda (Brasil), mais os do Ceará e de Fortaleza. Você recebe o aviso 7 dias antes.</p></div>`;
+}
+function monthSummary(k) {
+  const mine = t => isAdmin() || t.assignee === S.me.id;
+  const ts = realTasks().filter(t => ym(t.date) === k && mine(t));
+  const cnt = (kind, rx) => { const x = ts.filter(t => (kind ? t.kind === kind : true) && (!rx || rx.test(t.title || ''))); return [x.filter(t => t.status === 'feito').length, x.length]; };
+  const [tf, tt] = cnt('tarefa'), [lf, lt] = cnt('ligacao'), [ff, ft] = cnt('followup');
+  const ms = meetings().filter(t => ym(t.date) === k), decided = ms.filter(t => ['feito', 'noshow'].includes(t.status)).length;
+  const prosp = ts.filter(t => /prospec/i.test(t.title || '')).reduce((a, t) => a + (+t.count || 0), 0);
+  const ct = S.d.content.filter(c => ym(c.date) === k), pub = ct.filter(c => c.status === 'publicado').length;
+  const cl = S.d.clients, novos = cl.filter(c => ym(c.start_date || c.created_at) === k).length;
+  const row = (icn, name, val, sub, r) => `<a class="li" href="#${r}"><div class="t"><b style="font-weight:500">${ic(icn)} ${esc(name)}</b><small>${sub}</small></div><b class="num">${val}</b>${ic('right')}</a>`;
+  return `<div class="card" style="margin-top:14px"><h3>${ic('spark')}Bravus Work no mês · ${monthName(k)}<span class="sp"></span><span class="chip blue">tudo do app</span></h3>
+    <div class="grid g2" style="gap:0 18px"><div class="list">
+      ${row('meet', 'Reuniões', ms.length, `${ms.filter(t => t.status === 'feito').length} realizadas · ${ms.filter(t => t.status === 'noshow').length} faltas · ${ms.filter(t => t.outcome === 'fechou').length} fecharam · comparecimento ${decided ? Math.round(ms.filter(t => t.status === 'feito').length / decided * 100) + '%' : '—'}`, 'reunioes')}
+      ${row('cal', 'Tarefas', `${tf}/${tt}`, 'concluídas no mês', 'agenda')}
+      ${row('chat', 'Prospecções', prosp, `ligações ${lf}/${lt} · follow-ups ${ff}/${ft}`, 'agenda')}
+    </div><div class="list">
+      ${row('users', 'Clientes', cl.filter(inWallet).length, `${novos} novo(s) no mês · ${cl.filter(c => !inWallet(c)).length} fora da carteira`, 'clientes')}
+      ${row('film', 'Conteúdo', `${pub}/${ct.length}`, 'publicados no mês', 'conteudo')}
+      ${canFin() ? row('wallet', 'Financeiro', brl(finMonth(k).recebido), `a receber ${brl(finMonth(k).aReceber)} · em atraso ${brl(finMonth(k).atrasado)}`, 'financeiro') : row('target', 'Metas', '→', 'acompanhe o progresso do mês', 'metas')}
+    </div></div></div>`;
+}
 function weekChart() {
   const days = Array.from({ length: 7 }, (_, i) => addDays(today(), i - 6));
   const vals = days.map(d => realTasks().filter(t => t.date === d && t.status === 'feito' && (isAdmin() || t.assignee === S.me.id)).length);
@@ -908,28 +943,67 @@ const m2hm = m => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
 const WD = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const dayName = (ds, i) => i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : WD[new Date(ds + 'T12:00:00').getDay()];
 const busyMeet = t => !['cancelada', 'remarcada', 'noshow'].includes(t.status);
+/* regra dos membros (não admin): seg–sex só a partir das 18:30; sábado, domingo e feriado em qualquer horário. Admin é livre. */
+const MEMBER_MEET_START = '18:30';
+const HOL = {};
+function holidays(y) {
+  if (HOL[y]) return HOL[y];
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const easter = new Date(y, Math.floor((h + l - 7 * m + 114) / 31) - 1, ((h + l - 7 * m + 114) % 31) + 1, 12);
+  const rel = n => { const x = new Date(easter); x.setDate(x.getDate() + n); return iso(x); };
+  const out = {};
+  [['01-01', 'Confraternização Universal'], ['03-19', 'São José (CE)'], ['03-25', 'Data Magna do Ceará'], ['04-13', 'Aniversário de Fortaleza'], ['04-21', 'Tiradentes'], ['05-01', 'Dia do Trabalho'], ['08-15', 'N. Sra. da Assunção (Fortaleza)'], ['09-07', 'Independência'], ['10-12', 'N. Sra. Aparecida'], ['11-02', 'Finados'], ['11-15', 'Proclamação da República'], ['11-20', 'Consciência Negra'], ['12-25', 'Natal']].forEach(([md, n]) => { out[`${y}-${md}`] = n; });
+  out[rel(-48)] = 'Carnaval'; out[rel(-47)] = 'Carnaval'; out[rel(-2)] = 'Sexta-feira Santa'; out[rel(60)] = 'Corpus Christi';
+  return (HOL[y] = out);
+}
+/* datas comerciais (não são feriado, mas são ótimas para campanhas) */
+function salesDates(y) {
+  const nth = (mo, wd, n) => { const x = new Date(y, mo, 1, 12); x.setDate(1 + ((wd - x.getDay() + 7) % 7) + (n - 1) * 7); return iso(x); };
+  const bf = (() => { const x = new Date(nth(10, 4, 4) + 'T12:00:00'); x.setDate(x.getDate() + 1); return iso(x); })();
+  const e = Object.entries(holidays(y)).find(([, n]) => n === 'Sexta-feira Santa'); const pas = e ? (x => { x.setDate(x.getDate() + 2); return iso(x); })(new Date(e[0] + 'T12:00:00')) : null;
+  const out = { [`${y}-03-08`]: 'Dia da Mulher', [`${y}-03-15`]: 'Dia do Consumidor', [nth(4, 0, 2)]: 'Dia das Mães', [`${y}-06-12`]: 'Dia dos Namorados', [nth(7, 0, 2)]: 'Dia dos Pais', [`${y}-09-15`]: 'Dia do Cliente', [bf]: 'Black Friday', [`${y}-12-31`]: 'Réveillon' };
+  if (pas) out[pas] = 'Páscoa';
+  return out;
+}
+/* próximas datas (feriados + comerciais) dentro de N dias, a partir de hoje */
+function upcomingDates(n) {
+  const out = []; const t0 = today();
+  for (let i = 0; i <= n; i++) { const ds = addDays(t0, i); const h = holidayName(ds), c = salesDates(+ds.slice(0, 4))[ds]; if (h) out.push({ ds, i, name: h, hol: true }); if (c && c !== h) out.push({ ds, i, name: c, hol: false }); }
+  return out;
+}
+const GCAL_HOL = 'https://calendar.google.com/calendar/u/0/r?cid=' + encodeURIComponent('pt-br.brazilian#holiday@group.v.calendar.google.com');
+const holidayName = ds => ds ? holidays(+ds.slice(0, 4))[ds] || '' : '';
+const meetFreeDay = ds => { const w = new Date(ds + 'T12:00:00').getDay(); return w === 0 || w === 6 || !!holidayName(ds); };
+const meetAllowed = (ds, tm) => isAdmin() || !ds || meetFreeDay(ds) || hm2m(tm) >= hm2m(MEMBER_MEET_START);
+const meetRuleMsg = ds => holidayName(ds) ? `Feriado (${holidayName(ds)}): pode marcar em qualquer horário.` : meetFreeDay(ds) ? 'Fim de semana: pode marcar em qualquer horário.' : `Segunda a sexta: reuniões a partir das ${MEMBER_MEET_START}.`;
 function daySlots(ds, who) {
   const dur = Math.max(15, +S.set.meet_slot || 60), st = hm2m(S.set.meetings_start || '18:30'), en = Math.max(hm2m(S.set.meetings_end || '21:30'), st + dur);
   const ms = meetings().filter(t => t.date === ds && t.time && busyMeet(t) && (!who || t.assignee === who));
   const past = ds < today() || (ds === today() ? hm2m(nowHM()) : -1);
+  const isPast = m => past === true || (typeof past === 'number' && past >= m);
   const out = [];
   for (let m = st; m + dur <= en; m += dur) {
     const hit = ms.filter(t => { const a = hm2m(t.time); return a < m + dur && a + dur > m; });
-    out.push({ time: m2hm(m), meets: hit, past: past === true || (typeof past === 'number' && past >= m) });
+    out.push({ time: m2hm(m), meets: hit, past: isPast(m), locked: !hit.length && !meetAllowed(ds, m2hm(m)) });
   }
-  return out;
+  // reuniões fora do bloco padrão (ex.: 12:00) também aparecem e contam como ocupadas
+  ms.filter(t => !out.some(x => x.meets.includes(t))).forEach(t => out.push({ time: t.time, meets: [t], past: isPast(hm2m(t.time)) }));
+  return out.sort((a, b) => hm2m(a.time) - hm2m(b.time));
 }
 function weekStrip(who) {
   const days = []; const d0 = new Date(); for (let i = 0; i < 7; i++) { const d = new Date(d0); d.setDate(d0.getDate() + i); days.push(iso(d)); }
   const sel = days.includes(S.meetDay) ? S.meetDay : days[0];
-  const info = days.map((ds, i) => { const sl = daySlots(ds, who); const free = sl.filter(x => !x.past && !x.meets.length).length; const busy = sl.filter(x => x.meets.length).length; return { ds, i, free, busy, open: sl.filter(x => !x.past).length }; });
+  const info = days.map((ds, i) => { const sl = daySlots(ds, who); const free = sl.filter(x => !x.past && !x.locked && !x.meets.length).length; const busy = sl.filter(x => x.meets.length).length; return { ds, i, free, busy, open: sl.filter(x => !x.past).length }; });
   const slots = daySlots(sel, who);
   const tag = x => x.open === 0 ? ['off', 'Encerrado'] : x.free === 0 ? ['bad', 'Lotado'] : ['ok', `${x.free} livre${x.free > 1 ? 's' : ''}`];
+  const hol = holidayName(sel);
   return `<div class="card wk-card" style="margin-bottom:14px"><h3>${ic('cal')}Horários da semana <span class="muted small" style="font-weight:400;margin-left:auto">blocos de ${S.set.meet_slot || 60} min · ${esc(S.set.meetings_start)} às ${esc(S.set.meetings_end || '21:30')}</span></h3>
-    <div class="wk">${info.map(x => { const [c, t] = tag(x); return `<button class="wd ${c} ${x.ds === sel ? 'on' : ''}" data-act="meetDay" data-d="${x.ds}"><b>${dayName(x.ds, x.i)}</b><small>${fdate(x.ds)}</small><i>${t}</i></button>`; }).join('')}</div>
+    <div class="wk">${info.map(x => { const [c, t] = tag(x); return `<button class="wd ${c} ${x.ds === sel ? 'on' : ''}" data-act="meetDay" data-d="${x.ds}"><b>${dayName(x.ds, x.i)}</b><small>${fdate(x.ds)}${holidayName(x.ds) ? ' · feriado' : ''}</small><i>${t}</i></button>`; }).join('')}</div>
+    ${hol || !isAdmin() ? `<p class="note" style="margin:8px 0 0">${hol ? `${esc(hol)} · ` : ''}${isAdmin() ? 'Você pode marcar em qualquer horário.' : esc(meetRuleMsg(sel))}</p>` : ''}
     <div class="slots">${slots.map(x => x.meets.length
       ? `<button class="slot busy" data-act="editMeet" data-id="${x.meets[0].id}"><b>${x.time}</b><span>Ocupado</span><small>${esc(x.meets[0].time)} · ${esc(meetWho(x.meets[0]))}</small></button>`
       : x.past ? `<div class="slot past"><b>${x.time}</b><span>Passou</span></div>`
+      : x.locked ? `<div class="slot past" title="${esc(meetRuleMsg(sel))}"><b>${x.time}</b><span>Fora da regra</span></div>`
       : `<button class="slot free" data-act="meetSlot" data-d="${sel}" data-t="${x.time}"><b>${x.time}</b><span>Livre</span><small>toque para marcar</small></button>`).join('')}</div></div>`;
 }
 V.reunioes = () => {
@@ -955,7 +1029,7 @@ V.reunioes = () => {
     ${weekStrip(mine)}
     <div class="grid g4" style="margin-bottom:14px">
       ${kpi('Reuniões no mês', ms.length, `${prev} no mês anterior${prev ? ` (${ms.length >= prev ? '+' : ''}${Math.round((ms.length - prev) / prev * 100)}%)` : ''}`, 'hl')}
-      ${kpi('Realizadas', `<span style="color:var(--ok)">${real.length}</span>`, `${nos.length} não compareceu`)}
+      ${kpi('Realizadas', `<span style="color:var(--ok)">${real.length}</span>`, `${nos.length} não compareceu${pend.filter(t => ym(t.date) === k).length ? ` · <b style="color:var(--warn,#ffbe50)">${pend.filter(t => ym(t.date) === k).length} aguardando resultado</b>` : ''}`)}
       ${kpi('Comparecimento', decided ? Math.round(real.length / decided * 100) + '%' : '—', 'realizadas ÷ (realizadas + faltas)')}
       ${kpi('Fecharam', `<span style="color:var(--ok)">${won.length}</span>`, `${com.length ? Math.round(won.length / com.length * 100) : 0}% das comerciais · ${ms.filter(t => t.outcome === 'negociando').length} em negociação`)}
     </div>
@@ -977,10 +1051,17 @@ function meetForm(t = {}) {
     <div class="f2">${fld('Data *', 'date', t.date || today(), 'date', 'required')}${fld('Horário *', 'time', t.time || S.set.meetings_start, 'time', 'required')}</div>
     <div class="f2">${sel('Tipo', 'meet_type', MTYPES, t.meet_type || 'comercial')}${sel('Formato', 'meet_format', MFORMATS, t.meet_format || 'meet')}</div>
     ${ticketPick(t.ticket)}
-    ${t.id ? `<div class="f2">${sel('Status', 'status', MSTATUS, t.status || 'pendente')}${sel('Resultado', 'outcome', MOUT, t.outcome || '')}</div>` : ''}
+    <p class="note" id="meetRule" style="margin:0"></p>
+    <div class="f2">${sel('Status', 'status', MSTATUS, t.status || 'pendente')}${sel('Resultado', 'outcome', MOUT, t.outcome || '')}</div>
     ${area('Anotações', 'description', t.description)}
   </div>`, { form: 'saveMeet', footer: `${t.id ? `<button type="button" class="btn bad" data-act="delTask" data-id="${t.id}">${ic('trash')}</button>${t.outcome === 'fechou' && !t.client_id ? `<button type="button" class="btn ok" data-act="meetToClient" data-id="${t.id}">${ic('plus')}Virar cliente</button>` : ''}<span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
-  const wa = $('#waPaste'); if (wa) wa.addEventListener('input', () => { const p = parseWa(wa.value), f = wa.form; if (p.date) f.date.value = p.date; if (p.time) f.time.value = p.time; if (p.phone && !f.phone.value) f.phone.value = p.phone; });
+  const fm = $('#modal-root form[data-form="saveMeet"]'); let stTouched = !!t.id;
+  const chk = () => { if (!fm) return; const ds = fm.date.value, tm = fm.time.value, r = $('#meetRule'); const passed = ds && tm && (ds < today() || (ds === today() && tm <= nowHM()));
+    if (!stTouched && fm.status.value !== 'feito' && passed) fm.status.value = 'feito'; if (!stTouched && !passed && fm.status.value === 'feito') fm.status.value = 'pendente';
+    const ok = meetAllowed(ds, tm); const msg = isAdmin() ? (passed && !t.id ? 'Esta reunião já aconteceu: ela entra como Realizada e já conta no painel.' : '') : (ok ? meetRuleMsg(ds) : `Fora do horário permitido. ${meetRuleMsg(ds)}`) + (passed && !t.id && ok ? ' Já aconteceu: entra como Realizada.' : '');
+    if (r) { r.textContent = msg; r.style.display = msg ? '' : 'none'; r.style.color = ok ? '' : 'var(--bad,#ff6b7a)'; } };
+  if (fm) { fm.status.addEventListener('change', () => { stTouched = true; }); fm.date.addEventListener('input', chk); fm.time.addEventListener('input', chk); chk(); }
+  const wa = $('#waPaste'); if (wa) wa.addEventListener('input', () => { const p = parseWa(wa.value), f = wa.form; if (p.date) f.date.value = p.date; if (p.time) f.time.value = p.time; if (p.phone && !f.phone.value) f.phone.value = p.phone; chk(); });
   const cs = $('#modal-root select[name="client_id"]'); if (cs) cs.addEventListener('change', () => { const x = client(cs.value), f = cs.form; if (!x) return; f.company.value = x.name; if (!f.contact_name.value) f.contact_name.value = x.contact || ''; if (!f.phone.value) f.phone.value = x.whatsapp || x.phone || ''; f.meet_type.value = 'alinhamento'; });
 }
 V.agenda = () => {
@@ -996,6 +1077,7 @@ V.agenda = () => {
       <div class="datebar"><button class="btn sm ic" data-act="agDate" data-d="${addDays(d, -1)}">${ic('left')}</button><b>${d === today() ? 'Hoje' : esc(fdateL(d).split(',')[0])} · ${fdate(d)}</b><button class="btn sm ic" data-act="agDate" data-d="${addDays(d, 1)}">${ic('right')}</button>${d !== today() ? `<button class="btn sm" data-act="agDate" data-d="${today()}">Hoje</button>` : ''}</div>
       ${isAdmin() ? `<div class="tabs">${team().map(p => `<button data-act="agWho" data-w="${p.id}" class="${who === p.id ? 'on' : ''}">${esc(p.name.split(' ')[0])}</button>`).join('')}<button data-act="agWho" data-w="all" class="${who === 'all' ? 'on' : ''}">Todos</button></div>` : ''}
     </div>
+    ${(() => { const h = holidayName(d), c = salesDates(+d.slice(0, 4))[d]; return h || c ? `<div class="card" style="margin-bottom:14px;border-color:rgba(255,190,80,.45)"><b>${ic('cal')} ${esc(h || c)}</b> <span class="muted small">· ${h ? 'feriado' : 'data comercial'}</span></div>` : ''; })()}
     <div class="grid g3" style="margin-bottom:14px">${kpi('Concluídas', `${done}/${ts.length}`, `${ts.length ? Math.round(done / ts.length * 100) : 0}% do dia`, 'hl')}${goals.length ? goals.slice(0, 2).map(g => kpi(g.title.replace(/\(.*\)/, '').slice(0, 32), `${g.count || 0}/${g.goal}`, 'meta do dia', (g.count || 0) >= g.goal ? 'g' : '')).join('') : kpi('Reuniões', ts.filter(t => t.kind === 'reuniao').length, 'no dia') + kpi('Ligações', ts.filter(t => t.kind === 'ligacao').length, `a partir das ${S.set.calls_start}`)}</div>
     ${late.length ? `<div class="warnbox" style="margin-bottom:12px">${late.length} tarefa(s) atrasada(s) de dias anteriores. <a href="#" data-act="showLate">Ver</a></div>` : ''}
     ${ts.length ? ts.map(taskRow).join('') : `<div class="card">${empty('Nada programado para este dia.')}</div>`}`;
@@ -1023,7 +1105,7 @@ function taskForm(t = {}, template = false) {
     <div class="f2">${fld('Meta (quantidade, opcional)', 'goal', t.goal || '', 'number', 'min="0" placeholder="ex.: 15"')}${sel('Avisar antes', 'remind_min', [[0, 'Na hora'], [5, '5 min'], [10, '10 min'], [15, '15 min'], [30, '30 min'], [60, '1 hora']], t.remind_min ?? S.set.remind_default)}</div>
     ${area('Descrição', 'description', t.description)}
     ${isAdmin() && !template ? `<label class="sw"><input type="checkbox" name="override"> Permitir ligação fora da regra (antes das ${S.set.calls_start})</label>` : ''}
-    ${!template ? `<p class="note">Regra: ligações a partir das ${S.set.calls_start}. Reuniões podem ser em qualquer horário.</p>` : ''}
+    ${!template ? `<p class="note">Regra: ligações a partir das ${S.set.calls_start}. Reuniões: administrador em qualquer horário; membros de segunda a sexta a partir das ${MEMBER_MEET_START}, e em qualquer horário no fim de semana e feriados.</p>` : ''}
   </div>`, { form: 'saveTask', footer: `${t.id ? `<button type="button" class="btn bad" data-act="delTask" data-id="${t.id}">${ic('trash')}</button>${!template && t.date ? `<button type="button" class="btn" data-act="taskCal" data-id="${t.id}" title="Adicionar ao calendário">${ic('cal')}<span class="hide-m">Calendário</span></button>` : ''}<span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
 }
 
@@ -1052,7 +1134,14 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.3.3', notes: [
+const RELEASE = { version: '2.4.0', notes: [
+  'Painel conectado a todo o Bravus Work: novo resumo do mês com reuniões, tarefas, prospecções, clientes, conteúdo e financeiro, cada um levando para a sua aba.',
+  'Reuniões que já passaram sem resultado aparecem nas Prioridades de hoje e no card de Reuniões; um toque e você marca Realizada ou Faltou.',
+  'Dá para registrar uma reunião que já aconteceu: se a data/hora já passou, ela entra como Realizada e conta na hora.',
+  'Reuniões fora do horário padrão (ex.: 12:00) agora aparecem ocupando o horário na semana.',
+  'Membros (Priscila): reuniões de segunda a sexta a partir das 18:30; sábado, domingo e feriados em qualquer horário. O administrador marca e edita em qualquer horário.',
+  'Excluir cliente: só o administrador (também travado no banco).',
+  'Feriados no calendário (os mesmos do Google Agenda, mais Ceará e Fortaleza) e datas comerciais (Dia das Mães, Black Friday…). Aviso 7 dias antes para criar panfleto, flyer e desconto.',
   'Reuniões: agora dá para marcar em qualquer horário, sem trava de regra.',
   'Reuniões: botões de Ticket (Baixo, Médio, Alto) dentro de cada reunião, selo colorido na lista e filtro por ticket com contagem do mês.',
   'Você continua conectado: fechar o app ou ficar sem usar não desliga mais a sessão. Só sai se tocar no cadeado.',
@@ -1318,7 +1407,7 @@ const A = {
     modal('Adicionar membro à equipe', `<div class="f">
       <div class="f2">${fld('Nome *', 'name', '', 'text', 'required maxlength="80" placeholder="ex.: Teste Bravus"')}${fld('E-mail de acesso *', 'email', '', 'email', 'required autocomplete="off" placeholder="nome@email.com"')}</div>
       <div class="f2"><label class="fl">Senha *<div class="row" style="gap:6px"><input name="pin" id="nmPin" value="${sug}" minlength="6" required autocomplete="off" style="flex:1"><button type="button" class="btn sm" data-act="genPin">Gerar</button></div></label>${fld('Cargo', 'title', '', 'text', 'maxlength="60" list="cargos" placeholder="ex.: Social media"')}<datalist id="cargos">${CARGOS.map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
-      ${sel('Acesso', 'role', [['comercial', 'Membro — vê tudo e adiciona reuniões'], ['admin', 'Administrador — pode alterar tudo']], 'comercial')}
+      ${sel('Acesso', 'role', [['comercial', 'Membro — vê tudo e adiciona reuniões (seg–sex a partir das 18:30; fim de semana e feriado livre)'], ['admin', 'Administrador — pode alterar tudo']], 'comercial')}
       <p class="note">O e-mail pode ser inventado para teste (ex.: teste@bravusmidia.com.br): o acesso já sai liberado, sem confirmação por e-mail. Depois de criar, eu mostro o acesso pronto para copiar ou mandar no WhatsApp.</p></div>`,
       { form: 'saveMember', footer: `<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Criar membro</button>` }); },
   genPin: () => { const el = $('#nmPin'); if (el) el.value = 'bravus' + Math.floor(1000 + Math.random() * 9000); },
@@ -1445,7 +1534,7 @@ const A = {
     closeModal(); toast(`${NOTICE[k].name} aberto no WhatsApp`, pause ? 'Cliente marcado como Pausado.' : 'Registrado no histórico.', 'ok'); await refresh();
   },
   noticeReset: d => { const t = $(`form[data-form="${d.k === 'recharge' ? 'saveRecharge' : 'saveShutdown'}"] textarea[name="msg"]`); if (t) t.value = NOTICE[d.k].def(); toast('Texto padrão restaurado', 'Clique em salvar para gravar.'); },
-  delClient: d => confirmBox('Excluir cliente?', 'Isto apaga o cliente e as cobranças ligadas a ele. Para manter o histórico, prefira marcar como “Cancelado”.', 'Excluir', async () => {
+  delClient: d => !isAdmin() ? toast('Só o administrador exclui clientes', '', 'warn') : confirmBox('Excluir cliente?', 'Isto apaga o cliente e as cobranças ligadas a ele. Para manter o histórico, prefira marcar como “Cancelado”.', 'Excluir', async () => {
     const c = client(d.id); for (const t of ['campaigns', 'invoices']) for (const r of S.d[t].filter(x => x.client_id === d.id)) await store.remove(t, r.id);
     await store.remove('clients', d.id); await log(`Excluiu o cliente ${c && c.name}`); toast('Cliente excluído', '', 'ok'); await refresh(); }, true),
   clientReport: d => clientReport(d.id), print: () => EMBED ? toast('Disponível no app publicado', 'Na versão instalada, este botão salva o relatório em PDF.', 'warn') : window.print(),
@@ -1619,15 +1708,19 @@ const F = {
     const c = v.client_id ? client(v.client_id) : null;
     const who = (v.company || '').trim() || (c && c.name) || (v.contact_name || '').trim();
     if (!who) return toast('Informe o nome do contato ou a empresa', '', 'bad');
+    const old = v.id ? S.d.tasks.find(x => x.id === v.id) || {} : {};
+    if (!isAdmin() && (!v.id || old.date !== v.date || old.time !== v.time) && !meetAllowed(v.date, v.time)) return toast('Horário fora da regra', meetRuleMsg(v.date), 'bad');
     const row = { title: `Reunião · ${who}`, kind: 'reuniao', date: v.date, time: v.time, assignee: v.assignee || S.me.id, client_id: v.client_id || null, description: v.description, priority: 'alta', remind_min: 30,
       contact_name: (v.contact_name || '').trim() || null, company: (v.company || '').trim() || null, phone: (v.phone || '').trim() || null, meet_type: v.meet_type, meet_format: v.meet_format, ticket: v.ticket || null };
-    if (v.id) { row.status = v.status; row.outcome = v.outcome || null; row.done_at = v.status === 'feito' ? (S.d.tasks.find(x => x.id === v.id) || {}).done_at || new Date().toISOString() : null; }
+    row.status = v.status || 'pendente'; row.outcome = v.outcome || null; row.done_at = row.status === 'feito' ? old.done_at || new Date().toISOString() : null;
     const extra = ['contact_name', 'company', 'phone', 'meet_type', 'meet_format', 'outcome', 'ticket'];
-    const save = r => v.id ? store.update('tasks', v.id, r) : store.insert('tasks', { ...r, status: 'pendente', count: 0, is_template: false });
+    const save = r => v.id ? store.update('tasks', v.id, r) : store.insert('tasks', { status: 'pendente', ...r, count: 0, is_template: false });
     try { await save(row); } catch (e) { const m = e && e.message || ''; if (/ticket/i.test(m)) { delete row.ticket; await save(row); toast('Reunião salva sem o ticket', 'Falta rodar o SQL v2.2 (ticket) no Supabase.', 'warn'); } else { if (!/column|contact_name|company|meet_|outcome|phone/i.test(m)) throw e; extra.forEach(x => delete row[x]); await save(row); toast('Reunião salva sem os detalhes', 'O banco ainda não tem os campos de reunião (SQL v1.4).', 'warn'); } }
-    if (!v.id) { await log(`Marcou reunião com ${who} · ${fdate(v.date)} ${v.time}`, row.client_id); await notifyTeam(`Reunião marcada com ${who}`, `${fdate(v.date)} às ${v.time} · ${firstName(row.assignee)} · por ${firstName(S.me.id)}`, 'tarefa', null, 'reunioes'); }
-    else if (v.outcome === 'fechou') { await log(`Reunião com ${who}: fechou negócio 🎉`, row.client_id); await notifyTeam(`Fechou negócio com ${who}! 🎉`, `Registrado por ${firstName(S.me.id)}`, 'pago', `won:${v.id}`, 'reunioes'); }
-    closeModal(); toast(v.id ? 'Reunião atualizada' : 'Reunião marcada', `${who} · ${fdate(v.date)} às ${v.time}`, 'ok'); await refresh();
+    const st = row.status || 'pendente';
+    if (!v.id && st === 'pendente') { await log(`Marcou reunião com ${who} · ${fdate(v.date)} ${v.time}`, row.client_id); await notifyTeam(`Reunião marcada com ${who}`, `${fdate(v.date)} às ${v.time} · ${firstName(row.assignee)} · por ${firstName(S.me.id)}`, 'tarefa', null, 'reunioes'); }
+    else if (st !== (old.status || 'pendente') && st !== 'pendente' && v.outcome !== 'fechou') { await log(`Reunião com ${who} (${fdate(v.date)} ${v.time}): ${lbl(MSTATUS, st).toLowerCase()}`, row.client_id); await notifyTeam(`Reunião com ${who}: ${lbl(MSTATUS, st).toLowerCase()}`, `${fdate(v.date)} às ${v.time} · registrado por ${firstName(S.me.id)}`, 'tarefa', `meet:${v.id || who + v.date + v.time}:${st}`, 'reunioes'); }
+    if (v.outcome === 'fechou' && old.outcome !== 'fechou') { await log(`Reunião com ${who}: fechou negócio 🎉`, row.client_id); await notifyTeam(`Fechou negócio com ${who}! 🎉`, `Registrado por ${firstName(S.me.id)}`, 'pago', `won:${v.id || who + v.date}`, 'reunioes'); }
+    closeModal(); toast(v.id ? 'Reunião atualizada' : st === 'feito' ? 'Reunião registrada como realizada' : 'Reunião marcada', `${who} · ${fdate(v.date)} às ${v.time}`, 'ok'); await refresh();
   },
   saveTask: async (v, fd, form) => {
     const tpl = !!v.is_template;
