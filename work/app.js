@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.7.4';
+const VERSION = '2.7.5';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -1220,7 +1220,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.7.4', notes: [
+const RELEASE = { version: '2.7.5', notes: [
+  'Agenda: ao tocar no quadrado da tarefa aparece na hora o ✓ verde, a tarefa fica riscada e some o “Atrasada” (também na lista de atrasadas). Toque de novo para desmarcar.',
   'Em atraso automático: mensalidade que passou do vencimento sem pagamento entra em “Em atraso” e o cliente vira inadimplente no painel, mesmo se estava marcada como “A receber”.',
   'As mensalidades do mês agora são geradas sozinhas quando o administrador entra no app (antes precisava clicar em gerar). Nenhum cliente fica sem cobrança.',
   'Avisos visíveis no celular: quando uma janela está aberta (ex.: Nova reunião), o aviso de erro ou de restrição aparece dentro dela, no topo do formulário. O popup do topo também desceu para não ficar atrás da barra do iPhone.',
@@ -1727,9 +1728,19 @@ const A = {
     });
   },
   toggleTask: async d => {
-    const t = S.d.tasks.find(x => x.id === d.id); const done = t.status !== 'feito';
-    Object.assign(t, { status: done ? 'feito' : 'pendente', done_at: done ? new Date().toISOString() : null }); renderView();
-    await store.update('tasks', t.id, { status: t.status, done_at: t.done_at });
+    const t = S.d.tasks.find(x => x.id === d.id); if (!t) return; const done = t.status !== 'feito';
+    if (!isAdmin() && t.assignee && t.assignee !== S.me.id) return toast('Só o responsável ou o administrador marca esta tarefa', '', 'warn');
+    Object.assign(t, { status: done ? 'feito' : 'pendente', done_at: done ? new Date().toISOString() : null });
+    /* mostra na hora o ✓ no quadrado clicado (também dentro da janela de atrasadas) */
+    document.querySelectorAll(`.ck[data-act="toggleTask"][data-id="${t.id}"]`).forEach(b => {
+      b.innerHTML = done ? ic('check') : ''; b.classList.toggle('on', done); b.classList.remove('pop'); void b.offsetWidth; if (done) b.classList.add('pop');
+      const row = b.closest('.task'); if (row) { row.classList.toggle('done', done); if (done) row.classList.remove('late'); row.querySelectorAll('.chip.bad').forEach(c => { if (/Atrasada/.test(c.textContent)) c.style.display = done ? 'none' : ''; }); }
+    });
+    if (navigator.vibrate && done) try { navigator.vibrate(30); } catch {}
+    setTimeout(() => renderView(), 350);
+    try { await store.update('tasks', t.id, { status: t.status, done_at: t.done_at }); }
+    catch (e) { Object.assign(t, { status: done ? 'pendente' : 'feito', done_at: null }); renderView(); return toast('Não foi possível marcar', e.message, 'bad'); }
+    toast(done ? 'Tarefa concluída ✓' : 'Tarefa reaberta', t.title, done ? 'ok' : '');
     if (done) log(`Concluiu: ${t.title}`, t.client_id);
   },
   cnt: async d => {

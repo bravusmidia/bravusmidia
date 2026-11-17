@@ -114,7 +114,7 @@ tr:last-child td{border-bottom:0}
 
 /* tarefas */
 .task{display:flex;gap:12px;align-items:flex-start;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card);margin-bottom:8px}
-.task .ck{width:26px;height:26px;border-radius:8px;border:2px solid var(--line2);display:grid;place-items:center;flex:none;margin-top:1px}
+.task .ck{width:26px;height:26px;border-radius:8px;border:2px solid var(--line2);display:grid;place-items:center;flex:none;margin-top:1px;background:transparent;color:#04110b;cursor:pointer;transition:background .15s,border-color .15s}
 .task.done{opacity:.55}.task.done .ck{background:var(--ok);border-color:var(--ok);color:#04110b}
 .task.done .tt{text-decoration:line-through}
 .task .tm{font-variant-numeric:tabular-nums;font-weight:700;color:var(--blue2);width:48px;flex:none;font-size:14px;margin-top:3px}
@@ -395,3 +395,10 @@ html,body{overscroll-behavior-y:none}
 .mo-alert b{display:block}.mo-alert .small{display:block;color:var(--tx2);margin-top:2px}
 @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
 @media (max-width:860px){#toasts{left:12px;right:12px;max-width:none;top:calc(10px + env(safe-area-inset-top,0px))}}
+
+/* v2.7.5 quadrado da agenda mostra o ✓ ao marcar */
+.task .ck .i{width:16px;height:16px;stroke:#04110b;stroke-width:3}
+.task .ck.on,.task.done .ck{background:var(--ok);border-color:var(--ok);color:#04110b}
+.task .ck.pop{animation:ckpop .35s ease}
+.task.done{opacity:.7;background:rgba(43,212,138,.05)}.task.done .tt{text-decoration:line-through}
+@keyframes ckpop{0%{transform:scale(.6)}60%{transform:scale(1.2)}100%{transform:scale(1)}}
