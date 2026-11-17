@@ -370,3 +370,7 @@ html,body{overscroll-behavior-y:none}
 .ot-grid .kpi b{font-size:16px;margin-top:2px}
 .sec .i{width:14px;height:14px;margin-right:6px}
 @media (max-width:600px){.ot-grid .kpi{padding:7px 8px}.ot-grid .kpi b{font-size:14px}.ot-grid .kpi small{font-size:9px}}
+.medal{flex:none;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.55));vertical-align:middle}
+.chip.tier{height:26px;padding:0 10px 0 6px;gap:5px}
+.tier-tabs button .medal{margin-right:4px;vertical-align:-4px}
+.tier-seg span .medal{margin-right:5px}

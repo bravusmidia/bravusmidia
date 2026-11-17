@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.6.3';
+const VERSION = '2.6.4';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -810,7 +810,20 @@ const TIERS = [['ouro', 'Ouro'], ['prata', 'Prata'], ['bronze', 'Bronze']];
 const autoTier = v => (+v || 0) >= 1200 ? 'ouro' : (+v || 0) > 800 ? 'prata' : 'bronze';
 const clientTier = c => (c && TIERS.some(t => t[0] === c.tier)) ? c.tier : autoTier(c && c.contract_value);
 const tierName = k => lbl(TIERS, k);
-const tierChip = c => { const k = clientTier(c); return `<span class="chip tier ${k}" title="Ticket ${tierName(k)}${c.tier ? ' (marcado)' : ' (pelo valor do contrato)'}">${ic('star')}${tierName(k)}</span>`; };
+/* medalha metálica realista (gradientes definidos uma vez no documento) */
+const MEDAL_C = { ouro: ['#fff6c8', '#f7d257', '#c9961b', '#7a5208', '#d93d3d', '#9e1f1f'], prata: ['#ffffff', '#e4e9f0', '#a9b3c1', '#5b6574', '#2f6fe0', '#1b3f8f'], bronze: ['#ffe0c2', '#e3a06a', '#a8622e', '#5a2f10', '#2e9d62', '#17633b'] };
+(function medalDefs() {
+  if (document.getElementById('medalDefs')) return;
+  const g = Object.entries(MEDAL_C).map(([k, c]) => `<linearGradient id="md-${k}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c[0]}"/><stop offset=".35" stop-color="${c[1]}"/><stop offset=".7" stop-color="${c[2]}"/><stop offset="1" stop-color="${c[3]}"/></linearGradient><linearGradient id="mi-${k}" x1="1" y1="1" x2="0" y2="0"><stop offset="0" stop-color="${c[0]}"/><stop offset=".45" stop-color="${c[1]}"/><stop offset="1" stop-color="${c[2]}"/></linearGradient><linearGradient id="mr-${k}" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${c[5]}"/><stop offset=".5" stop-color="${c[4]}"/><stop offset="1" stop-color="${c[5]}"/></linearGradient>`).join('');
+  document.body.insertAdjacentHTML('afterbegin', `<svg id="medalDefs" width="0" height="0" style="position:absolute;width:0;height:0" aria-hidden="true"><defs>${g}<radialGradient id="md-shine" cx=".32" cy=".28" r=".6"><stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset=".4" stop-color="#fff" stop-opacity=".15"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs></svg>`);
+})();
+const medal = (k, size = 18) => `<svg class="medal" width="${size}" height="${size * 1.25}" viewBox="0 0 32 40" aria-hidden="true">
+  <path d="M8 0h7l3 14h-7z" fill="url(#mr-${k})"/><path d="M24 0h-7l-3 14h7z" fill="url(#mr-${k})" opacity=".85"/>
+  <circle cx="16" cy="26" r="13" fill="url(#md-${k})"/><circle cx="16" cy="26" r="13" fill="none" stroke="${MEDAL_C[k][3]}" stroke-opacity=".6" stroke-width="1"/>
+  <circle cx="16" cy="26" r="9.6" fill="url(#mi-${k})" stroke="${MEDAL_C[k][3]}" stroke-opacity=".45" stroke-width=".8"/>
+  <path d="M16 19.6l1.9 3.9 4.3.6-3.1 3 .7 4.3-3.8-2-3.8 2 .7-4.3-3.1-3 4.3-.6z" fill="${MEDAL_C[k][1]}" stroke="${MEDAL_C[k][3]}" stroke-opacity=".7" stroke-width=".7"/>
+  <circle cx="16" cy="26" r="13" fill="url(#md-shine)"/></svg>`;
+const tierChip = c => { const k = clientTier(c); return `<span class="chip tier ${k}" title="Ticket ${tierName(k)}${c.tier ? ' (marcado)' : ' (pelo valor do contrato)'}">${medal(k)}${tierName(k)}</span>`; };
 const tierRule = 'Bronze até R$ 800 · Prata acima de R$ 800 até R$ 1.199 · Ouro a partir de R$ 1.200';
 V.clientes = () => {
   const f = S.cliFilter; let cl = S.d.clients.slice().sort((a, b) => a.name.localeCompare(b.name));
@@ -826,7 +839,7 @@ V.clientes = () => {
   return head('Clientes', `${ativos} de ${S.set.max_clients} vagas usadas`, `${isAdmin() ? `<label class="btn" title="Importar planilha (ex.: Metrifiquei)">${ic('down')}<span class="hide-m">Importar</span><input type="file" accept=".csv,text/csv" data-act-change="importCsv" hidden></label>` : ''}${isAdmin() ? `<button class="btn pri" data-act="editClient">${ic('plus')}Cliente</button>` : ''}`) +
     (isAdmin() ? ['shutdown'].filter(k => nDue(k).length).map(k => `<div class="card" style="margin-bottom:14px;border-color:${k === 'shutdown' ? 'rgba(255,107,122,.45)' : 'rgba(255,190,80,.45)'}"><h3>${ic(NOTICE[k].icon)}${k === 'shutdown' ? 'Comunicados de desligamento' : 'Avisos de recarga'} pendentes<span class="sp"></span><a class="small" href="#ajustes">editar texto</a></h3><div class="list">${nDue(k).map(c => `<div class="li"><div class="t"><b>${esc(c.name)}</b><small>${esc(nReason(k, c))}</small></div><button class="btn sm ${k === 'shutdown' ? 'bad' : 'pri'}" data-act="noticeOpen" data-k="${k}" data-id="${c.id}">${ic('wa')}Enviar</button></div>`).join('')}</div></div>`).join('') : '') +
     `<div class="tabs" style="margin-bottom:10px">${tabs.map(t => `<button data-act="cliFilter" data-f="${t[0]}" class="${f === t[0] ? 'on' : ''}">${t[1]}</button>`).join('')}</div>
-    <div class="row wrap" style="gap:10px;margin-bottom:14px"><span class="muted small" style="font-weight:600">Ticket</span><div class="tabs tier-tabs" style="margin:0">${[['', 'Todos'], ...TIERS].map(x => `<button data-act="cliTier" data-f="${x[0]}" class="${x[0]} ${tf === x[0] ? 'on' : ''}">${x[0] ? ic('star') : ''}${esc(x[1])} <small>${x[0] ? base.filter(c => clientTier(c) === x[0]).length : base.length}</small></button>`).join('')}</div></div>
+    <div class="row wrap" style="gap:10px;margin-bottom:14px"><span class="muted small" style="font-weight:600">Ticket</span><div class="tabs tier-tabs" style="margin:0">${[['', 'Todos'], ...TIERS].map(x => `<button data-act="cliTier" data-f="${x[0]}" class="${x[0]} ${tf === x[0] ? 'on' : ''}">${x[0] ? medal(x[0], 14) : ''}${esc(x[1])} <small>${x[0] ? base.filter(c => clientTier(c) === x[0]).length : base.length}</small></button>`).join('')}</div></div>
     <div class="grid g3">${cl.length ? cl.map(c => `<div class="ccard tier-${clientTier(c)}" data-act="openClient" data-id="${c.id}">
       <div class="hd"><span class="av tier-av ${clientTier(c)}">${esc(initials(c.name))}</span><div class="sp" style="min-width:0"><b>${esc(c.name)}</b><div style="margin-top:4px">${tierChip(c)}</div></div>${walletBtn(c)}</div>
       <div class="row wrap" style="gap:6px">${(c.services || []).map(s => `<span class="chip blue">${esc(svcName(s))}</span>`).join('') || '<span class="muted small">Sem serviços</span>'}</div>
@@ -847,7 +860,7 @@ function clientForm(c = {}) {
     <div class="f2">${fld('Valor mensal do contrato (R$)', 'contract_value', c.contract_value, 'number', 'step="0.01" min="0"')}${sel('Forma de pagamento', 'installments', [['1', 'À vista (1 vencimento)'], ['2', 'Parcelado em 2x']], String(c.installments || 1))}</div>
     <div class="f2">${fld('1º vencimento (dia)', 'due_day', c.due_day || 10, 'number', 'min="1" max="31"')}<div id="dd2" style="${+c.installments === 2 ? '' : 'visibility:hidden'}">${fld('2º vencimento (dia)', 'due_day2', c.due_day2 || '', 'number', 'min="1" max="31" placeholder="ex.: 20"')}</div></div>
     <p class="note" id="ddNote" style="${+c.installments === 2 ? '' : 'display:none'};margin-top:-6px">Parcelado: o valor mensal é dividido em 2 cobranças iguais, uma em cada dia. Máximo 2x.</p>
-    <div class="fl">Ticket do cliente<div class="seg tier-seg" role="radiogroup">${[['', 'Automático'], ...TIERS].map(x => `<label class="${x[0]}"><input type="radio" name="tier" value="${x[0]}" ${(c.tier || '') === x[0] ? 'checked' : ''}><span>${x[0] ? ic('star') : ''}${x[1]}</span></label>`).join('')}</div><small class="muted" id="tierHint" style="display:block;margin-top:6px">${tierRule}</small></div>
+    <div class="fl">Ticket do cliente<div class="seg tier-seg" role="radiogroup">${[['', 'Automático'], ...TIERS].map(x => `<label class="${x[0]}"><input type="radio" name="tier" value="${x[0]}" ${(c.tier || '') === x[0] ? 'checked' : ''}><span>${x[0] ? medal(x[0], 16) : ''}${x[1]}</span></label>`).join('')}</div><small class="muted" id="tierHint" style="display:block;margin-top:6px">${tierRule}</small></div>
     <div class="f2">${fld('Data de contratação', 'start_date', c.start_date || today(), 'date')}${sel('Status na carteira', 'op_status', OP, c.op_status || 'ativo')}</div>
     ${fld('Data de saída (se saiu)', 'end_date', c.end_date, 'date')}
     ${reasonField(c.end_reason)}
@@ -860,7 +873,7 @@ function clientDetail(id) {
   const acts = S.d.activity.filter(a => a.client_id === id).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 15);
   const wa = onlyDigits(c.whatsapp || c.phone);
   const wal = !isAdmin() ? '' : `<div class="card row wrap" style="gap:10px;margin-bottom:12px;padding:12px 14px"><div class="sp"><b>Status na carteira</b><div class="small muted">${inWallet(c) ? 'Cliente ativo na carteira' : `Saiu${c.end_date ? ' em ' + fdateY(c.end_date) : ''}${c.end_reason ? ' · ' + esc(c.end_reason) : ''}`}</div></div><div class="tabs" style="margin:0"><button type="button" class="${inWallet(c) ? 'on' : ''}" data-act="setWallet" data-id="${c.id}" data-on="1" data-from="detail"><i class="dot ${inWallet(c) ? 'on' : ''}"></i> Online</button><button type="button" class="${inWallet(c) ? '' : 'on'}" data-act="setWallet" data-id="${c.id}" data-on="0" data-from="detail"><i class="dot"></i> Offline</button></div></div>`;
-  const tierBox = !isAdmin() ? '' : `<div class="card row wrap" style="gap:10px;margin-bottom:12px;padding:12px 14px"><div class="sp"><b>Ticket do cliente</b><div class="small muted">${c.tier ? 'Marcado manualmente' : `Automático pelo valor${canFin() ? ' (' + brl(c.contract_value) + ')' : ''}`}</div></div><div class="tabs tier-tabs" style="margin:0">${[['', 'Auto'], ...TIERS].map(x => `<button type="button" class="${x[0]} ${(c.tier || '') === x[0] ? 'on' : ''}" data-act="setTier" data-id="${c.id}" data-t="${x[0]}">${x[0] ? ic('star') : ''}${x[1]}</button>`).join('')}</div></div>`;
+  const tierBox = !isAdmin() ? '' : `<div class="card row wrap" style="gap:10px;margin-bottom:12px;padding:12px 14px"><div class="sp"><b>Ticket do cliente</b><div class="small muted">${c.tier ? 'Marcado manualmente' : `Automático pelo valor${canFin() ? ' (' + brl(c.contract_value) + ')' : ''}`}</div></div><div class="tabs tier-tabs" style="margin:0">${[['', 'Auto'], ...TIERS].map(x => `<button type="button" class="${x[0]} ${(c.tier || '') === x[0] ? 'on' : ''}" data-act="setTier" data-id="${c.id}" data-t="${x[0]}">${x[0] ? medal(x[0], 14) : ''}${x[1]}</button>`).join('')}</div></div>`;
   modal(c.name, `${wal}${tierBox}<div class="row wrap" style="gap:6px;margin-bottom:12px">${tierChip(c)}${walletChip(c)}${canFin() ? (isAdmin() ? payBtn(c) : finChip(clientFin(c))) : ''}${(c.services || []).map(s => `<span class="chip blue">${esc(svcName(s))}</span>`).join('')}</div>
     <div class="grid g2" style="gap:10px">
       <div class="card"><h3>Contato</h3><div class="small" style="display:grid;gap:4px"><span>👤 ${esc(c.contact || '—')}</span><span>📱 ${esc(c.whatsapp || c.phone || '—')}</span><span>✉️ ${esc(c.email || '—')}</span><span>📷 ${esc(c.instagram || '—')}</span><span>🏷️ ${esc(c.segment || '—')}</span><span>🧑‍💼 Responsável: ${esc(pname(c.owner))}</span></div></div>
@@ -1178,7 +1191,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.6.3', notes: [
+const RELEASE = { version: '2.6.4', notes: [
+  'Clientes: medalhas realistas de Ouro, Prata e Bronze no lugar da estrela.',
   'Alertas: botões “Lidos de hoje” e “Todos lidos”, com a contagem de não lidos.',
   'Tempo online mais enxuto: só Hoje e Total, proporcional no celular.',
   'Tempo online: o app conta o tempo que cada um passa no Bravus Work (hoje, 7 dias, mês e total) e mostra para todos, no topo, na Equipe e no Painel.',
