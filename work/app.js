@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.7.3';
+const VERSION = '2.7.4';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -244,7 +244,7 @@ const walletChip = c => inWallet(c) ? '<span class="chip ok"><i class="dot on"><
 
 function invStatus(i) {
   if (i.status === 'pago' || i.status === 'cancelado' || i.status === 'atrasado') return i.status; /* atrasado = marcado manualmente */
-  if (i.status === 'areceber') return 'pendente'; /* a receber = marcado manualmente, não vira atraso sozinho */
+  /* pendente ou "a receber": passou do vencimento sem pagar = em atraso (v2.7.4) */
   return i.due_date < today() ? 'atrasado' : 'pendente';
 }
 /* status do mês atual (cobranças canceladas não contam) */
@@ -320,6 +320,21 @@ const metrics = x => {
 const CAMP_ST = [['ativa', 'Ativa'], ['pausada', 'Pausada'], ['sem_entrega', 'Sem entrega'], ['problema', 'Com problema'], ['encerrada', 'Encerrada']];
 const campChip = s => `<span class="chip ${s === 'ativa' ? 'ok' : s === 'problema' || s === 'sem_entrega' ? 'bad' : s === 'pausada' ? 'warn' : ''}">${esc((CAMP_ST.find(x => x[0] === s) || [s, s])[1])}</span>`;
 
+/* gera as mensalidades do mês que faltam (usado pelo botão e automático ao entrar como admin) */
+async function genMonthInvoices(k) {
+  let n = 0;
+  for (const c of S.d.clients.filter(c => c.op_status !== 'cancelado' && +c.contract_value > 0)) {
+    const mine = S.d.invoices.filter(i => i.client_id === c.id && ym(i.due_date) === k);
+    const have = mine.filter(i => /mensalidade/i.test(i.description || '') || i.asaas_id);
+    const ps = parts(c); if (have.length >= ps.length || mine.length >= ps.length) continue;
+    const [y, m] = k.split('-').map(Number); const last = new Date(y, m, 0).getDate();
+    for (let j = Math.max(have.length, mine.length); j < ps.length; j++) {
+      const due = `${k}-${pad(Math.min(ps[j][0], last))}`;
+      S.d.invoices.push(await store.insert('invoices', { client_id: c.id, amount: ps[j][1], due_date: due, description: `Mensalidade ${monthName(k)}/${y}${ps.length > 1 ? ` (${j + 1}/2)` : ''}`, status: 'pendente' })); n++;
+    }
+  }
+  return n;
+}
 function finMonth(k) {
   const recebido = S.d.invoices.filter(i => i.status === 'pago' && ym(i.paid_at) === k).reduce((a, i) => a + +i.amount, 0);
   const aReceber = S.d.invoices.filter(i => invStatus(i) === 'pendente' && ym(i.due_date) === k).reduce((a, i) => a + +i.amount, 0);
@@ -587,6 +602,7 @@ async function startSession(userId) {
     for (const t of defaultTemplates(me.id, pri && pri.id)) S.d.tasks.push(await store.insert('tasks', t));
     if (!S.d.settings.length) await store.upsertSettings(S.set);
   }
+  if (isAdmin()) try { const n = await genMonthInvoices(curYM()); if (n) { await log(`Gerou ${n} mensalidade(s) de ${curYM()} automaticamente`); await loadAll('invoices'); } } catch (e) { console.warn('auto mensalidades', e); }
   await heartbeat(); await log('Entrou no app');
   S.route = (location.hash.replace(/^#\/?/, '') || 'painel').split('?')[0];
   render(); tick(); setTimeout(releaseNotice, 800); checkVersion();
@@ -1204,7 +1220,9 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.7.3', notes: [
+const RELEASE = { version: '2.7.4', notes: [
+  'Em atraso automático: mensalidade que passou do vencimento sem pagamento entra em “Em atraso” e o cliente vira inadimplente no painel, mesmo se estava marcada como “A receber”.',
+  'As mensalidades do mês agora são geradas sozinhas quando o administrador entra no app (antes precisava clicar em gerar). Nenhum cliente fica sem cobrança.',
   'Avisos visíveis no celular: quando uma janela está aberta (ex.: Nova reunião), o aviso de erro ou de restrição aparece dentro dela, no topo do formulário. O popup do topo também desceu para não ficar atrás da barra do iPhone.',
   'Checklist da Equipe: reuniões também podem ser marcadas no quadrado (vira “Realizada” e conta no painel e em Reuniões).',
   'Checklist da Equipe: ao marcar aparece o ✓ verde no quadrado e a tarefa desce para “Feitas” (com data e hora), sem sumir. Tudo conta no painel.',
@@ -1572,7 +1590,7 @@ const A = {
       <div class="sec" style="margin-top:0">${esc(monthName(k))}/${k.slice(0, 4)}</div>
       ${inv.length ? `<div class="list">${inv.map(line).join('')}</div>` : (+c.contract_value > 0 ? `<p class="small muted" style="margin-bottom:10px">Ainda não tem cobrança deste mês. Escolha o status e eu crio a mensalidade${isSplit(c) ? ' (2 parcelas)' : ''} de ${brl(c.contract_value)}:</p><div class="li"><div class="t"><b>${brl(c.contract_value)}</b><small>vence ${esc(dueTxt(c))}</small></div>${B('new', null, '')}</div>` : `<p class="note">Este cliente está sem valor de contrato. Edite o cliente e informe o valor mensal.</p>`)}
       ${late.length ? `<div class="sec">Meses anteriores em atraso</div><div class="list">${late.map(line).join('')}</div>` : ''}
-      <p class="note" style="margin-top:12px">Pago entra em “Entrou no mês” do painel na data de hoje. A receber e Em atraso ficam como você marcar, sem mudar sozinhos.</p>`,
+      <p class="note" style="margin-top:12px">Pago entra em “Entrou no mês” do painel na data de hoje. A receber vira Em atraso sozinho quando passa do vencimento sem pagamento.</p>`,
       { footer: `<button type="button" class="btn" data-act="openClient" data-id="${c.id}">Ver cliente</button><span class="sp"></span><button type="button" class="btn" data-act="closeModal">Fechar</button>` });
   },
   invMenu: d => { const i = S.d.invoices.find(x => x.id === d.id); if (i) A.payMenu({ id: i.client_id }); },
@@ -1670,16 +1688,7 @@ const A = {
   editInvoice: d => invoiceForm(S.d.invoices.find(i => i.id === d.id)),
   delInvoice: d => { const i = S.d.invoices.find(x => x.id === d.id) || {}; return confirmBox(`Tem certeza que quer excluir a cobrança de ${esc(cname(i.client_id) || '')}?`, `${brl(i.amount)} · vence ${fdate(i.due_date)}. Não dá para desfazer. Prefira “Cancelado” para manter o histórico.`, 'Sim, excluir cobrança', async () => { await store.remove('invoices', d.id); await refresh(); }, true); },
   genInvoices: async d => {
-    const k = d.m; let n = 0;
-    for (const c of S.d.clients.filter(c => c.op_status !== 'cancelado' && +c.contract_value > 0)) {
-      const have = S.d.invoices.filter(i => i.client_id === c.id && ym(i.due_date) === k && (/mensalidade/i.test(i.description || '') || i.asaas_id));
-      const ps = parts(c); if (have.length >= ps.length) continue;
-      const [y, m] = k.split('-').map(Number); const last = new Date(y, m, 0).getDate();
-      for (let j = have.length; j < ps.length; j++) {
-        const due = `${k}-${pad(Math.min(ps[j][0], last))}`;
-        await store.insert('invoices', { client_id: c.id, amount: ps[j][1], due_date: due, description: `Mensalidade ${monthName(k)}/${y}${ps.length > 1 ? ` (${j + 1}/2)` : ''}`, status: 'pendente' }); n++;
-      }
-    }
+    const k = d.m; const n = await genMonthInvoices(k);
     await log(`Gerou ${n} mensalidade(s) de ${k}`); toast(n ? `${n} mensalidade(s) criada(s)` : 'Tudo já estava gerado', '', 'ok'); await refresh();
   },
   payInvoice: d => {
