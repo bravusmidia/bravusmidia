@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.7.2';
+const VERSION = '2.7.3';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -198,6 +198,19 @@ function toast(title, body = '', type = '') {
   const el = document.createElement('div'); el.className = 'toast ' + type;
   el.innerHTML = `<b>${esc(title)}</b>${body ? `<span class="small muted">${esc(body)}</span>` : ''}`;
   const box = $('#toasts'); box.appendChild(el); while (box.children.length > 3) box.firstChild.remove(); setTimeout(() => el.remove(), 4200);
+  modalAlert(title, body, type);
+}
+/* com uma janela aberta, o aviso também aparece dentro dela (no celular o topo fica atrás da barra do iPhone) */
+function modalAlert(title, body = '', type = '') {
+  const mo = $('#modal-root .mo'); if (!mo || !type || type === 'ok') return;
+  const bd = mo.querySelector('.bd'); if (!bd) return;
+  let al = mo.querySelector('.mo-alert');
+  if (!al) { al = document.createElement('div'); bd.prepend(al); }
+  al.className = 'mo-alert ' + type; al.setAttribute('role', 'alert');
+  al.innerHTML = `<b>${esc(title)}</b>${body ? `<span class="small">${esc(body)}</span>` : ''}`;
+  bd.scrollTo({ top: 0, behavior: 'smooth' });
+  al.style.animation = 'none'; void al.offsetWidth; al.style.animation = '';
+  if (navigator.vibrate) try { navigator.vibrate(60); } catch {}
 }
 function modal(title, body, { footer = '', wide = false, form = '', cls = '', onOpen = null } = {}) {
   const root = $('#modal-root');
@@ -1191,7 +1204,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.7.2', notes: [
+const RELEASE = { version: '2.7.3', notes: [
+  'Avisos visíveis no celular: quando uma janela está aberta (ex.: Nova reunião), o aviso de erro ou de restrição aparece dentro dela, no topo do formulário. O popup do topo também desceu para não ficar atrás da barra do iPhone.',
   'Checklist da Equipe: reuniões também podem ser marcadas no quadrado (vira “Realizada” e conta no painel e em Reuniões).',
   'Checklist da Equipe: ao marcar aparece o ✓ verde no quadrado e a tarefa desce para “Feitas” (com data e hora), sem sumir. Tudo conta no painel.',
   'Equipe: toque em Hoje, Semana ou Atrasadas de cada pessoa para ver a lista do que falta e marcar como feito (checklist). Tem também “Marcar todas como feitas”.',
