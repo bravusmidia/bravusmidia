@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.4.1';
+const VERSION = '2.5.0';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -35,6 +35,7 @@ const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v == n
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 
 const ICON = {
+  star:'<path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/>',
   grid:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/>',
   users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',
   target:'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
@@ -767,7 +768,7 @@ function monthSummary(k) {
       ${row('cal', 'Tarefas', `${tf}/${tt}`, 'concluídas no mês', 'agenda')}
       ${row('chat', 'Prospecções', prosp, `ligações ${lf}/${lt} · follow-ups ${ff}/${ft}`, 'agenda')}
     </div><div class="list">
-      ${row('users', 'Clientes', cl.filter(inWallet).length, `${novos} novo(s) no mês · ${cl.filter(c => !inWallet(c)).length} fora da carteira`, 'clientes')}
+      ${row('users', 'Clientes', cl.filter(inWallet).length, `${TIERS.map(t => `${cl.filter(c => inWallet(c) && clientTier(c) === t[0]).length} ${t[1].toLowerCase()}`).join(' · ')} · ${novos} novo(s) no mês`, 'clientes')}
       ${row('film', 'Conteúdo', `${pub}/${ct.length}`, 'publicados no mês', 'conteudo')}
       ${canFin() ? row('wallet', 'Financeiro', brl(finMonth(k).recebido), `a receber ${brl(finMonth(k).aReceber)} · em atraso ${brl(finMonth(k).atrasado)}`, 'financeiro') : row('target', 'Metas', '→', 'acompanhe o progresso do mês', 'metas')}
     </div></div></div>`;
@@ -780,6 +781,13 @@ function weekChart() {
 }
 
 /* ---------- CLIENTES ---------- */
+/* ---------- TICKET DO CLIENTE: Ouro / Prata / Bronze ---------- */
+const TIERS = [['ouro', 'Ouro'], ['prata', 'Prata'], ['bronze', 'Bronze']];
+const autoTier = v => (+v || 0) >= 1200 ? 'ouro' : (+v || 0) > 800 ? 'prata' : 'bronze';
+const clientTier = c => (c && TIERS.some(t => t[0] === c.tier)) ? c.tier : autoTier(c && c.contract_value);
+const tierName = k => lbl(TIERS, k);
+const tierChip = c => { const k = clientTier(c); return `<span class="chip tier ${k}" title="Ticket ${tierName(k)}${c.tier ? ' (marcado)' : ' (pelo valor do contrato)'}">${ic('star')}${tierName(k)}</span>`; };
+const tierRule = 'Bronze até R$ 800 · Prata acima de R$ 800 até R$ 1.199 · Ouro a partir de R$ 1.200';
 V.clientes = () => {
   const f = S.cliFilter; let cl = S.d.clients.slice().sort((a, b) => a.name.localeCompare(b.name));
   const ativos = S.d.clients.filter(c => c.op_status !== 'cancelado').length;
@@ -787,12 +795,16 @@ V.clientes = () => {
   if (f === 'online') cl = cl.filter(inWallet);
   if (f === 'offline') cl = cl.filter(c => !inWallet(c)).sort((a, b) => String(b.end_date || '').localeCompare(String(a.end_date || '')));
   if (f === 'inad') cl = cl.filter(c => clientFin(c) === 'inadimplente');
+  const tf = S.cliTier || ''; const base = cl;
+  if (tf) cl = cl.filter(c => clientTier(c) === tf);
+  const order = { ouro: 0, prata: 1, bronze: 2 }; cl = cl.slice().sort((a, b) => order[clientTier(a)] - order[clientTier(b)] || a.name.localeCompare(b.name));
   const tabs = [['online', `Online · ${ativos}`], ['offline', `Offline · ${nOff}`], ['inad', 'Inadimplentes'], ['todos', `Todos · ${S.d.clients.length}`]];
   return head('Clientes', `${ativos} de ${S.set.max_clients} vagas usadas`, `${isAdmin() ? `<label class="btn" title="Importar planilha (ex.: Metrifiquei)">${ic('down')}<span class="hide-m">Importar</span><input type="file" accept=".csv,text/csv" data-act-change="importCsv" hidden></label>` : ''}${isAdmin() ? `<button class="btn pri" data-act="editClient">${ic('plus')}Cliente</button>` : ''}`) +
     (isAdmin() ? ['shutdown'].filter(k => nDue(k).length).map(k => `<div class="card" style="margin-bottom:14px;border-color:${k === 'shutdown' ? 'rgba(255,107,122,.45)' : 'rgba(255,190,80,.45)'}"><h3>${ic(NOTICE[k].icon)}${k === 'shutdown' ? 'Comunicados de desligamento' : 'Avisos de recarga'} pendentes<span class="sp"></span><a class="small" href="#ajustes">editar texto</a></h3><div class="list">${nDue(k).map(c => `<div class="li"><div class="t"><b>${esc(c.name)}</b><small>${esc(nReason(k, c))}</small></div><button class="btn sm ${k === 'shutdown' ? 'bad' : 'pri'}" data-act="noticeOpen" data-k="${k}" data-id="${c.id}">${ic('wa')}Enviar</button></div>`).join('')}</div></div>`).join('') : '') +
-    `<div class="tabs" style="margin-bottom:14px">${tabs.map(t => `<button data-act="cliFilter" data-f="${t[0]}" class="${f === t[0] ? 'on' : ''}">${t[1]}</button>`).join('')}</div>
-    <div class="grid g3">${cl.length ? cl.map(c => `<div class="ccard" data-act="openClient" data-id="${c.id}">
-      <div class="hd"><span class="av" style="background:linear-gradient(135deg,#1c5fe6,#0b1a3d)">${esc(initials(c.name))}</span><b>${esc(c.name)}</b>${walletBtn(c)}</div>
+    `<div class="tabs" style="margin-bottom:10px">${tabs.map(t => `<button data-act="cliFilter" data-f="${t[0]}" class="${f === t[0] ? 'on' : ''}">${t[1]}</button>`).join('')}</div>
+    <div class="row wrap" style="gap:10px;margin-bottom:14px"><span class="muted small" style="font-weight:600">Ticket</span><div class="tabs tier-tabs" style="margin:0">${[['', 'Todos'], ...TIERS].map(x => `<button data-act="cliTier" data-f="${x[0]}" class="${x[0]} ${tf === x[0] ? 'on' : ''}">${x[0] ? ic('star') : ''}${esc(x[1])} <small>${x[0] ? base.filter(c => clientTier(c) === x[0]).length : base.length}</small></button>`).join('')}</div></div>
+    <div class="grid g3">${cl.length ? cl.map(c => `<div class="ccard tier-${clientTier(c)}" data-act="openClient" data-id="${c.id}">
+      <div class="hd"><span class="av tier-av ${clientTier(c)}">${esc(initials(c.name))}</span><div class="sp" style="min-width:0"><b>${esc(c.name)}</b><div style="margin-top:4px">${tierChip(c)}</div></div>${walletBtn(c)}</div>
       <div class="row wrap" style="gap:6px">${(c.services || []).map(s => `<span class="chip blue">${esc(svcName(s))}</span>`).join('') || '<span class="muted small">Sem serviços</span>'}</div>
       <div class="ft"><span class="muted">${esc(c.segment || 'Segmento —')} · vence ${esc(dueTxt(c))}</span>${canFin() ? `<b>${brl(c.contract_value)}</b>` : ''}</div>
       ${!inWallet(c) ? `<div class="small muted">Saiu ${c.end_date ? 'em ' + fdateY(c.end_date) : ''}${c.end_reason ? ' · ' + esc(c.end_reason) : ''}${c.start_date ? ` · cliente desde ${fdateY(c.start_date)}` : ''}</div>` : ''}
@@ -811,11 +823,12 @@ function clientForm(c = {}) {
     <div class="f2">${fld('Valor mensal do contrato (R$)', 'contract_value', c.contract_value, 'number', 'step="0.01" min="0"')}${sel('Forma de pagamento', 'installments', [['1', 'À vista (1 vencimento)'], ['2', 'Parcelado em 2x']], String(c.installments || 1))}</div>
     <div class="f2">${fld('1º vencimento (dia)', 'due_day', c.due_day || 10, 'number', 'min="1" max="31"')}<div id="dd2" style="${+c.installments === 2 ? '' : 'visibility:hidden'}">${fld('2º vencimento (dia)', 'due_day2', c.due_day2 || '', 'number', 'min="1" max="31" placeholder="ex.: 20"')}</div></div>
     <p class="note" id="ddNote" style="${+c.installments === 2 ? '' : 'display:none'};margin-top:-6px">Parcelado: o valor mensal é dividido em 2 cobranças iguais, uma em cada dia. Máximo 2x.</p>
+    <div class="fl">Ticket do cliente<div class="seg tier-seg" role="radiogroup">${[['', 'Automático'], ...TIERS].map(x => `<label class="${x[0]}"><input type="radio" name="tier" value="${x[0]}" ${(c.tier || '') === x[0] ? 'checked' : ''}><span>${x[0] ? ic('star') : ''}${x[1]}</span></label>`).join('')}</div><small class="muted" id="tierHint" style="display:block;margin-top:6px">${tierRule}</small></div>
     <div class="f2">${fld('Data de contratação', 'start_date', c.start_date || today(), 'date')}${sel('Status na carteira', 'op_status', OP, c.op_status || 'ativo')}</div>
     ${fld('Data de saída (se saiu)', 'end_date', c.end_date, 'date')}
     ${reasonField(c.end_reason)}
     ${area('Observações', 'notes', c.notes)}
-  </div>`, { form: 'saveClient', onOpen: f => { const sl = f.installments; sl.addEventListener('change', () => { const two = sl.value === '2'; $('#dd2').style.visibility = two ? '' : 'hidden'; $('#ddNote').style.display = two ? '' : 'none'; if (two) f.due_day2.focus(); }); }, footer: `${c.id && isAdmin() ? `<button type="button" class="btn bad" data-act="delClient" data-id="${c.id}">${ic('trash')}</button><span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
+  </div>`, { form: 'saveClient', onOpen: f => { const th = () => { const h = $('#tierHint'); const pick = (f.querySelector('input[name="tier"]:checked') || {}).value; if (h) h.textContent = pick ? `Marcado como ${tierName(pick)}. ${tierRule}` : `Automático pelo valor: ${tierName(autoTier(num(f.contract_value.value)))}. ${tierRule}`; }; f.contract_value.addEventListener('input', th); f.querySelectorAll('input[name="tier"]').forEach(r => r.addEventListener('change', th)); th(); const sl = f.installments; sl.addEventListener('change', () => { const two = sl.value === '2'; $('#dd2').style.visibility = two ? '' : 'hidden'; $('#ddNote').style.display = two ? '' : 'none'; if (two) f.due_day2.focus(); }); }, footer: `${c.id && isAdmin() ? `<button type="button" class="btn bad" data-act="delClient" data-id="${c.id}">${ic('trash')}</button><span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
 }
 function clientDetail(id) {
   const c = client(id); if (!c) return;
@@ -823,7 +836,8 @@ function clientDetail(id) {
   const acts = S.d.activity.filter(a => a.client_id === id).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 15);
   const wa = onlyDigits(c.whatsapp || c.phone);
   const wal = !isAdmin() ? '' : `<div class="card row wrap" style="gap:10px;margin-bottom:12px;padding:12px 14px"><div class="sp"><b>Status na carteira</b><div class="small muted">${inWallet(c) ? 'Cliente ativo na carteira' : `Saiu${c.end_date ? ' em ' + fdateY(c.end_date) : ''}${c.end_reason ? ' · ' + esc(c.end_reason) : ''}`}</div></div><div class="tabs" style="margin:0"><button type="button" class="${inWallet(c) ? 'on' : ''}" data-act="setWallet" data-id="${c.id}" data-on="1" data-from="detail"><i class="dot ${inWallet(c) ? 'on' : ''}"></i> Online</button><button type="button" class="${inWallet(c) ? '' : 'on'}" data-act="setWallet" data-id="${c.id}" data-on="0" data-from="detail"><i class="dot"></i> Offline</button></div></div>`;
-  modal(c.name, `${wal}<div class="row wrap" style="gap:6px;margin-bottom:12px">${walletChip(c)}${canFin() ? (isAdmin() ? payBtn(c) : finChip(clientFin(c))) : ''}${(c.services || []).map(s => `<span class="chip blue">${esc(svcName(s))}</span>`).join('')}</div>
+  const tierBox = !isAdmin() ? '' : `<div class="card row wrap" style="gap:10px;margin-bottom:12px;padding:12px 14px"><div class="sp"><b>Ticket do cliente</b><div class="small muted">${c.tier ? 'Marcado manualmente' : `Automático pelo valor${canFin() ? ' (' + brl(c.contract_value) + ')' : ''}`}</div></div><div class="tabs tier-tabs" style="margin:0">${[['', 'Auto'], ...TIERS].map(x => `<button type="button" class="${x[0]} ${(c.tier || '') === x[0] ? 'on' : ''}" data-act="setTier" data-id="${c.id}" data-t="${x[0]}">${x[0] ? ic('star') : ''}${x[1]}</button>`).join('')}</div></div>`;
+  modal(c.name, `${wal}${tierBox}<div class="row wrap" style="gap:6px;margin-bottom:12px">${tierChip(c)}${walletChip(c)}${canFin() ? (isAdmin() ? payBtn(c) : finChip(clientFin(c))) : ''}${(c.services || []).map(s => `<span class="chip blue">${esc(svcName(s))}</span>`).join('')}</div>
     <div class="grid g2" style="gap:10px">
       <div class="card"><h3>Contato</h3><div class="small" style="display:grid;gap:4px"><span>👤 ${esc(c.contact || '—')}</span><span>📱 ${esc(c.whatsapp || c.phone || '—')}</span><span>✉️ ${esc(c.email || '—')}</span><span>📷 ${esc(c.instagram || '—')}</span><span>🏷️ ${esc(c.segment || '—')}</span><span>🧑‍💼 Responsável: ${esc(pname(c.owner))}</span></div></div>
       <div class="card"><h3>Contrato</h3><div class="small" style="display:grid;gap:4px">${canFin() ? `<span>Valor: <b>${brl(c.contract_value)}</b>/mês</span>` : ''}<span>Vencimento: ${esc(dueTxt(c))}${isSplit(c) && canFin() ? ` · ${parts(c).map(p => brl(p[1])).join(' + ')}` : ''}</span><span>Desde: ${c.start_date ? new Date(c.start_date + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}</span></div></div>
@@ -1140,7 +1154,9 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.4.1', notes: [
+const RELEASE = { version: '2.5.0', notes: [
+  'Clientes com ticket Ouro, Prata e Bronze: selo colorido no card, filtro com contagem e cards ordenados do Ouro para o Bronze.',
+  'Ticket automático pelo valor do contrato (Bronze até R$ 800 · Prata acima de R$ 800 · Ouro a partir de R$ 1.200), ou marcado à mão na conta de cada cliente.',
   'Status online corrigido: você aparece online na hora em que abre ou volta para o app.',
   'Painel conectado a todo o Bravus Work: novo resumo do mês com reuniões, tarefas, prospecções, clientes, conteúdo e financeiro, cada um levando para a sua aba.',
   'Reuniões que já passaram sem resultado aparecem nas Prioridades de hoje e no card de Reuniões; um toque e você marca Realizada ou Faltou.',
@@ -1409,6 +1425,14 @@ const A = {
   authChangeEmail: () => { AUTH.stage = 'email'; AUTH.pin = ''; renderAuth(); },
   moreMenu: () => modal('Menu', `<div class="list">${NAV.filter(navOk).map(n => `<a class="li" href="#${n[0]}" data-act="closeModal">${ic(n[2])}<div class="t"><b>${n[1]}</b></div>${n[0] === 'alertas' && unread() ? `<span class="badge">${unread()}</span>` : ''}</a>`).join('')}<button class="li" data-act="logout" style="width:100%">${ic('lock')}<div class="t" style="text-align:left"><b>Bloquear / sair</b></div></button></div>`),
   cliFilter: d => { S.cliFilter = d.f; renderView(); },
+  cliTier: d => { S.cliTier = d.f; renderView(); },
+  setTier: async d => {
+    if (!isAdmin()) return toast('Só o administrador muda o ticket', '', 'warn');
+    const c = client(d.id); if (!c) return;
+    try { await store.update('clients', c.id, { tier: d.t || null }); } catch (e) { return toast('Não foi possível salvar o ticket', /tier/i.test(e.message || '') ? 'Falta rodar o SQL v2.4 (ticket) no Supabase.' : e.message, 'bad'); }
+    c.tier = d.t || null; await log(d.t ? `Ticket de ${c.name}: ${tierName(d.t)}` : `Ticket de ${c.name} voltou para automático (${tierName(autoTier(c.contract_value))})`, c.id);
+    toast('Ticket atualizado', `${c.name} · ${tierName(clientTier(c))}`, 'ok'); await refresh(); clientDetail(c.id);
+  },
   newMember: () => { if (!isAdmin()) return;
     const sug = 'bravus' + Math.floor(1000 + Math.random() * 9000);
     modal('Adicionar membro à equipe', `<div class="f">
@@ -1655,7 +1679,7 @@ const F = {
     if (!v.name.trim()) return toast('Informe o nome da empresa', '', 'bad');
     const row = { name: v.name.trim(), contact: v.contact, whatsapp: v.whatsapp, phone: v.phone, email: v.email, instagram: v.instagram, segment: v.segment, owner: v.owner || null,
       services: fd.getAll('services'), contract_value: num(v.contract_value) || 0, due_day: num(v.due_day), installments: v.installments === '2' ? 2 : 1, due_day2: v.installments === '2' ? num(v.due_day2) : null, start_date: v.start_date || null, op_status: v.op_status,
-      notes: v.notes };
+      notes: v.notes, tier: v.tier || null };
     if (row.installments === 2 && (!row.due_day2 || row.due_day2 < 1 || row.due_day2 > 31)) return toast('Informe o dia do 2º vencimento', 'Parcelado aceita até 2x.', 'warn');
     if (row.installments === 2 && row.due_day2 === row.due_day) return toast('Os dois vencimentos estão no mesmo dia', 'Escolha dias diferentes ou use À vista.', 'warn');
     const old = v.id && client(v.id);
@@ -1664,7 +1688,7 @@ const F = {
     if (old && inWallet(old) !== inWallet(row)) await log(inWallet(row) ? `${row.name} voltou para a carteira (online)` : `${row.name} saiu da carteira (offline)${row.end_reason ? ': ' + row.end_reason : ''}`, v.id);
     const noCol = e => /end_date|end_reason|installments|due_day2|column/i.test(e && e.message || '');
     const save = r => v.id ? store.update('clients', v.id, r) : store.insert('clients', r);
-    let saved; try { saved = await save(row); } catch (e) { if (!noCol(e)) throw e; delete row.end_date; delete row.end_reason; delete row.installments; delete row.due_day2; saved = await save(row); toast('Banco ainda sem alguns campos', 'Rode o SQL v1.5 no Supabase para guardar o parcelamento e a saída.', 'warn'); }
+    let saved; try { saved = await save(row); } catch (e) { if (/tier/i.test(e && e.message || '')) { delete row.tier; saved = await save(row); toast('Cliente salvo sem o ticket', 'Falta rodar o SQL v2.4 (ticket) no Supabase.', 'warn'); } else { if (!noCol(e)) throw e; delete row.end_date; delete row.end_reason; delete row.installments; delete row.due_day2; saved = await save(row); toast('Banco ainda sem alguns campos', 'Rode o SQL v1.5 no Supabase para guardar o parcelamento e a saída.', 'warn'); } }
     if (v.id) await log(`Atualizou o cadastro de ${row.name}`, v.id); else { await log(`Cadastrou o cliente ${row.name}`, saved && saved.id); await notifyTeam(`Cliente novo: ${row.name} 🎉`, `${row.contract_value ? brl(row.contract_value) + '/mês · ' : ''}vence ${dueTxt(row)}`, 'pago', null, 'clientes'); }
     closeModal(); toast('Cliente salvo', '', 'ok'); await refresh();
   },

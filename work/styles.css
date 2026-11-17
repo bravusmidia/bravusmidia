@@ -98,7 +98,7 @@ tr:last-child td{border-bottom:0}
 .ccard{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:10px;cursor:pointer;transition:.15s}
 .ccard:hover{border-color:var(--line2);transform:translateY(-1px)}
 .ccard .hd{display:flex;align-items:center;gap:10px}
-.ccard .hd b{flex:1;font-size:15px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ccard .hd b{display:block;flex:1;font-size:15px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ccard .ft{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:10px;font-size:13px}
 
 /* barras */
@@ -340,3 +340,25 @@ html,body{overscroll-behavior-y:none}
 .tk-tabs button.warn.on{background:rgba(255,181,71,.16);border-color:var(--warn);color:var(--warn)}
 .tk-tabs button.bad.on{background:rgba(255,90,106,.16);border-color:var(--bad);color:var(--bad)}
 .li .chip svg{width:13px;height:13px}
+
+/* ticket do cliente: Ouro / Prata / Bronze (v2.5) */
+:root{--gold:#f5c542;--silver:#c9d3e0;--bronze:#d98a4e}
+.chip.tier .i{width:13px;height:13px}
+.chip.tier.ouro{color:var(--gold);border-color:rgba(245,197,66,.45);background:rgba(245,197,66,.1)}
+.chip.tier.prata{color:var(--silver);border-color:rgba(201,211,224,.4);background:rgba(201,211,224,.08)}
+.chip.tier.bronze{color:var(--bronze);border-color:rgba(217,138,78,.45);background:rgba(217,138,78,.1)}
+.tier-av.ouro{background:linear-gradient(135deg,#f5c542,#8a6410)!important;color:#1a1300}
+.tier-av.prata{background:linear-gradient(135deg,#e3e9f2,#6b7686)!important;color:#121820}
+.tier-av.bronze{background:linear-gradient(135deg,#e09a62,#6e3a14)!important;color:#1e0f04}
+.ccard.tier-ouro{border-color:rgba(245,197,66,.35)}
+.ccard.tier-prata{border-color:rgba(201,211,224,.25)}
+.ccard.tier-bronze{border-color:rgba(217,138,78,.3)}
+.tier-tabs button .i{width:13px;height:13px;margin-right:4px;vertical-align:-2px}
+.tier-tabs button.ouro.on{color:var(--gold);border-color:var(--gold);background:rgba(245,197,66,.12)}
+.tier-tabs button.prata.on{color:var(--silver);border-color:var(--silver);background:rgba(201,211,224,.1)}
+.tier-tabs button.bronze.on{color:var(--bronze);border-color:var(--bronze);background:rgba(217,138,78,.12)}
+.tier-seg span .i{width:14px;height:14px;margin-right:4px}
+.tier-seg span{display:flex!important;align-items:center;justify-content:center}
+.seg .ouro input:checked+span{background:rgba(245,197,66,.16);border-color:var(--gold);color:var(--gold)}
+.seg .prata input:checked+span{background:rgba(201,211,224,.14);border-color:var(--silver);color:var(--silver)}
+.seg .bronze input:checked+span{background:rgba(217,138,78,.16);border-color:var(--bronze);color:var(--bronze)}
