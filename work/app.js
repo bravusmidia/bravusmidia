@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.7.6';
+const VERSION = '2.7.7';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -161,6 +161,13 @@ Estamos iniciando o protocolo de desligamento, com a suspensão dos serviços e 
 Caso deseje manter os serviços ativos, solicitamos a regularização do saldo pendente.
 
 *Esta é uma mensagem automática do sistema.*`;
+const PAUSE_MSG = `Olá, {contato}! Tudo bem?
+
+Informamos que os serviços da *{cliente}* com a Bravus Mídia estão *pausados* a partir de hoje.
+
+Assim que quiser retomar, é só nos chamar por aqui que reativamos tudo.
+
+Equipe Bravus Mídia`;
 const S = { me: null, route: 'painel', d: {}, set: { ...DEFAULT_SETTINGS }, agendaDate: today(), agendaWho: null,
   finMonth: curYM(), meetMonth: curYM(), goalMonth: curYM(), meetWho: '', meetTicket: '', meetDay: null, cliFilter: 'online', contentWeek: null, popped: new Set(), startedAt: new Date().toISOString() };
 TABLES.forEach(t => S.d[t] = []);
@@ -912,7 +919,7 @@ function clientDetail(id) {
     <div class="sec">Histórico de atividades</div>
     <div class="list">${acts.length ? acts.map(a => `<div class="li"><div class="t"><b style="font-weight:500">${esc(a.action)}</b><small>${esc(firstName(a.user_id))} · ${new Date(a.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</small></div></div>`).join('') : empty('Sem registros ainda.')}</div>
     <form data-form="clientNote" class="row" style="margin-top:10px"><input type="hidden" name="id" value="${c.id}"><input name="text" placeholder="Registrar atividade (ex.: liguei, enviei proposta)" maxlength="300"><button class="btn">Registrar</button></form>`,
-    { wide: true, footer: `${wa ? `<a class="btn ok" href="https://wa.me/55${wa.replace(/^55/, '')}" target="_blank" rel="noopener">${ic('wa')}WhatsApp</a>` : ''}<button type="button" class="btn" data-act="editMeet" data-client="${c.id}">${ic('meet')}<span class="hide-m">Reunião</span></button><button type="button" class="btn" data-act="clientReport" data-id="${c.id}">${ic('file')}Relatório</button>${isAdmin() ? `<button type="button" class="btn bad" data-act="noticeOpen" data-k="shutdown" data-id="${c.id}" title="Comunicado de desligamento">${ic('bell')}<span class="hide-m">Desligamento</span></button>` : ''}<span class="sp"></span>${isAdmin() ? `<button type="button" class="btn pri" data-act="editClient" data-id="${c.id}">${ic('edit')}Editar</button>` : ''}` });
+    { wide: true, footer: `${wa ? `<a class="btn ok" href="https://wa.me/55${wa.replace(/^55/, '')}" target="_blank" rel="noopener">${ic('wa')}WhatsApp</a>` : ''}<button type="button" class="btn" data-act="editMeet" data-client="${c.id}">${ic('meet')}<span class="hide-m">Reunião</span></button><button type="button" class="btn" data-act="clientReport" data-id="${c.id}">${ic('file')}Relatório</button>${isAdmin() ? `<button type="button" class="btn bad" data-act="offboard" data-id="${c.id}" title="Pausar, cancelar ou enviar comunicado">${ic('bell')}<span class="hide-m">${c.op_status === 'pausado' ? 'Pausado' : 'Pausar / Cancelar'}</span></button>` : ''}<span class="sp"></span>${isAdmin() ? `<button type="button" class="btn pri" data-act="editClient" data-id="${c.id}">${ic('edit')}Editar</button>` : ''}` });
 }
 
 /* ---------- IMPORTAR CLIENTES (CSV do Metrifiquei ou planilha simples) ---------- */
@@ -1220,7 +1227,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.7.6', notes: [
+const RELEASE = { version: '2.7.7', notes: [
+  'Cliente: o botão “Desligamento” virou “Pausar / Cancelar”. Ao tocar você escolhe: Pausar (fica na carteira como Pausado, com aviso opcional no WhatsApp), Cancelar (sai da carteira, com data, motivo e cobranças) ou só enviar o comunicado de desligamento. Cliente pausado ganha o botão “Retomar”.',
   '“A receber” agora mostra o total de tudo que falta receber: mensalidades do mês ainda não vencidas + as atrasadas. O card “Atrasado” continua mostrando só o valor em atraso.',
   'Agenda: ao tocar no quadrado da tarefa aparece na hora o ✓ verde, a tarefa fica riscada e some o “Atrasada” (também na lista de atrasadas). Toque de novo para desmarcar.',
   'Em atraso automático: mensalidade que passou do vencimento sem pagamento entra em “Em atraso” e o cliente vira inadimplente no painel, mesmo se estava marcada como “A receber”.',
@@ -1670,6 +1678,39 @@ const A = {
   },
   editClient: d => { if (!isAdmin()) return toast('Somente o administrador altera clientes', 'Peça acesso de administrador ao Andrade.', 'warn'); if (!d.id && S.d.clients.filter(c => c.op_status !== 'cancelado').length >= S.set.max_clients) return toast('Limite de clientes atingido', `Seu espaço comporta ${S.set.max_clients} clientes. Aumente em Ajustes.`, 'warn'); clientForm(d.id ? client(d.id) : {}); },
   openClient: d => clientDetail(d.id),
+  /* v2.7.7: escolher o que fazer com o cliente — pausar, cancelar ou só enviar o comunicado */
+  offboard: d => {
+    if (!isAdmin()) return toast('Somente o administrador altera clientes', '', 'warn');
+    const c = client(d.id); if (!c) return; const paused = c.op_status === 'pausado';
+    const opt = (act, cls, icon, t, sub) => `<button type="button" class="btn ${cls}" style="width:100%;justify-content:flex-start;text-align:left;padding:14px;height:auto;margin-bottom:10px" data-act="${act}" data-id="${c.id}">${ic(icon)}<span style="display:block"><b style="display:block">${t}</b><span class="small muted">${sub}</span></span></button>`;
+    modal('O que fazer com ' + c.name + '?', `
+      ${paused ? opt('resumeClient', 'ok', 'check', 'Retomar (voltar a Ativo)', 'O cliente está pausado. Volta a contar como ativo.') : opt('pauseClient', 'warn', 'clock', 'Pausar', 'Continua na carteira como Pausado. Dá para retomar depois.')}
+      ${opt('cancelClient', 'bad', 'x', 'Cancelar (sair da carteira)', 'Vai para Offline, com data e motivo. Pode cancelar as cobranças em aberto.')}
+      ${opt('shutNotice', '', 'bell', 'Só enviar comunicado de desligamento', 'Abre o WhatsApp com o comunicado, sem mudar o cliente.')}`,
+      { footer: '<button type="button" class="btn" data-act="closeModal">Fechar</button>' });
+  },
+  pauseClient: d => {
+    const c = client(d.id); if (!c) return; const wa = onlyDigits(c.whatsapp || c.phone);
+    modal('Pausar ' + c.name, `<p style="margin-bottom:10px">O cliente continua na carteira como <b>Pausado</b>. Para voltar, toque em “Retomar”.</p>
+      ${wa ? `<label class="sw" style="margin-bottom:10px"><input type="checkbox" id="pSend" checked> Avisar o cliente no WhatsApp</label>
+      <label class="fl">Mensagem (pode ajustar)<textarea id="pTxt" style="min-height:200px">${esc(fillMsg(PAUSE_MSG, c))}</textarea></label>` : '<div class="infobox">Este cliente não tem WhatsApp cadastrado, então a pausa é feita sem aviso.</div>'}`,
+      { footer: `<button type="button" class="btn" data-act="offboard" data-id="${c.id}">Voltar</button><span class="sp"></span><button type="button" class="btn warn" data-act="pauseDo" data-id="${c.id}">${ic('clock')}Pausar cliente</button>` });
+  },
+  pauseDo: async d => {
+    const c = client(d.id); if (!c) return; const send = ($('#pSend') || {}).checked; const txt = ($('#pTxt') || {}).value;
+    if (send && txt) window.open(waTo(c, txt), '_blank', 'noopener');
+    await store.update('clients', c.id, { op_status: 'pausado' }); await log(`Pausou o cliente ${c.name}${send ? ' (avisado no WhatsApp)' : ''}`, c.id);
+    await notifyTeam(`${c.name} foi pausado`, `Por ${firstName(S.me.id)}`, 'alerta', null, 'clientes');
+    closeModal(); toast(`${c.name} pausado`, send ? 'Aviso aberto no WhatsApp.' : 'Continua na carteira como Pausado.', 'ok'); await refresh(); clientDetail(c.id);
+  },
+  resumeClient: async d => {
+    const c = client(d.id); if (!c) return;
+    await store.update('clients', c.id, { op_status: 'ativo' }); await log(`Retomou o cliente ${c.name} (voltou a Ativo)`, c.id);
+    await notifyTeam(`${c.name} voltou a ficar ativo`, `Por ${firstName(S.me.id)}`, 'pago', null, 'clientes');
+    closeModal(); toast(`${c.name} ativo novamente`, '', 'ok'); await refresh(); clientDetail(c.id);
+  },
+  cancelClient: d => { closeModal(); A.setWallet({ id: d.id, on: '0', from: 'detail' }); },
+  shutNotice: d => noticeModal('shutdown', d.id),
   noticeOpen: d => { if (!isAdmin()) return toast('Somente o administrador envia este aviso', '', 'warn'); noticeModal(d.k, d.id); },
   noticeSend: async d => {
     const k = d.k, c = client(d.id); if (!c || !NOTICE[k]) return;

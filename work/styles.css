@@ -402,3 +402,4 @@ html,body{overscroll-behavior-y:none}
 .task .ck.pop{animation:ckpop .35s ease}
 .task.done{opacity:.7;background:rgba(43,212,138,.05)}.task.done .tt{text-decoration:line-through}
 @keyframes ckpop{0%{transform:scale(.6)}60%{transform:scale(1.2)}100%{transform:scale(1)}}
+.btn.warn{background:rgba(255,181,71,.12);border-color:rgba(255,181,71,.4);color:var(--warn)}
