@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.6.0';
+const VERSION = '2.6.1';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -1178,7 +1178,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.6.0', notes: [
+const RELEASE = { version: '2.6.1', notes: [
+  'Tempo online mais compacto, proporcional no celular.',
   'Tempo online: o app conta o tempo que cada um passa no Bravus Work (hoje, 7 dias, mês e total) e mostra para todos, no topo, na Equipe e no Painel.',
   'Clientes com ticket Ouro, Prata e Bronze: selo colorido no card, filtro com contagem e cards ordenados do Ouro para o Bronze.',
   'Ticket automático pelo valor do contrato (Bronze até R$ 800 · Prata acima de R$ 800 · Ouro a partir de R$ 1.200), ou marcado à mão na conta de cada cliente.',
