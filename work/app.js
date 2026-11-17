@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.6.4';
+const VERSION = '2.6.5';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -1191,7 +1191,9 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.6.4', notes: [
+const RELEASE = { version: '2.6.5', notes: [
+  'Equipe: botão Excluir membro no card de cada pessoa (só o administrador).',
+  'Toda exclusão pergunta “Tem certeza?” dizendo exatamente o que vai ser apagado (cliente, reunião, tarefa, cobrança, despesa, conteúdo, membro).',
   'Clientes: medalhas realistas de Ouro, Prata e Bronze no lugar da estrela.',
   'Alertas: botões “Lidos de hoje” e “Todos lidos”, com a contagem de não lidos.',
   'Tempo online mais enxuto: só Hoje e Total, proporcional no celular.',
@@ -1308,7 +1310,7 @@ V.equipe = () => {
     const late = mine.filter(isLate).length;
     const goals = td.filter(t => t.goal);
     const acts = S.d.activity.filter(a => a.user_id === p.id).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 6);
-    return `<div class="card"><div class="row" style="margin-bottom:14px"><span data-act="editProfile" data-id="${p.id}" style="cursor:pointer">${avatar(p, 48)}</span><div class="sp" data-act="editProfile" data-id="${p.id}" style="cursor:pointer"><b style="font-size:16px">${esc(p.name)}</b><div class="small muted">${esc(cargo(p))} · ${isOnline(p) ? '<span style="color:var(--ok)">online agora</span>' : 'offline · último acesso ' + ago(p.last_seen)}</div></div>${p.id === S.me.id || isAdmin() ? `<label class="btn sm" title="Trocar foto">${ic('plus')}Foto<input type="file" accept="image/*" data-act-change="setPhoto" data-id="${p.id}" hidden></label>` : ''}</div>
+    return `<div class="card"><div class="row" style="margin-bottom:14px"><span data-act="editProfile" data-id="${p.id}" style="cursor:pointer">${avatar(p, 48)}</span><div class="sp" data-act="editProfile" data-id="${p.id}" style="cursor:pointer"><b style="font-size:16px">${esc(p.name)}</b><div class="small muted">${esc(cargo(p))} · ${isOnline(p) ? '<span style="color:var(--ok)">online agora</span>' : 'offline · último acesso ' + ago(p.last_seen)}</div></div>${p.id === S.me.id || isAdmin() ? `<label class="btn sm" title="Trocar foto">${ic('plus')}Foto<input type="file" accept="image/*" data-act-change="setPhoto" data-id="${p.id}" hidden></label>` : ''}${isAdmin() && SUPA && p.id !== S.me.id ? `<button class="btn sm bad" data-act="removeMember" data-id="${p.id}" title="Excluir ${esc(p.name)} da equipe" style="margin-left:6px">${ic('trash')}<span class="hide-m">Excluir</span></button>` : ''}</div>
       <div class="sec" style="margin-top:0">${ic('clock')} Tempo online no Bravus Work</div>
       <div class="grid g4 ot-grid" style="gap:8px;margin-bottom:12px">${kpi('Hoje', fmtDur(timeToday(p.id)), '', isOnline(p) ? 'g' : '')}${kpi('Total', fmtDur(timeOf(p.id)))}</div>
       <div class="sec" style="margin-top:0">Tarefas</div>
@@ -1487,14 +1489,14 @@ const A = {
       { form: 'saveMember', footer: `<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Criar membro</button>` }); },
   genPin: () => { const el = $('#nmPin'); if (el) el.value = 'bravus' + Math.floor(1000 + Math.random() * 9000); },
   removeMember: d => { const p = prof(d.id); if (!p || !isAdmin() || p.id === S.me.id) return;
-    confirmBox(`Remover ${esc(p.name)} da equipe?`, `O acesso de <b>${esc(p.email || p.name)}</b> é apagado. Clientes e conteúdos dele(a) passam para você; tarefas, mensagens e histórico dele(a) são apagados. Não dá para desfazer.`, 'Remover', async () => {
+    confirmBox(`Tem certeza que quer excluir ${esc(p.name)}?`, `O acesso de <b>${esc(p.email || p.name)}</b> é apagado. Clientes e conteúdos dele(a) passam para você; tarefas, mensagens e histórico dele(a) são apagados. Não dá para desfazer.`, `Sim, excluir ${esc(firstName(p.id) || p.name)}`, async () => {
       const { error } = await sb.rpc('admin_remove_member', { target: p.id }); if (error) return toast('Não foi possível remover', error.message, 'bad');
       await log(`Removeu ${p.name} da equipe`); toast('Membro removido', p.name, 'ok'); await refresh(); renderView(); }, true); },
   copyAccess: d => { navigator.clipboard && navigator.clipboard.writeText(d.txt).then(() => toast('Acesso copiado', '', 'ok')); },
   chatToggle: () => { CW.open = !CW.open; lsSet('bw_cw_open', CW.open); renderChat(true); if (CW.open && innerWidth > 860) setTimeout(() => $('#chatInput') && $('#chatInput').focus(), 50); },
   cwTab: d => { CW.tab = d.t; renderChat(true); },
   msgPin: async d => { const m = S.d.messages.find(x => x.id === d.id); if (!m) return; try { await store.update('messages', m.id, { pinned: !m.pinned }); } catch (e) { return toast('Anotações ainda não ativadas no banco', 'Falta rodar o SQL v2.0 no Supabase.', 'warn'); } if (!m.pinned) toast('Guardado nas anotações', '', 'ok'); await loadAll('messages'); renderChat(); },
-  msgDel: d => confirmBox('Apagar anotação?', 'Ela some para todos.', 'Apagar', async () => { await store.remove('messages', d.id); await loadAll('messages'); renderChat(true); }, true),
+  msgDel: d => confirmBox('Tem certeza que quer apagar esta anotação?', 'Ela some para todos. Não dá para desfazer.', 'Sim, apagar', async () => { await store.remove('messages', d.id); await loadAll('messages'); renderChat(true); }, true),
   releaseOk: () => { lsSet('bw_version_seen', RELEASE.version); closeModal(); },
   updateNow: async () => { try { const r = await navigator.serviceWorker?.getRegistration(); await r?.update(); } catch {} location.reload(); },
   setRole: d => { const p = prof(d.id); if (!p || !isAdmin() || p.id === S.me.id) return; const toAdmin = p.role !== 'admin'; const nm = p.name.split(' ')[0];
@@ -1609,7 +1611,7 @@ const A = {
     closeModal(); toast(`${NOTICE[k].name} aberto no WhatsApp`, pause ? 'Cliente marcado como Pausado.' : 'Registrado no histórico.', 'ok'); await refresh();
   },
   noticeReset: d => { const t = $(`form[data-form="${d.k === 'recharge' ? 'saveRecharge' : 'saveShutdown'}"] textarea[name="msg"]`); if (t) t.value = NOTICE[d.k].def(); toast('Texto padrão restaurado', 'Clique em salvar para gravar.'); },
-  delClient: d => !isAdmin() ? toast('Só o administrador exclui clientes', '', 'warn') : confirmBox('Excluir cliente?', 'Isto apaga o cliente e as cobranças ligadas a ele. Para manter o histórico, prefira marcar como “Cancelado”.', 'Excluir', async () => {
+  delClient: d => !isAdmin() ? toast('Só o administrador exclui clientes', '', 'warn') : confirmBox(`Tem certeza que quer excluir o cliente ${esc((client(d.id) || {}).name || '')}?`, 'Isto apaga o cliente e as cobranças ligadas a ele. Não dá para desfazer. Para manter o histórico, prefira deixar ele Offline.', 'Sim, excluir cliente', async () => {
     const c = client(d.id); for (const t of ['campaigns', 'invoices']) for (const r of S.d[t].filter(x => x.client_id === d.id)) await store.remove(t, r.id);
     await store.remove('clients', d.id); await log(`Excluiu o cliente ${c && c.name}`); toast('Cliente excluído', '', 'ok'); await refresh(); }, true),
   clientReport: d => clientReport(d.id), print: () => EMBED ? toast('Disponível no app publicado', 'Na versão instalada, este botão salva o relatório em PDF.', 'warn') : window.print(),
@@ -1617,7 +1619,7 @@ const A = {
   finMonth: d => { S.finMonth = d.m; renderView(); },
   newInvoice: () => { if (!S.d.clients.length) return toast('Cadastre um cliente primeiro', '', 'warn'); invoiceForm({}); },
   editInvoice: d => invoiceForm(S.d.invoices.find(i => i.id === d.id)),
-  delInvoice: d => confirmBox('Excluir cobrança?', 'Prefira “Cancelado” para manter o histórico.', 'Excluir', async () => { await store.remove('invoices', d.id); await refresh(); }, true),
+  delInvoice: d => { const i = S.d.invoices.find(x => x.id === d.id) || {}; return confirmBox(`Tem certeza que quer excluir a cobrança de ${esc(cname(i.client_id) || '')}?`, `${brl(i.amount)} · vence ${fdate(i.due_date)}. Não dá para desfazer. Prefira “Cancelado” para manter o histórico.`, 'Sim, excluir cobrança', async () => { await store.remove('invoices', d.id); await refresh(); }, true); },
   genInvoices: async d => {
     const k = d.m; let n = 0;
     for (const c of S.d.clients.filter(c => c.op_status !== 'cancelado' && +c.contract_value > 0)) {
@@ -1639,10 +1641,10 @@ const A = {
   },
   chargeWa: d => { const i = S.d.invoices.find(x => x.id === d.id); log('Abriu lembrete de cobrança no WhatsApp', i && i.client_id); },
   newExpense: () => modal('Nova despesa', `<div class="f">${fld('Descrição *', 'description', '', 'text', 'required')}<div class="f2">${fld('Valor (R$) *', 'amount', '', 'number', 'step="0.01" min="0.01" required')}${fld('Data', 'date', today(), 'date', 'required')}</div>${sel('Categoria', 'category', ['Ferramentas', 'Equipe', 'Impostos', 'Anúncios próprios', 'Equipamentos', 'Outros'])}</div>`, { form: 'saveExpense', footer: `<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` }),
-  delExpense: d => confirmBox('Excluir despesa?', 'Esta ação não pode ser desfeita.', 'Excluir', async () => { await store.remove('expenses', d.id); await refresh(); }, true),
+  delExpense: d => { const x = S.d.expenses.find(e => e.id === d.id) || {}; return confirmBox(`Tem certeza que quer excluir a despesa “${esc(x.description || '')}”?`, `${brl(x.amount)} · ${fdate(x.date)}. Não dá para desfazer.`, 'Sim, excluir despesa', async () => { await store.remove('expenses', d.id); await refresh(); }, true); },
   newTask: () => isAdmin() ? taskForm({}) : toast('Membros só adicionam reuniões', 'Use “+ Reunião”.', 'warn'), editTask: d => { const t = S.d.tasks.find(t => t.id === d.id); return t && t.kind === 'reuniao' ? meetForm(t) : taskForm(t); },
   newTemplate: () => taskForm({}, true), editTemplate: d => taskForm(S.d.tasks.find(t => t.id === d.id), true),
-  delTask: d => confirmBox('Excluir?', 'Esta ação não pode ser desfeita.', 'Excluir', async () => { await store.remove('tasks', d.id); await refresh(); }, true),
+  delTask: d => { const t = S.d.tasks.find(x => x.id === d.id) || {}; const isM = t.kind === 'reuniao'; return confirmBox(isM ? `Tem certeza que quer excluir a reunião com ${esc(meetWho(t))}?` : `Tem certeza que quer excluir a tarefa “${esc(t.title || '')}”?`, `${t.date ? fdate(t.date) : ''}${t.time ? ' às ' + esc(t.time) : ''}${t.date ? ' · ' : ''}Não dá para desfazer.`, isM ? 'Sim, excluir reunião' : 'Sim, excluir tarefa', async () => { await store.remove('tasks', d.id); closeModal(); await refresh(); }, true); },
   toggleTask: async d => {
     const t = S.d.tasks.find(x => x.id === d.id); const done = t.status !== 'feito';
     Object.assign(t, { status: done ? 'feito' : 'pendente', done_at: done ? new Date().toISOString() : null }); renderView();
@@ -1667,7 +1669,7 @@ const A = {
     toast('Evento enviado ao calendário', EMBED ? 'Google Agenda aberto em nova aba.' : 'Abra o arquivo .ics para adicionar no iPhone/Android.');
   },
   editContent: d => (!d.id && !isAdmin()) ? toast('Membros só adicionam reuniões', '', 'warn') : contentForm(d.id ? S.d.content.find(c => c.id === d.id) : {}),
-  delContent: d => confirmBox('Excluir conteúdo?', 'Esta ação não pode ser desfeita.', 'Excluir', async () => { await store.remove('content', d.id); await refresh(); }, true),
+  delContent: d => { const c = S.d.content.find(x => x.id === d.id) || {}; return confirmBox(`Tem certeza que quer excluir o conteúdo “${esc(c.title || '')}”?`, 'Não dá para desfazer.', 'Sim, excluir conteúdo', async () => { await store.remove('content', d.id); await refresh(); }, true); },
   cNext: async (d, el, ev) => {
     const c = S.d.content.find(x => x.id === d.id); const i = CST.findIndex(s => s[0] === c.status);
     if (c.status === 'aprovacao' && !isAdmin()) return toast('Aguardando aprovação do Andrade', '', 'warn');
