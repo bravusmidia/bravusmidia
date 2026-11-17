@@ -145,7 +145,7 @@ tr:last-child td{border-bottom:0}
 
 /* forms */
 .f{display:grid;gap:12px}.f2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-label.fl{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--tx2);font-weight:600}
+label.fl,div.fl{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--tx2);font-weight:600}
 input,select,textarea{background:var(--bg2);border:1px solid var(--line2);border-radius:10px;padding:10px 12px;font-size:15px;outline:none;width:100%;min-height:42px}
 input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(47,123,255,.2)}
 textarea{min-height:80px}
@@ -326,3 +326,17 @@ html,body{overscroll-behavior-y:none}
 .mtime b{font-size:19px;font-weight:800;color:var(--blue2);font-variant-numeric:tabular-nums;line-height:1.1}
 .mtime small{font-size:10.5px;color:var(--tx2);white-space:nowrap}
 .mtime.hj{background:var(--blue);border-color:var(--blue)}.mtime.hj b,.mtime.hj small{color:#fff}
+/* v2.3.3 — ticket das reuniões */
+.seg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px}
+.seg label{position:relative;cursor:pointer}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg span{display:grid;place-items:center;height:42px;border-radius:var(--r2);border:1px solid var(--line2);background:var(--card2);color:var(--tx2);font-size:13px;font-weight:700;transition:.15s}
+.seg input:checked+span{background:var(--blue);border-color:var(--blue);color:#fff}
+.seg .ok input:checked+span{background:rgba(43,212,138,.16);border-color:var(--ok);color:var(--ok)}
+.seg .warn input:checked+span{background:rgba(255,181,71,.16);border-color:var(--warn);color:var(--warn)}
+.seg .bad input:checked+span{background:rgba(255,90,106,.16);border-color:var(--bad);color:var(--bad)}
+.tk-tabs button small{opacity:.7;margin-left:3px}
+.tk-tabs button.ok.on{background:rgba(43,212,138,.16);border-color:var(--ok);color:var(--ok)}
+.tk-tabs button.warn.on{background:rgba(255,181,71,.16);border-color:var(--warn);color:var(--warn)}
+.tk-tabs button.bad.on{background:rgba(255,90,106,.16);border-color:var(--bad);color:var(--bad)}
+.li .chip svg{width:13px;height:13px}

@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.3.2';
+const VERSION = '2.3.3';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -160,7 +160,7 @@ Caso deseje manter os serviços ativos, solicitamos a regularização do saldo p
 
 *Esta é uma mensagem automática do sistema.*`;
 const S = { me: null, route: 'painel', d: {}, set: { ...DEFAULT_SETTINGS }, agendaDate: today(), agendaWho: null,
-  finMonth: curYM(), meetMonth: curYM(), goalMonth: curYM(), meetWho: '', meetDay: null, cliFilter: 'online', contentWeek: null, popped: new Set(), startedAt: new Date().toISOString() };
+  finMonth: curYM(), meetMonth: curYM(), goalMonth: curYM(), meetWho: '', meetTicket: '', meetDay: null, cliFilter: 'online', contentWeek: null, popped: new Set(), startedAt: new Date().toISOString() };
 TABLES.forEach(t => S.d[t] = []);
 let store, sb;
 
@@ -880,6 +880,9 @@ const MTYPES = [['comercial', 'Comercial (primeira conversa)'], ['proposta', 'Ap
 const MFORMATS = [['meet', 'Google Meet'], ['whatsapp', 'Vídeo no WhatsApp'], ['ligacao', 'Ligação'], ['presencial', 'Presencial']];
 const MSTATUS = [['pendente', 'Agendada'], ['feito', 'Realizada'], ['noshow', 'Não compareceu'], ['remarcada', 'Remarcada'], ['cancelada', 'Cancelada']];
 const MOUT = [['', '—'], ['fechou', 'Fechou'], ['negociando', 'Em negociação'], ['perdido', 'Não fechou']];
+const TICKETS = [['baixo', 'Baixo', 'ok'], ['medio', 'Médio', 'warn'], ['alto', 'Alto', 'bad']];
+const ticketChip = t => { const x = TICKETS.find(k => k[0] === t.ticket); return x ? `<span class="chip ${x[2]}" title="Ticket ${x[1]}">${ic('wallet')}${x[1]}</span>` : ''; };
+const ticketPick = v => `<div class="fl">Ticket<div class="seg" role="radiogroup">${[['', 'Sem ticket', ''], ...TICKETS].map(x => `<label class="${x[2]}"><input type="radio" name="ticket" value="${x[0]}" ${(v || '') === x[0] ? 'checked' : ''}><span>${x[1]}</span></label>`).join('')}</div></div>`;
 const lbl = (L, k) => (L.find(x => x[0] === k) || ['', k || '—'])[1];
 const meetings = () => realTasks().filter(t => t.kind === 'reuniao');
 const meetWho = t => t.company || (t.client_id && cname(t.client_id)) || t.contact_name || t.title;
@@ -931,7 +934,9 @@ function weekStrip(who) {
 }
 V.reunioes = () => {
   const k = S.meetMonth || curYM(); const mine = S.meetWho || '';
-  const all = meetings().filter(t => !mine || t.assignee === mine);
+  const tk = S.meetTicket || '';
+  const allWho = meetings().filter(t => !mine || t.assignee === mine);
+  const all = allWho.filter(t => !tk || (tk === 'sem' ? !t.ticket : t.ticket === tk));
   const ms = all.filter(t => ym(t.date) === k).sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
   const real = ms.filter(t => t.status === 'feito'), nos = ms.filter(t => t.status === 'noshow'), past = ms.filter(t => t.date < today() || t.status !== 'pendente');
   const com = ms.filter(t => ['comercial', 'proposta'].includes(t.meet_type || 'comercial'));
@@ -942,10 +947,11 @@ V.reunioes = () => {
   const prev = all.filter(t => ym(t.date) === shift(-1)).length;
   const next = all.filter(t => t.status === 'pendente' && (t.date > today() || (t.date === today() && (t.time || '') >= nowHM()))).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
   const pend = all.filter(t => t.status === 'pendente' && isLate(t));
-  const row = t => `<div class="li"><div class="mtime ${t.date === today() ? 'hj' : ''}" data-act="editMeet" data-id="${t.id}"><b>${esc(t.time || '--:--')}</b><small>${t.date === today() ? 'Hoje' : t.date === iso(new Date(Date.now() + 864e5)) ? 'Amanhã' : WD[new Date(t.date + 'T12:00:00').getDay()] + ' ' + fdate(t.date)}</small></div><div class="t" data-act="editMeet" data-id="${t.id}" style="cursor:pointer"><b>${esc(meetWho(t))}${t.contact_name && t.company ? ` <span class="muted" style="font-weight:400">· ${esc(t.contact_name)}</span>` : ''}</b><small>${esc(lbl(MTYPES, t.meet_type || 'comercial'))} · ${esc(lbl(MFORMATS, t.meet_format || 'meet'))} · ${esc(firstName(t.assignee))}${t.outcome ? ' · ' + esc(lbl(MOUT, t.outcome)) : ''}</small></div>${meetChip(t)}</div>`;
+  const row = t => `<div class="li"><div class="mtime ${t.date === today() ? 'hj' : ''}" data-act="editMeet" data-id="${t.id}"><b>${esc(t.time || '--:--')}</b><small>${t.date === today() ? 'Hoje' : t.date === iso(new Date(Date.now() + 864e5)) ? 'Amanhã' : WD[new Date(t.date + 'T12:00:00').getDay()] + ' ' + fdate(t.date)}</small></div><div class="t" data-act="editMeet" data-id="${t.id}" style="cursor:pointer"><b>${esc(meetWho(t))}${t.contact_name && t.company ? ` <span class="muted" style="font-weight:400">· ${esc(t.contact_name)}</span>` : ''}</b><small>${esc(lbl(MTYPES, t.meet_type || 'comercial'))} · ${esc(lbl(MFORMATS, t.meet_format || 'meet'))} · ${esc(firstName(t.assignee))}${t.outcome ? ' · ' + esc(lbl(MOUT, t.outcome)) : ''}</small></div>${ticketChip(t)}${meetChip(t)}</div>`;
   return head('Reuniões', 'Bravus Meetings · tudo que você marca com clientes, organizado e contado', `<button class="btn pri" data-act="editMeet">${ic('plus')}Reunião</button>`) + `
     <div class="row wrap" style="gap:10px;margin-bottom:14px"><div class="datebar" style="margin:0"><button class="btn sm ic" data-act="meetMonth" data-m="${shift(-1)}">${ic('left')}</button><b>${label}</b><button class="btn sm ic" data-act="meetMonth" data-m="${shift(1)}">${ic('right')}</button></div><span class="sp"></span>
       <div class="tabs" style="margin:0">${[['', 'Todos'], ...team().map(p => [p.id, p.name.split(' ')[0]])].map(x => `<button data-act="meetWho" data-id="${x[0]}" class="${mine === x[0] ? 'on' : ''}">${esc(x[1])}</button>`).join('')}</div></div>
+    <div class="row wrap" style="gap:10px;margin-bottom:14px"><span class="muted small" style="font-weight:600">Ticket</span><div class="tabs tk-tabs" style="margin:0">${(() => { const mm = allWho.filter(t => ym(t.date) === k); return [['', 'Todos', '', mm.length], ...TICKETS.map(x => [x[0], x[1], x[2], mm.filter(t => t.ticket === x[0]).length]), ['sem', 'Sem ticket', '', mm.filter(t => !t.ticket).length]].map(x => `<button data-act="meetTicket" data-id="${x[0]}" class="${x[2]} ${tk === x[0] ? 'on' : ''}">${esc(x[1])} <small>${x[3]}</small></button>`).join(''); })()}</div></div>
     ${weekStrip(mine)}
     <div class="grid g4" style="margin-bottom:14px">
       ${kpi('Reuniões no mês', ms.length, `${prev} no mês anterior${prev ? ` (${ms.length >= prev ? '+' : ''}${Math.round((ms.length - prev) / prev * 100)}%)` : ''}`, 'hl')}
@@ -970,9 +976,9 @@ function meetForm(t = {}) {
     <div class="f2">${fld('WhatsApp', 'phone', t.phone || (c && c.whatsapp) || '', 'tel', 'placeholder="(85) 9 9999-9999"')}${sel('Responsável', 'assignee', teamOpts(), t.assignee || S.me.id)}</div>
     <div class="f2">${fld('Data *', 'date', t.date || today(), 'date', 'required')}${fld('Horário *', 'time', t.time || S.set.meetings_start, 'time', 'required')}</div>
     <div class="f2">${sel('Tipo', 'meet_type', MTYPES, t.meet_type || 'comercial')}${sel('Formato', 'meet_format', MFORMATS, t.meet_format || 'meet')}</div>
+    ${ticketPick(t.ticket)}
     ${t.id ? `<div class="f2">${sel('Status', 'status', MSTATUS, t.status || 'pendente')}${sel('Resultado', 'outcome', MOUT, t.outcome || '')}</div>` : ''}
     ${area('Anotações', 'description', t.description)}
-    ${isAdmin() ? `<label class="cklbl"><input type="checkbox" name="override"> Permitir horário fora da regra (antes das ${esc(S.set.meetings_start)})</label>` : ''}
   </div>`, { form: 'saveMeet', footer: `${t.id ? `<button type="button" class="btn bad" data-act="delTask" data-id="${t.id}">${ic('trash')}</button>${t.outcome === 'fechou' && !t.client_id ? `<button type="button" class="btn ok" data-act="meetToClient" data-id="${t.id}">${ic('plus')}Virar cliente</button>` : ''}<span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
   const wa = $('#waPaste'); if (wa) wa.addEventListener('input', () => { const p = parseWa(wa.value), f = wa.form; if (p.date) f.date.value = p.date; if (p.time) f.time.value = p.time; if (p.phone && !f.phone.value) f.phone.value = p.phone; });
   const cs = $('#modal-root select[name="client_id"]'); if (cs) cs.addEventListener('change', () => { const x = client(cs.value), f = cs.form; if (!x) return; f.company.value = x.name; if (!f.contact_name.value) f.contact_name.value = x.contact || ''; if (!f.phone.value) f.phone.value = x.whatsapp || x.phone || ''; f.meet_type.value = 'alinhamento'; });
@@ -990,7 +996,7 @@ V.agenda = () => {
       <div class="datebar"><button class="btn sm ic" data-act="agDate" data-d="${addDays(d, -1)}">${ic('left')}</button><b>${d === today() ? 'Hoje' : esc(fdateL(d).split(',')[0])} · ${fdate(d)}</b><button class="btn sm ic" data-act="agDate" data-d="${addDays(d, 1)}">${ic('right')}</button>${d !== today() ? `<button class="btn sm" data-act="agDate" data-d="${today()}">Hoje</button>` : ''}</div>
       ${isAdmin() ? `<div class="tabs">${team().map(p => `<button data-act="agWho" data-w="${p.id}" class="${who === p.id ? 'on' : ''}">${esc(p.name.split(' ')[0])}</button>`).join('')}<button data-act="agWho" data-w="all" class="${who === 'all' ? 'on' : ''}">Todos</button></div>` : ''}
     </div>
-    <div class="grid g3" style="margin-bottom:14px">${kpi('Concluídas', `${done}/${ts.length}`, `${ts.length ? Math.round(done / ts.length * 100) : 0}% do dia`, 'hl')}${goals.length ? goals.slice(0, 2).map(g => kpi(g.title.replace(/\(.*\)/, '').slice(0, 32), `${g.count || 0}/${g.goal}`, 'meta do dia', (g.count || 0) >= g.goal ? 'g' : '')).join('') : kpi('Reuniões', ts.filter(t => t.kind === 'reuniao').length, `a partir das ${S.set.meetings_start}`) + kpi('Ligações', ts.filter(t => t.kind === 'ligacao').length, `a partir das ${S.set.calls_start}`)}</div>
+    <div class="grid g3" style="margin-bottom:14px">${kpi('Concluídas', `${done}/${ts.length}`, `${ts.length ? Math.round(done / ts.length * 100) : 0}% do dia`, 'hl')}${goals.length ? goals.slice(0, 2).map(g => kpi(g.title.replace(/\(.*\)/, '').slice(0, 32), `${g.count || 0}/${g.goal}`, 'meta do dia', (g.count || 0) >= g.goal ? 'g' : '')).join('') : kpi('Reuniões', ts.filter(t => t.kind === 'reuniao').length, 'no dia') + kpi('Ligações', ts.filter(t => t.kind === 'ligacao').length, `a partir das ${S.set.calls_start}`)}</div>
     ${late.length ? `<div class="warnbox" style="margin-bottom:12px">${late.length} tarefa(s) atrasada(s) de dias anteriores. <a href="#" data-act="showLate">Ver</a></div>` : ''}
     ${ts.length ? ts.map(taskRow).join('') : `<div class="card">${empty('Nada programado para este dia.')}</div>`}`;
 };
@@ -1016,8 +1022,8 @@ function taskForm(t = {}, template = false) {
     <div class="f2">${isAdmin() ? sel('Responsável', 'assignee', teamOpts(), t.assignee || (S.agendaWho !== 'all' && S.agendaWho) || S.me.id) : `<input type="hidden" name="assignee" value="${S.me.id}">`}${sel('Cliente', 'client_id', clientOpts(), t.client_id || '')}</div>
     <div class="f2">${fld('Meta (quantidade, opcional)', 'goal', t.goal || '', 'number', 'min="0" placeholder="ex.: 15"')}${sel('Avisar antes', 'remind_min', [[0, 'Na hora'], [5, '5 min'], [10, '10 min'], [15, '15 min'], [30, '30 min'], [60, '1 hora']], t.remind_min ?? S.set.remind_default)}</div>
     ${area('Descrição', 'description', t.description)}
-    ${isAdmin() && !template ? `<label class="sw"><input type="checkbox" name="override"> Permitir horário fora da regra (reuniões antes das ${S.set.meetings_start})</label>` : ''}
-    ${!template ? `<p class="note">Regras: ligações a partir das ${S.set.calls_start}; reuniões a partir das ${S.set.meetings_start}.</p>` : ''}
+    ${isAdmin() && !template ? `<label class="sw"><input type="checkbox" name="override"> Permitir ligação fora da regra (antes das ${S.set.calls_start})</label>` : ''}
+    ${!template ? `<p class="note">Regra: ligações a partir das ${S.set.calls_start}. Reuniões podem ser em qualquer horário.</p>` : ''}
   </div>`, { form: 'saveTask', footer: `${t.id ? `<button type="button" class="btn bad" data-act="delTask" data-id="${t.id}">${ic('trash')}</button>${!template && t.date ? `<button type="button" class="btn" data-act="taskCal" data-id="${t.id}" title="Adicionar ao calendário">${ic('cal')}<span class="hide-m">Calendário</span></button>` : ''}<span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
 }
 
@@ -1046,7 +1052,9 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.3.2', notes: [
+const RELEASE = { version: '2.3.3', notes: [
+  'Reuniões: agora dá para marcar em qualquer horário, sem trava de regra.',
+  'Reuniões: botões de Ticket (Baixo, Médio, Alto) dentro de cada reunião, selo colorido na lista e filtro por ticket com contagem do mês.',
   'Você continua conectado: fechar o app ou ficar sem usar não desliga mais a sessão. Só sai se tocar no cadeado.',
   'Botão do chat flutuante: segure e arraste para qualquer lugar da tela; ele gruda na lateral mais próxima e lembra a posição.',
   'Painel: toque em qualquer card (Entrou no mês, A receber, Em atraso, Saldo, Clientes, Inadimplentes, Reuniões, Receita) e vá direto para a aba certa, já filtrada.',
@@ -1252,7 +1260,7 @@ V.ajustes = () => {
   return head('Ajustes', 'Somente o administrador vê esta tela') + `
   <form class="card f" data-form="saveSettings"><h3>${ic('gear')}Operação</h3>
     <div class="f2">${fld('Nome da agência', 'agency_name', s.agency_name)}${fld('Limite de clientes', 'max_clients', s.max_clients, 'number', 'min="1" max="500"')}</div>
-    <div class="f2">${fld('Ligações a partir de', 'calls_start', s.calls_start, 'time')}${fld('Reuniões a partir de', 'meetings_start', s.meetings_start, 'time')}</div>
+    <div class="f2">${fld('Ligações a partir de', 'calls_start', s.calls_start, 'time')}${fld('Horários livres da semana começam às', 'meetings_start', s.meetings_start, 'time')}</div>
     <div class="f2">${fld('Última reunião termina às', 'meetings_end', s.meetings_end || '21:30', 'time')}${fld('Duração de cada reunião (min)', 'meet_slot', s.meet_slot || 60, 'number', 'min="15" max="180" step="15"')}</div>
     <div class="f2">${fld('Meta diária de prospecção', 'prospect_goal', s.prospect_goal, 'number')}${fld('Meta diária de follow-ups (Priscila)', 'followup_goal', s.followup_goal, 'number')}</div>
     <div class="f2">${fld('Priscila — início', 'priscila_start', s.priscila_start, 'time')}${fld('Priscila — fim', 'priscila_end', s.priscila_end, 'time')}</div>
@@ -1371,7 +1379,7 @@ const A = {
   reasonsReset: () => { const t = $('form[data-form="saveReasons"] textarea[name="list"]'); if (t) t.value = DEFAULT_SETTINGS.exit_reasons.join('\n'); toast('Lista padrão restaurada', 'Clique em salvar para gravar.'); },
   editMeet: d => meetForm(d.id ? S.d.tasks.find(t => t.id === d.id) : (d.client ? { client_id: d.client, meet_type: 'alinhamento' } : {})),
   meetMonth: d => { S.meetMonth = d.m; renderView(); }, meetDay: d => { S.meetDay = d.d; renderView(); },
-  meetSlot: d => meetForm({ date: d.d, time: d.t }), meetWho: d => { S.meetWho = d.id; renderView(); },
+  meetSlot: d => meetForm({ date: d.d, time: d.t }), meetWho: d => { S.meetWho = d.id; renderView(); }, meetTicket: d => { S.meetTicket = d.id; renderView(); },
   meetSet: async d => { const t = S.d.tasks.find(x => x.id === d.id); if (!t) return; await store.update('tasks', t.id, { status: d.s, done_at: d.s === 'feito' ? new Date().toISOString() : null }); await log(`Reunião com ${meetWho(t)}: ${lbl(MSTATUS, d.s).toLowerCase()}`, t.client_id); toast('Reunião atualizada', lbl(MSTATUS, d.s), 'ok'); await refresh(); if (d.s === 'feito') meetForm(S.d.tasks.find(x => x.id === d.id)); },
   meetConfirm: d => { const t = S.d.tasks.find(x => x.id === d.id); if (!t) return; const c = client(t.client_id) || {}; const ph = t.phone || c.whatsapp || c.phone; const dia = t.date === today() ? 'hoje' : `no dia ${fdate(t.date)}`;
     window.open(waTo({ whatsapp: ph }, `Olá${t.contact_name ? ', ' + t.contact_name.split(' ')[0] : ''}! Passando para confirmar nossa reunião ${dia} às ${t.time}${t.meet_format === 'meet' ? ' pelo Google Meet' : t.meet_format === 'presencial' ? '' : t.meet_format === 'ligacao' ? ' por ligação' : ' por vídeo no WhatsApp'}. Posso confirmar? 😊`), '_blank', 'noopener'); log(`Enviou confirmação de reunião para ${meetWho(t)}`, t.client_id); },
@@ -1611,14 +1619,12 @@ const F = {
     const c = v.client_id ? client(v.client_id) : null;
     const who = (v.company || '').trim() || (c && c.name) || (v.contact_name || '').trim();
     if (!who) return toast('Informe o nome do contato ou a empresa', '', 'bad');
-    const override = isAdmin() && form.override && form.override.checked;
-    if (v.time < S.set.meetings_start && !override) return toast(`Reuniões só a partir das ${S.set.meetings_start}`, isAdmin() ? 'Marque “Permitir horário fora da regra” para abrir exceção.' : 'Fale com o administrador para abrir exceção.', 'warn');
     const row = { title: `Reunião · ${who}`, kind: 'reuniao', date: v.date, time: v.time, assignee: v.assignee || S.me.id, client_id: v.client_id || null, description: v.description, priority: 'alta', remind_min: 30,
-      contact_name: (v.contact_name || '').trim() || null, company: (v.company || '').trim() || null, phone: (v.phone || '').trim() || null, meet_type: v.meet_type, meet_format: v.meet_format };
+      contact_name: (v.contact_name || '').trim() || null, company: (v.company || '').trim() || null, phone: (v.phone || '').trim() || null, meet_type: v.meet_type, meet_format: v.meet_format, ticket: v.ticket || null };
     if (v.id) { row.status = v.status; row.outcome = v.outcome || null; row.done_at = v.status === 'feito' ? (S.d.tasks.find(x => x.id === v.id) || {}).done_at || new Date().toISOString() : null; }
-    const extra = ['contact_name', 'company', 'phone', 'meet_type', 'meet_format', 'outcome'];
+    const extra = ['contact_name', 'company', 'phone', 'meet_type', 'meet_format', 'outcome', 'ticket'];
     const save = r => v.id ? store.update('tasks', v.id, r) : store.insert('tasks', { ...r, status: 'pendente', count: 0, is_template: false });
-    try { await save(row); } catch (e) { if (!/column|contact_name|company|meet_|outcome|phone/i.test(e && e.message || '')) throw e; extra.forEach(x => delete row[x]); await save(row); toast('Reunião salva sem os detalhes', 'O banco ainda não tem os campos de reunião (SQL v1.4).', 'warn'); }
+    try { await save(row); } catch (e) { const m = e && e.message || ''; if (/ticket/i.test(m)) { delete row.ticket; await save(row); toast('Reunião salva sem o ticket', 'Falta rodar o SQL v2.2 (ticket) no Supabase.', 'warn'); } else { if (!/column|contact_name|company|meet_|outcome|phone/i.test(m)) throw e; extra.forEach(x => delete row[x]); await save(row); toast('Reunião salva sem os detalhes', 'O banco ainda não tem os campos de reunião (SQL v1.4).', 'warn'); } }
     if (!v.id) { await log(`Marcou reunião com ${who} · ${fdate(v.date)} ${v.time}`, row.client_id); await notifyTeam(`Reunião marcada com ${who}`, `${fdate(v.date)} às ${v.time} · ${firstName(row.assignee)} · por ${firstName(S.me.id)}`, 'tarefa', null, 'reunioes'); }
     else if (v.outcome === 'fechou') { await log(`Reunião com ${who}: fechou negócio 🎉`, row.client_id); await notifyTeam(`Fechou negócio com ${who}! 🎉`, `Registrado por ${firstName(S.me.id)}`, 'pago', `won:${v.id}`, 'reunioes'); }
     closeModal(); toast(v.id ? 'Reunião atualizada' : 'Reunião marcada', `${who} · ${fdate(v.date)} às ${v.time}`, 'ok'); await refresh();
@@ -1628,7 +1634,6 @@ const F = {
     const row = { title: v.title.trim(), kind: v.kind, priority: v.priority, time: v.time || null, assignee: v.assignee || S.me.id, client_id: v.client_id || null, goal: num(v.goal) || null, remind_min: num(v.remind_min) ?? 10, description: v.description };
     if (!row.title) return toast('Informe o título', '', 'bad');
     const override = isAdmin() && form.override && form.override.checked;
-    if (row.kind === 'reuniao' && (!row.time || row.time < S.set.meetings_start) && !override) return toast(`Reuniões só a partir das ${S.set.meetings_start}`, isAdmin() ? 'Marque “Permitir horário fora da regra” para abrir exceção.' : 'Fale com o administrador para abrir exceção.', 'warn');
     if (row.kind === 'ligacao' && row.time && row.time < S.set.calls_start && !override) return toast(`Ligações a partir das ${S.set.calls_start}`, 'Ajuste o horário ou abra exceção.', 'warn');
     if (tpl) { row.is_template = true; row.days = fd.getAll('days').map(Number); if (!row.days.length) return toast('Escolha ao menos um dia', '', 'bad'); }
     else row.date = v.date;
