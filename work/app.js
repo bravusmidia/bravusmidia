@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.7.9';
+const VERSION = '2.8.0';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -169,7 +169,7 @@ Assim que quiser retomar, é só nos chamar por aqui que reativamos tudo.
 
 Equipe Bravus Mídia`;
 const S = { me: null, route: 'painel', d: {}, set: { ...DEFAULT_SETTINGS }, agendaDate: today(), agendaWho: null,
-  finMonth: curYM(), meetMonth: curYM(), goalMonth: curYM(), meetWho: '', meetTicket: '', meetDay: null, cliFilter: 'online', contentWeek: null, popped: new Set(), startedAt: new Date().toISOString() };
+  finMonth: curYM(), meetMonth: curYM(), goalMonth: curYM(), meetWho: '', meetTicket: '', meetDay: null, weekOpen: lsGet('bw_week_open', false), pipeTab: '', cliFilter: 'online', contentWeek: null, popped: new Set(), startedAt: new Date().toISOString() };
 TABLES.forEach(t => S.d[t] = []);
 let store, sb;
 
@@ -1090,7 +1090,9 @@ function weekStrip(who) {
   const slots = daySlots(sel, who);
   const tag = x => x.open === 0 ? ['off', 'Encerrado'] : x.free === 0 ? ['bad', 'Lotado'] : ['ok', `${x.free} livre${x.free > 1 ? 's' : ''}`];
   const hol = holidayName(sel);
-  return `<div class="card wk-card" style="margin-bottom:14px"><h3>${ic('cal')}Horários da semana <span class="muted small" style="font-weight:400;margin-left:auto">blocos de ${S.set.meet_slot || 60} min · ${esc(S.set.meetings_start)} às ${esc(S.set.meetings_end || '21:30')}</span></h3>
+  const td = info[0];
+  if (!S.weekOpen) return `<button class="card wk-toggle" data-act="weekToggle" style="margin-bottom:14px">${ic('cal')}<b>Horários da semana</b><span class="muted small">${td.open ? `${td.free} livre${td.free === 1 ? '' : 's'} hoje` : 'hoje encerrado'} · ${info.reduce((n, x) => n + x.free, 0)} na semana</span><span class="sp"></span><span class="btn sm">Ver horários ${ic('down')}</span></button>`;
+  return `<div class="card wk-card" style="margin-bottom:14px"><h3>${ic('cal')}Horários da semana <span class="muted small" style="font-weight:400;margin-left:auto">blocos de ${S.set.meet_slot || 60} min · ${esc(S.set.meetings_start)} às ${esc(S.set.meetings_end || '21:30')}</span><button class="btn sm" data-act="weekToggle">Ocultar</button></h3>
     <div class="wk">${info.map(x => { const [c, t] = tag(x); return `<button class="wd ${c} ${x.ds === sel ? 'on' : ''}" data-act="meetDay" data-d="${x.ds}"><b>${dayName(x.ds, x.i)}</b><small>${fdate(x.ds)}${holidayName(x.ds) ? ' · feriado' : ''}</small><i>${t}</i></button>`; }).join('')}</div>
     ${hol || !isAdmin() ? `<p class="note" style="margin:8px 0 0">${hol ? `${esc(hol)} · ` : ''}${isAdmin() ? 'Você pode marcar em qualquer horário.' : esc(meetRuleMsg(sel))}</p>` : ''}
     <div class="slots">${slots.map(x => x.meets.length
@@ -1098,6 +1100,35 @@ function weekStrip(who) {
       : x.past ? `<div class="slot past"><b>${x.time}</b><span>Passou</span></div>`
       : x.locked ? `<div class="slot past" title="${esc(meetRuleMsg(sel))}"><b>${x.time}</b><span>Fora da regra</span></div>`
       : `<button class="slot free" data-act="meetSlot" data-d="${sel}" data-t="${x.time}"><b>${x.time}</b><span>Livre</span><small>toque para marcar</small></button>`).join('')}</div></div>`;
+}
+/* v2.8.0 — Andamento pós-reunião (reunião → proposta → contrato → pagamento → onboarding → operação) */
+const PIPE = [['reuniao', 'Reunião', 'Reunião realizada'], ['proposta', 'Proposta', 'Proposta enviada'], ['contrato', 'Contrato', 'Contrato assinado'], ['pagamento', 'Pagamento', '1º pagamento recebido'], ['onboarding', 'Onboarding', 'Onboarding feito (acessos, briefing, grupo)'], ['operacao', 'Operação', 'Operação rodando']];
+const pipeOf = t => { let c = {}; if (typeof t.category === 'string' && t.category.startsWith('pipe:')) { try { c = JSON.parse(t.category.slice(5)) || {}; } catch {} } return Object.assign(c, t.pipeline && typeof t.pipeline === 'object' ? t.pipeline : {}); };
+const dealKey = t => t.client_id || ((t.company || t.contact_name || '').trim().toLowerCase()) || t.phone || t.id;
+function deals() {
+  const g = {};
+  meetings().forEach(t => { const k = dealKey(t); (g[k] = g[k] || []).push(t); });
+  return Object.values(g).map(ms => {
+    ms.sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
+    const last = ms[ms.length - 1]; const out = ms.slice().reverse().find(t => t.outcome) || {};
+    if (!['fechou', 'negociando'].includes(out.outcome)) return null;
+    const p = Object.assign({}, ...ms.map(pipeOf));
+    const cid = ms.map(t => t.client_id).find(Boolean);
+    const auto = { reuniao: ms.some(t => t.status === 'feito'), pagamento: !!cid && S.d.invoices.some(i => i.client_id === cid && i.status === 'pago') };
+    const done = PIPE.map(([k]) => !!(p[k] || auto[k]));
+    const next = done.indexOf(false);
+    return { ms, last, outcome: out.outcome, p, auto, done, next, n: done.filter(Boolean).length, who: meetWho(last) };
+  }).filter(Boolean).sort((a, b) => (a.next < 0) - (b.next < 0) || (b.last.date || '').localeCompare(a.last.date || ''));
+}
+function pipeCard() {
+  const all = deals(); const fin = S.pipeTab === 'fin'; const list = all.filter(d => fin ? d.next < 0 : d.next >= 0);
+  const can = isAdmin();
+  const row = d => `<div class="deal"><div class="deal-h"><div class="t" data-act="editMeet" data-id="${d.last.id}" style="cursor:pointer"><b>${esc(d.who)}</b><small>${d.outcome === 'fechou' ? '<span style="color:var(--ok)">Fechou</span>' : 'Em negociação'} · última reunião ${fdate(d.last.date)}${d.last.ticket ? ' · ticket ' + esc(lbl(TICKETS.map(x => [x[0], x[1]]), d.last.ticket)) : ''}</small></div><span class="deal-n">${d.n}/${PIPE.length}</span></div>
+    <div class="pipe">${PIPE.map(([k, nm, full], i) => { const ok = d.done[i], au = !d.p[k] && d.auto[k], nx = i === d.next; const dt = d.p[k] && d.p[k] !== true ? fdate(String(d.p[k]).slice(0, 10)) : au ? 'automático' : nx ? 'próximo' : ''; return `<button class="pst ${ok ? 'ok' : ''} ${nx ? 'nx' : ''}" ${can && !au ? `data-act="pipeStep" data-id="${d.last.id}" data-s="${k}"` : 'disabled'} title="${esc(full)}${au ? ' (marcado automaticamente)' : ''}"><i>${ok ? ic('check') : i + 1}</i><b>${nm}</b><small>${dt}</small></button>`; }).join('')}</div>
+    ${d.next >= 0 ? `<p class="muted small" style="margin:6px 0 0">Próximo passo: <b style="color:var(--tx)">${esc(PIPE[d.next][2])}</b></p>` : ''}</div>`;
+  return `<div class="card" style="margin-bottom:14px"><h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${ic('target')}Andamento pós-reunião <span class="sp"></span><span class="tabs" style="margin:0"><button data-act="pipeTab" data-id="" class="${fin ? '' : 'on'}">Em andamento <small>${all.filter(d => d.next >= 0).length}</small></button><button data-act="pipeTab" data-id="fin" class="${fin ? 'on' : ''}">Concluídos <small>${all.filter(d => d.next < 0).length}</small></button></span></h3>
+    ${list.length ? `<div class="deals">${list.map(row).join('')}</div>` : empty(fin ? 'Nenhuma operação concluída ainda.' : 'Quando uma reunião ficar como “Fechou” ou “Em negociação”, o passo a passo aparece aqui.')}
+    <p class="note" style="margin:10px 0 0">${can ? 'Toque em cada etapa para marcar ou desmarcar. Reunião e Pagamento marcam sozinhos (reunião realizada / mensalidade paga do cliente).' : 'Só o administrador marca as etapas. Reunião e Pagamento marcam sozinhos.'}</p></div>`;
 }
 V.reunioes = () => {
   const k = S.meetMonth || curYM(); const mine = S.meetWho || '';
@@ -1119,6 +1150,7 @@ V.reunioes = () => {
     <div class="row wrap" style="gap:10px;margin-bottom:14px"><div class="datebar" style="margin:0"><button class="btn sm ic" data-act="meetMonth" data-m="${shift(-1)}">${ic('left')}</button><b>${label}</b><button class="btn sm ic" data-act="meetMonth" data-m="${shift(1)}">${ic('right')}</button></div><span class="sp"></span>
       <div class="tabs" style="margin:0">${[['', 'Todos'], ...team().map(p => [p.id, p.name.split(' ')[0]])].map(x => `<button data-act="meetWho" data-id="${x[0]}" class="${mine === x[0] ? 'on' : ''}">${esc(x[1])}</button>`).join('')}</div></div>
     <div class="row wrap" style="gap:10px;margin-bottom:14px"><span class="muted small" style="font-weight:600">Ticket</span><div class="tabs tk-tabs" style="margin:0">${(() => { const mm = allWho.filter(t => ym(t.date) === k); return [['', 'Todos', '', mm.length], ...TICKETS.map(x => [x[0], x[1], x[2], mm.filter(t => t.ticket === x[0]).length]), ['sem', 'Sem ticket', '', mm.filter(t => !t.ticket).length]].map(x => `<button data-act="meetTicket" data-id="${x[0]}" class="${x[2]} ${tk === x[0] ? 'on' : ''}">${esc(x[1])} <small>${x[3]}</small></button>`).join(''); })()}</div></div>
+    ${pipeCard()}
     ${weekStrip(mine)}
     <div class="grid g4" style="margin-bottom:14px">
       ${kpi('Reuniões no mês', ms.length, `${prev} no mês anterior${prev ? ` (${ms.length >= prev ? '+' : ''}${Math.round((ms.length - prev) / prev * 100)}%)` : ''}`, 'hl')}
@@ -1230,7 +1262,9 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.7.9', notes: [
+const RELEASE = { version: '2.8.0', notes: [
+  'Reuniões: novo “Andamento pós-reunião”. Cada negócio fechado ou em negociação mostra o passo a passo: Reunião → Proposta → Contrato → Pagamento → Onboarding → Operação rodando. Toque na etapa para marcar; Reunião e Pagamento marcam sozinhos.',
+  'Reuniões: os “Horários da semana” agora ficam recolhidos num botão. Toque em “Ver horários” para abrir.',
   'Agenda: o número do botão de somar (antes fixo em +5) agora é editável. Toque no número, digite quanto quer somar (ex.: 10, 20) e toque no +. O app lembra o número de cada rotina neste aparelho.',
   'Agenda: a barra das metas (seguir, deixar de seguir, prospecção…) ganhou uma bolinha. Arraste para marcar a quantidade rápido; os botões − + e +5 continuam funcionando.',
   'Cliente: o botão “Desligamento” virou “Pausar / Cancelar”. Ao tocar você escolhe: Pausar (fica na carteira como Pausado, com aviso opcional no WhatsApp), Cancelar (sai da carteira, com data, motivo e cobranças) ou só enviar o comunicado de desligamento. Cliente pausado ganha o botão “Retomar”.',
@@ -1626,7 +1660,15 @@ const A = {
   pickReason: (d, el) => { const f = el.closest('form'); if (!f) return; f.end_reason.value = d.v; f.querySelectorAll('[data-act="pickReason"]').forEach(b => b.classList.toggle('blue', b === el)); },
   reasonsReset: () => { const t = $('form[data-form="saveReasons"] textarea[name="list"]'); if (t) t.value = DEFAULT_SETTINGS.exit_reasons.join('\n'); toast('Lista padrão restaurada', 'Clique em salvar para gravar.'); },
   editMeet: d => meetForm(d.id ? S.d.tasks.find(t => t.id === d.id) : (d.client ? { client_id: d.client, meet_type: 'alinhamento' } : {})),
-  meetMonth: d => { S.meetMonth = d.m; renderView(); }, meetDay: d => { S.meetDay = d.d; renderView(); },
+  meetMonth: d => { S.meetMonth = d.m; renderView(); }, meetDay: d => { S.meetDay = d.d; renderView(); }, weekToggle: () => { S.weekOpen = !S.weekOpen; lsSet('bw_week_open', S.weekOpen); renderView(); }, pipeTab: d => { S.pipeTab = d.id; renderView(); },
+  pipeStep: async d => { if (!isAdmin()) return; const t = S.d.tasks.find(x => x.id === d.id); if (!t) return;
+    const deal = deals().find(x => x.last.id === t.id); const p = Object.assign({}, deal ? deal.p : pipeOf(t)); const on = !p[d.s];
+    if (on) p[d.s] = new Date().toISOString(); else delete p[d.s];
+    const put = async (id, obj, cat) => { try { await store.update('tasks', id, { pipeline: obj, ...(String(cat || '').startsWith('pipe:') ? { category: null } : {}) }); } catch (e) { if (!/pipeline|column/i.test(e && e.message || '')) throw e; await store.update('tasks', id, { category: 'pipe:' + JSON.stringify(obj) }); } };
+    await put(t.id, p, t.category);
+    if (!on && deal) for (const m of deal.ms) if (m.id !== t.id && pipeOf(m)[d.s]) { const q = pipeOf(m); delete q[d.s]; await put(m.id, q, m.category); }
+    const nm = lbl(PIPE, d.s); if (on) { await log(`${meetWho(t)}: ${PIPE.find(x => x[0] === d.s)[2].toLowerCase()}`, t.client_id); if (d.s === 'operacao') await notifyTeam(`Operação rodando: ${meetWho(t)} 🚀`, `Marcado por ${firstName(S.me.id)}`, 'pago', `pipe:${t.id}:op`, 'reunioes'); }
+    toast(on ? `${nm} ✓` : `${nm} desmarcado`, meetWho(t), on ? 'ok' : ''); await refresh(); },
   meetSlot: d => meetForm({ date: d.d, time: d.t }), meetWho: d => { S.meetWho = d.id; renderView(); }, meetTicket: d => { S.meetTicket = d.id; renderView(); },
   meetSet: async d => { const t = S.d.tasks.find(x => x.id === d.id); if (!t) return; await store.update('tasks', t.id, { status: d.s, done_at: d.s === 'feito' ? new Date().toISOString() : null }); await log(`Reunião com ${meetWho(t)}: ${lbl(MSTATUS, d.s).toLowerCase()}`, t.client_id); toast('Reunião atualizada', lbl(MSTATUS, d.s), 'ok'); await refresh(); if (d.s === 'feito') meetForm(S.d.tasks.find(x => x.id === d.id)); },
   meetConfirm: d => { const t = S.d.tasks.find(x => x.id === d.id); if (!t) return; const c = client(t.client_id) || {}; const ph = t.phone || c.whatsapp || c.phone; const dia = t.date === today() ? 'hoje' : `no dia ${fdate(t.date)}`;
