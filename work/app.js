@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.7.5';
+const VERSION = '2.7.6';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -340,7 +340,7 @@ function finMonth(k) {
   const aReceber = S.d.invoices.filter(i => invStatus(i) === 'pendente' && ym(i.due_date) === k).reduce((a, i) => a + +i.amount, 0);
   const atrasado = S.d.invoices.filter(i => invStatus(i) === 'atrasado').reduce((a, i) => a + +i.amount, 0);
   const saidas = S.d.expenses.filter(e => ym(e.date) === k).reduce((a, e) => a + +e.amount, 0);
-  return { recebido, aReceber, atrasado, saidas, saldo: recebido - saidas };
+  return { recebido, aReceber, atrasado, aReceberTotal: aReceber + atrasado, saidas, saldo: recebido - saidas };
 }
 const lastMonths = n => { const out = []; const d = new Date(); d.setDate(15); for (let i = n - 1; i >= 0; i--) { const x = new Date(d); x.setMonth(d.getMonth() - i); out.push(`${x.getFullYear()}-${pad(x.getMonth() + 1)}`); } return out; };
 const mrr = () => S.d.clients.filter(c => c.op_status !== 'cancelado').reduce((a, c) => a + (+c.contract_value || 0), 0);
@@ -759,7 +759,7 @@ V.painel = () => {
   return head(`${greet}, ${firstName(S.me.id)}`, fdateL(d), isAdmin() ? `<button class="btn pri" data-act="newTask">${ic('plus')}Tarefa</button>` : `<button class="btn pri" data-act="editMeet">${ic('plus')}Reunião</button>`) + `
   ${canFin() ? `<div class="grid g4">
     ${kpi('Entrou no mês', brl(fm.recebido), 'pagamentos confirmados', 'hl', ['financeiro', 'pago', 'fin-cob'])}
-    ${kpi('A receber', brl(fm.aReceber), 'vencimentos do mês', 'y', ['financeiro', 'pendente', 'fin-cob'])}
+    ${kpi('A receber', brl(fm.aReceberTotal), fm.atrasado ? `mês ${brl(fm.aReceber)} + atrasado ${brl(fm.atrasado)}` : 'vencimentos do mês', 'y', ['financeiro', 'pendente', 'fin-cob'])}
     ${kpi('Em atraso', brl(fm.atrasado), `${inad.length} cliente(s) inadimplente(s)`, fm.atrasado ? 'r' : '', ['financeiro', 'atrasado', 'fin-cob'])}
     ${kpi('Saldo do mês', brl(fm.saldo), `saídas ${brl(fm.saidas)}`, fm.saldo >= 0 ? 'g' : 'r', ['financeiro', 'todos', 'fin-saidas'])}
   </div>` : ''}
@@ -823,7 +823,7 @@ function monthSummary(k) {
     </div><div class="list">
       ${row('users', 'Clientes', cl.filter(inWallet).length, `${TIERS.map(t => `${cl.filter(c => inWallet(c) && clientTier(c) === t[0]).length} ${t[1].toLowerCase()}`).join(' · ')} · ${novos} novo(s) no mês`, 'clientes')}
       ${row('film', 'Conteúdo', `${pub}/${ct.length}`, 'publicados no mês', 'conteudo')}
-      ${canFin() ? row('wallet', 'Financeiro', brl(finMonth(k).recebido), `a receber ${brl(finMonth(k).aReceber)} · em atraso ${brl(finMonth(k).atrasado)}`, 'financeiro') : row('target', 'Metas', '→', 'acompanhe o progresso do mês', 'metas')}
+      ${canFin() ? row('wallet', 'Financeiro', brl(finMonth(k).recebido), `a receber ${brl(finMonth(k).aReceberTotal)} · em atraso ${brl(finMonth(k).atrasado)}`, 'financeiro') : row('target', 'Metas', '→', 'acompanhe o progresso do mês', 'metas')}
     </div></div></div>`;
 }
 function weekChart() {
@@ -967,7 +967,7 @@ V.financeiro = () => {
   const shift = n => { const d = new Date(k + '-15T12:00:00'); d.setMonth(d.getMonth() + n); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
   return head('Financeiro', 'Bravus Finance · entradas, saídas e cobranças', isAdmin() ? `<button class="btn" data-act="genInvoices" data-m="${k}">${ic('sync')}<span class="hide-m">Gerar mensalidades</span></button><button class="btn pri" data-act="newInvoice">${ic('plus')}Cobrança</button>` : '') + `
     <div class="datebar" style="margin-bottom:14px"><button class="btn sm ic" data-act="finMonth" data-m="${shift(-1)}">${ic('left')}</button><b>${label}</b><button class="btn sm ic" data-act="finMonth" data-m="${shift(1)}">${ic('right')}</button></div>
-    <div class="grid g4">${kpi('Entrou', brl(fm.recebido), 'confirmado', 'hl', ['financeiro', 'pago', 'fin-cob'])}${kpi('A receber', brl(fm.aReceber), '', 'y', ['financeiro', 'pendente', 'fin-cob'])}${kpi('Atrasado (total)', brl(fm.atrasado), '', fm.atrasado ? 'r' : '', ['financeiro', 'atrasado', 'fin-cob'])}${kpi('Saiu', brl(fm.saidas), `saldo do mês ${brl(fm.saldo)}`, fm.saidas ? 'r' : '', ['financeiro', 'todos', 'fin-saidas'])}</div>
+    <div class="grid g4">${kpi('Entrou', brl(fm.recebido), 'confirmado', 'hl', ['financeiro', 'pago', 'fin-cob'])}${kpi('A receber', brl(fm.aReceberTotal), fm.atrasado ? `mês ${brl(fm.aReceber)} + atrasado ${brl(fm.atrasado)}` : '', 'y', ['financeiro', 'pendente', 'fin-cob'])}${kpi('Atrasado (total)', brl(fm.atrasado), '', fm.atrasado ? 'r' : '', ['financeiro', 'atrasado', 'fin-cob'])}${kpi('Saiu', brl(fm.saidas), `saldo do mês ${brl(fm.saldo)}`, fm.saidas ? 'r' : '', ['financeiro', 'todos', 'fin-saidas'])}</div>
     <div class="card" id="fin-cob" style="margin-top:14px"><h3>${ic('wallet')}Cobranças<span class="sp"></span><span class="small muted">${inv.length}</span></h3>
       <div class="tabs" style="margin-bottom:10px">${fTabs.map(t => `<button data-act="finFilter" data-f="${t[0]}" class="${ff === t[0] ? 'on' : ''}">${t[1]}</button>`).join('')}</div>
       <div class="list">${inv.length ? inv.map(i => { const c = client(i.client_id) || {}; const s = invStatus(i); return `<div class="li"><div class="t"><b>${esc(c.name || '—')} · ${brl(i.amount)}</b><small>${esc(i.description || 'Mensalidade')} · vence ${fdate(i.due_date)}${i.status === 'pago' ? ` · pago em ${fdate(i.paid_at)} (${esc(i.method || '')})` : ''}</small></div>${invChip(i)}
@@ -1220,7 +1220,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.7.5', notes: [
+const RELEASE = { version: '2.7.6', notes: [
+  '“A receber” agora mostra o total de tudo que falta receber: mensalidades do mês ainda não vencidas + as atrasadas. O card “Atrasado” continua mostrando só o valor em atraso.',
   'Agenda: ao tocar no quadrado da tarefa aparece na hora o ✓ verde, a tarefa fica riscada e some o “Atrasada” (também na lista de atrasadas). Toque de novo para desmarcar.',
   'Em atraso automático: mensalidade que passou do vencimento sem pagamento entra em “Em atraso” e o cliente vira inadimplente no painel, mesmo se estava marcada como “A receber”.',
   'As mensalidades do mês agora são geradas sozinhas quando o administrador entra no app (antes precisava clicar em gerar). Nenhum cliente fica sem cobrança.',
@@ -1450,7 +1451,7 @@ V.metas = () => {
     <div class="datebar" style="margin-bottom:14px"><button class="btn sm ic" data-act="goalMonth" data-m="${shift(-1)}">${ic('left')}</button><b>${label}</b><button class="btn sm ic" data-act="goalMonth" data-m="${shift(1)}">${ic('right')}</button></div>
     ${canFin() ? (() => { const fm = finMonth(k), prev = fm.recebido + fm.aReceber, nAt = new Set(S.d.invoices.filter(i => invStatus(i) === 'atrasado').map(i => i.client_id)).size; return `<div class="grid g4" style="margin-bottom:14px">
       ${kpi('Entrou no mês', brl(fm.recebido), `${Math.round(fm.recebido / (g10 || 1) * 100)}% da meta de ${brl(g10)}`, 'hl', ['financeiro', 'pago', 'fin-cob'])}
-      ${kpi('A receber', brl(fm.aReceber), `previsão do mês: ${brl(prev)}`, 'y', ['financeiro', 'pendente', 'fin-cob'])}
+      ${kpi('A receber', brl(fm.aReceberTotal), `mês ${brl(fm.aReceber)} + atrasado ${brl(fm.atrasado)}`, 'y', ['financeiro', 'pendente', 'fin-cob'])}
       ${kpi('Em atraso', brl(fm.atrasado), `${nAt} cliente(s)`, fm.atrasado ? 'r' : '', ['financeiro', 'atrasado', 'fin-cob'])}
       ${kpi('Falta para a meta', brl(Math.max(0, g10 - fm.recebido)), prev >= g10 ? 'se todos pagarem, a meta é batida ✅' : `mesmo se todos pagarem, faltam ${brl(g10 - prev)}`, fm.recebido >= g10 ? 'g' : '')}
     </div>`; })() : ''}
