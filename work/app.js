@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.7.8';
+const VERSION = '2.7.9';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -1175,6 +1175,9 @@ V.agenda = () => {
     ${late.length ? `<div class="warnbox" style="margin-bottom:12px">${late.length} tarefa(s) atrasada(s) de dias anteriores. <a href="#" data-act="showLate">Ver</a></div>` : ''}
     ${ts.length ? ts.map(taskRow).join('') : `<div class="card">${empty('Nada programado para este dia.')}</div>`}`;
 };
+/* v2.7.9: número do botão +N editável (guardado neste aparelho, por rotina) */
+const cStepKey = t => 'bw_step_' + (t.template_id || t.id);
+const cStep = t => { try { return Math.max(1, +localStorage.getItem(cStepKey(t)) || 5); } catch { return 5; } };
 function taskRow(t) {
   const late = isLate(t);
   return `<div class="task ${t.status === 'feito' ? 'done' : ''} ${late ? 'late' : ''}">
@@ -1182,7 +1185,7 @@ function taskRow(t) {
     <span class="tm">${esc(t.time || '—')}</span>
     <div class="bd"><div class="tt">${esc(t.title)}</div>${t.description ? `<div class="small muted">${esc(t.description)}</div>` : ''}
       <div class="mt">${t.kind !== 'tarefa' ? `<span class="chip blue">${esc((KINDS.find(k => k[0] === t.kind) || ['', t.kind])[1])}</span>` : ''}${t.priority === 'alta' ? '<span class="chip bad">Alta</span>' : ''}${t.client_id ? `<span class="chip">${esc(cname(t.client_id))}</span>` : ''}${S.agendaWho === 'all' ? `<span class="chip">${esc(firstName(t.assignee))}</span>` : ''}${late ? '<span class="chip bad">Atrasada</span>' : ''}${t.template_id ? '<span class="chip">Rotina</span>' : ''}</div>
-      ${t.goal ? `<div class="cnt"><button class="btn sm ic" data-act="cnt" data-id="${t.id}" data-v="-1">−</button><b>${t.count || 0} / ${t.goal}</b><button class="btn sm ic" data-act="cnt" data-id="${t.id}" data-v="1">+</button><button class="btn sm" data-act="cnt" data-id="${t.id}" data-v="5">+5</button><input type="range" class="cslide sp" min="0" max="${Math.max(t.goal, t.count || 0)}" step="1" value="${t.count || 0}" data-cslide="${t.id}" aria-label="Arraste para marcar a quantidade" style="--p:${Math.min(100, (t.count || 0) / Math.max(t.goal, t.count || 0) * 100)}%"></div>` : ''}
+      ${t.goal ? `<div class="cnt"><button class="btn sm ic" data-act="cnt" data-id="${t.id}" data-v="-1">−</button><b>${t.count || 0} / ${t.goal}</b><button class="btn sm ic" data-act="cnt" data-id="${t.id}" data-v="1">+</button><span class="cadd"><button class="btn sm" data-act="cntStep" data-id="${t.id}" aria-label="Somar a quantidade ao lado">+</button><input type="number" inputmode="numeric" class="cstep" min="1" max="9999" value="${cStep(t)}" data-cstep="${t.id}" aria-label="Quantidade a somar"></span><input type="range" class="cslide sp" min="0" max="${Math.max(t.goal, t.count || 0)}" step="1" value="${t.count || 0}" data-cslide="${t.id}" aria-label="Arraste para marcar a quantidade" style="--p:${Math.min(100, (t.count || 0) / Math.max(t.goal, t.count || 0) * 100)}%"></div>` : ''}
     </div>
     <button class="btn sm ic" data-act="editTask" data-id="${t.id}" aria-label="Editar">${ic('edit')}</button></div>`;
 }
@@ -1227,7 +1230,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.7.8', notes: [
+const RELEASE = { version: '2.7.9', notes: [
+  'Agenda: o número do botão de somar (antes fixo em +5) agora é editável. Toque no número, digite quanto quer somar (ex.: 10, 20) e toque no +. O app lembra o número de cada rotina neste aparelho.',
   'Agenda: a barra das metas (seguir, deixar de seguir, prospecção…) ganhou uma bolinha. Arraste para marcar a quantidade rápido; os botões − + e +5 continuam funcionando.',
   'Cliente: o botão “Desligamento” virou “Pausar / Cancelar”. Ao tocar você escolhe: Pausar (fica na carteira como Pausado, com aviso opcional no WhatsApp), Cancelar (sai da carteira, com data, motivo e cobranças) ou só enviar o comunicado de desligamento. Cliente pausado ganha o botão “Retomar”.',
   '“A receber” agora mostra o total de tudo que falta receber: mensalidades do mês ainda não vencidas + as atrasadas. O card “Atrasado” continua mostrando só o valor em atraso.',
@@ -1786,6 +1790,7 @@ const A = {
     toast(done ? 'Tarefa concluída ✓' : 'Tarefa reaberta', t.title, done ? 'ok' : '');
     if (done) log(`Concluiu: ${t.title}`, t.client_id);
   },
+  cntStep: d => { const t = S.d.tasks.find(x => x.id === d.id); if (!t) return; const inp = document.querySelector(`.cstep[data-cstep="${t.id}"]`); const v = Math.max(1, Math.min(9999, +(inp && inp.value) || cStep(t))); try { localStorage.setItem(cStepKey(t), v); } catch {} return A.cnt({ id: t.id, v }); },
   cnt: async d => {
     const t = S.d.tasks.find(x => x.id === d.id); t.count = Math.max(0, (t.count || 0) + +d.v); renderView();
     await store.update('tasks', t.id, { count: t.count });
@@ -2072,6 +2077,10 @@ document.addEventListener('input', e => {
   const b = r.closest('.cnt') && r.closest('.cnt').querySelector('b'); if (b) b.textContent = `${r.value} / ${t.goal}`;
 });
 document.addEventListener('change', async e => {
+  if (e.target.dataset && e.target.dataset.cstep) {
+    const t = S.d.tasks.find(x => x.id === e.target.dataset.cstep); if (!t) return;
+    const v = Math.max(1, Math.min(9999, Math.round(+e.target.value) || 5)); e.target.value = v; try { localStorage.setItem(cStepKey(t), v); } catch {} return;
+  }
   if (e.target.dataset && e.target.dataset.cslide) {
     const t = S.d.tasks.find(x => x.id === e.target.dataset.cslide); if (!t) return;
     const v = +e.target.value - (t.count || 0); if (v) await A.cnt({ id: t.id, v }); return;
