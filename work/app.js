@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.6.2';
+const VERSION = '2.6.3';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -1178,7 +1178,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.6.2', notes: [
+const RELEASE = { version: '2.6.3', notes: [
+  'Alertas: botões “Lidos de hoje” e “Todos lidos”, com a contagem de não lidos.',
   'Tempo online mais enxuto: só Hoje e Total, proporcional no celular.',
   'Tempo online: o app conta o tempo que cada um passa no Bravus Work (hoje, 7 dias, mês e total) e mostra para todos, no topo, na Equipe e no Painel.',
   'Clientes com ticket Ouro, Prata e Bronze: selo colorido no card, filtro com contagem e cards ordenados do Ouro para o Bronze.',
@@ -1307,7 +1308,7 @@ V.equipe = () => {
 V.alertas = () => {
   const ns = S.d.notifications.filter(n => n.user_id === S.me.id).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 100);
   const perm = 'Notification' in window ? Notification.permission : 'unsupported';
-  return head('Alertas', 'Bravus Notify', `<button class="btn" data-act="readAll">${ic('check')}<span class="hide-m">Marcar lidas</span></button>`) + `
+  return head('Alertas', 'Bravus Notify', (() => { const un = S.d.notifications.filter(n => n.user_id === S.me.id && !n.read), ut = un.filter(n => iso(new Date(n.created_at)) === today()); return `<div class="row" style="gap:8px"><button class="btn" data-act="readAll" data-s="hoje" ${ut.length ? '' : 'disabled'} title="Marca como lidos só os alertas de hoje">${ic('check')}Lidos de hoje${ut.length ? ` <small>${ut.length}</small>` : ''}</button><button class="btn pri" data-act="readAll" ${un.length ? '' : 'disabled'} title="Marca todos como lidos">${ic('check')}Todos lidos${un.length ? ` <small>${un.length}</small>` : ''}</button></div>`; })()) + `
     ${perm !== 'granted' ? `<div class="infobox row" style="margin-bottom:14px"><div class="sp">${perm === 'unsupported' ? 'Este navegador não suporta notificações. No iPhone, instale o app na Tela de Início (Compartilhar → Adicionar à Tela de Início) e abra por lá.' : perm === 'denied' ? 'As notificações estão bloqueadas neste aparelho. Libere nas configurações do navegador para este site.' : 'Ative as notificações para receber lembretes no celular e no computador.'}</div>${perm === 'default' ? `<button class="btn pri" data-act="enablePush">${ic('bell')}Ativar</button>` : ''}</div>` : `<div class="row small muted" style="margin-bottom:12px">${ic('bell')}Notificações ativas neste aparelho. <button class="btn sm" data-act="testPush">Testar</button></div>`}
     <div class="card"><div class="list alist">${ns.length ? ns.map(n => `<a class="li" href="#${esc(n.route || 'painel')}" data-act="readOne" data-id="${n.id}" style="${n.read ? 'opacity:.55' : ''}"><i class="dot ${n.type === 'alerta' ? 'bad' : n.type === 'pago' ? 'on' : n.read ? '' : 'warn'}"></i><div class="t"><b>${esc(n.title)}</b><small>${esc(n.body || '')} · ${ago(n.created_at)}</small></div></a>`).join('') : empty('Nenhum alerta por enquanto.')}</div></div>
     <p class="note" style="margin-top:10px">Lembretes no horário exato dependem do sistema do aparelho. Com o app fechado, os avisos chegam pelo servidor (Supabase + push) quando estiver configurado.</p>`;
@@ -1661,7 +1662,14 @@ const A = {
     if (next === 'aprovacao') await notifyUsers(admins(), 'Publicação aguardando aprovação', c.title, 'conteudo', `apr:${c.id}`, 'conteudo');
   },
   cWeek: d => { S.contentWeek = d.d; renderView(); },
-  readAll: async () => { for (const n of S.d.notifications.filter(n => n.user_id === S.me.id && !n.read)) await store.update('notifications', n.id, { read: true }); await refresh(); },
+  readAll: async d => {
+    const onlyToday = d && d.s === 'hoje';
+    const list = S.d.notifications.filter(n => n.user_id === S.me.id && !n.read && (!onlyToday || iso(new Date(n.created_at)) === today()));
+    if (!list.length) return toast(onlyToday ? 'Nenhum alerta de hoje para marcar' : 'Tudo já está lido', '', 'ok');
+    list.forEach(n => { n.read = true }); renderView();
+    await Promise.all(list.map(n => store.update('notifications', n.id, { read: true }).catch(() => {})));
+    toast(onlyToday ? 'Alertas de hoje marcados como lidos' : 'Todos os alertas marcados como lidos', `${list.length} alerta(s)`, 'ok'); await refresh();
+  },
   readOne: async d => { const n = S.d.notifications.find(x => x.id === d.id); if (n && !n.read) { n.read = true; store.update('notifications', n.id, { read: true }); } location.hash = '#' + (n && n.route || 'painel'); },
   enablePush: async () => {
     try {
