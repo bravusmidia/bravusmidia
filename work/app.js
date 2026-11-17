@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.7.0';
+const VERSION = '2.7.1';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -1191,7 +1191,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.7.0', notes: [
+const RELEASE = { version: '2.7.1', notes: [
+  'Checklist da Equipe: ao marcar aparece o ✓ verde no quadrado e a tarefa desce para “Feitas” (com data e hora), sem sumir. Tudo conta no painel.',
   'Equipe: toque em Hoje, Semana ou Atrasadas de cada pessoa para ver a lista do que falta e marcar como feito (checklist). Tem também “Marcar todas como feitas”.',
   'Tudo que é marcado entra na hora no Painel (tarefas concluídas, atrasadas e produtividade).',
   'Equipe: botão Excluir membro no card de cada pessoa (só o administrador).',
@@ -1306,28 +1307,34 @@ async function checkVersion() {
 /* ---------- TAREFAS DE CADA PERFIL: toque no número, veja o que falta e marque o que foi feito ---------- */
 const kpiP = (uid, m, label, val, cls = '') => `<div class="kpi go ${cls}" role="button" tabindex="0" title="Ver ${esc(label.toLowerCase())}" data-act="personTasks" data-id="${uid}" data-m="${m}"><small>${esc(label)}</small><b>${val}</b><i class="kgo">${ic('right')}</i></div>`;
 const PT = { late: 'Atrasadas', today: 'Hoje', week: 'Últimos 7 dias' };
+const PT_JUST = new Set();
 function personTaskList(uid, m) {
   const d = today(), wk = Array.from({ length: 7 }, (_, i) => addDays(d, -i));
   const mine = realTasks().filter(t => t.assignee === uid);
-  const ts = m === 'late' ? mine.filter(isLate) : m === 'today' ? mine.filter(t => t.date === d) : mine.filter(t => wk.includes(t.date));
-  return ts.sort((a, b) => (a.status === 'feito') - (b.status === 'feito') || (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
+  // nas atrasadas, as que você acabou de marcar continuam aparecendo (em “Feitas”) até fechar a janela
+  const ts = m === 'late' ? mine.filter(t => isLate(t) || (PT_JUST.has(t.id) && t.status === 'feito')) : m === 'today' ? mine.filter(t => t.date === d) : mine.filter(t => wk.includes(t.date));
+  return ts.sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
 }
 function personTasks(uid, m) {
   const p = prof(uid); if (!p) return;
   const can = isAdmin() || uid === S.me.id;
-  const ts = personTaskList(uid, m), done = ts.filter(t => t.status === 'feito').length, pend = ts.length - done;
-  const row = t => { const isM = t.kind === 'reuniao'; return `<div class="li pt-row ${t.status === 'feito' ? 'done' : ''}">
+  const ts = personTaskList(uid, m), doneL = ts.filter(t => t.status === 'feito'), pendL = ts.filter(t => t.status !== 'feito'), done = doneL.length, pend = pendL.length;
+  const row = t => { const isM = t.kind === 'reuniao'; return `<div class="li pt-row ${t.status === 'feito' ? 'done' : ''}" data-row="${t.id}">
     ${isM ? `<span class="ck m" title="Reunião">${ic('meet')}</span>` : `<button type="button" class="ck ${t.status === 'feito' ? 'on' : ''}" ${can ? `data-act="ptCheck" data-id="${t.id}" data-u="${uid}" data-m="${m}"` : 'disabled'} aria-label="Concluir">${t.status === 'feito' ? ic('check') : ''}</button>`}
-    <div class="t"><b>${esc(t.title)}</b><small>${t.date === d0() ? 'Hoje' : WD[new Date(t.date + 'T12:00:00').getDay()] + ' ' + fdate(t.date)}${t.time ? ' · ' + esc(t.time) : ''}${t.client_id ? ' · ' + esc(cname(t.client_id)) : ''}${t.goal ? ` · meta ${t.count || 0}/${t.goal}` : ''}${isLate(t) ? ' · <span style="color:var(--bad)">atrasada</span>' : ''}</small></div>
+    <div class="t"><b>${esc(t.title)}</b><small>${t.status === 'feito' && t.done_at ? `<span style="color:var(--ok)">✓ feita ${new Date(t.done_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span> · ` : ''}${t.date === d0() ? 'Hoje' : WD[new Date(t.date + 'T12:00:00').getDay()] + ' ' + fdate(t.date)}${t.time ? ' · ' + esc(t.time) : ''}${t.client_id ? ' · ' + esc(cname(t.client_id)) : ''}${t.goal ? ` · meta ${t.count || 0}/${t.goal}` : ''}${isLate(t) ? ' · <span style="color:var(--bad)">atrasada</span>' : ''}</small></div>
     ${isM ? `<button type="button" class="btn sm" data-act="editMeet" data-id="${t.id}">Ver reunião</button>` : ''}</div>`; };
   modal(`${esc(firstName(uid) || p.name)} · ${PT[m]}`, `<div class="row wrap" style="gap:8px;margin-bottom:12px">${Object.entries(PT).map(([k, n]) => `<button type="button" class="btn sm ${k === m ? 'pri' : ''}" data-act="personTasks" data-id="${uid}" data-m="${k}">${n} <small>${k === 'late' ? personTaskList(uid, k).length : personTaskList(uid, k).filter(t => t.status !== 'feito').length}</small></button>`).join('')}</div>
     <div class="row small" style="margin-bottom:6px"><span class="muted">${pend} pendente(s) · ${done} feita(s)</span><span class="sp"></span>${ts.length ? `<b>${Math.round(done / ts.length * 100)}%</b>` : ''}</div>
     <div class="prog" style="margin-bottom:12px"><i style="width:${ts.length ? done / ts.length * 100 : 0}%"></i></div>
-    <div class="list">${ts.length ? ts.map(row).join('') : empty(m === 'late' ? 'Nada atrasado. ✅' : 'Nenhuma tarefa aqui.')}</div>
+    <div class="sec" style="margin:4px 0 6px">A fazer (${pend})</div>
+    <div class="list">${pendL.length ? pendL.map(row).join('') : empty(m === 'late' ? 'Nada atrasado. ✅' : 'Tudo feito por aqui. ✅')}</div>
+    ${doneL.length ? `<div class="sec" style="margin:16px 0 6px;color:var(--ok)">${ic('check')}Feitas (${done}) · já contam no painel</div><div class="list">${doneL.map(row).join('')}</div>` : ''}
     ${can ? '' : `<p class="note" style="margin-top:10px">Só ${esc(firstName(uid))} ou o administrador marcam estas tarefas.</p>`}`,
     { wide: true, footer: `${can && pend && ts.some(t => t.kind !== 'reuniao' && t.status !== 'feito') ? `<button type="button" class="btn ok" data-act="ptAll" data-id="${uid}" data-m="${m}">${ic('check')}Marcar todas como feitas</button>` : ''}<span class="sp"></span><button type="button" class="btn" data-act="closeModal">Fechar</button>` });
 }
 const d0 = () => today();
+/* re-desenha a janela sem perder a rolagem */
+function personTasksKeep(uid, m) { const bd = $('#modal-root .bd'); const y = bd ? bd.scrollTop : 0; personTasks(uid, m); const nb = $('#modal-root .bd'); if (nb) nb.scrollTop = y; }
 V.equipe = () => {
   const d = today(); const wk = Array.from({ length: 7 }, (_, i) => addDays(d, -i));
   return head('Equipe', 'Bravus Team · produtividade e presença', isAdmin() && SUPA ? `<button class="btn pri" data-act="newMember">${ic('plus')}Membro</button>` : '') + `<div class="grid g2">${team().map(p => {
@@ -1672,12 +1679,16 @@ const A = {
   newTask: () => isAdmin() ? taskForm({}) : toast('Membros só adicionam reuniões', 'Use “+ Reunião”.', 'warn'), editTask: d => { const t = S.d.tasks.find(t => t.id === d.id); return t && t.kind === 'reuniao' ? meetForm(t) : taskForm(t); },
   newTemplate: () => taskForm({}, true), editTemplate: d => taskForm(S.d.tasks.find(t => t.id === d.id), true),
   delTask: d => { const t = S.d.tasks.find(x => x.id === d.id) || {}; const isM = t.kind === 'reuniao'; return confirmBox(isM ? `Tem certeza que quer excluir a reunião com ${esc(meetWho(t))}?` : `Tem certeza que quer excluir a tarefa “${esc(t.title || '')}”?`, `${t.date ? fdate(t.date) : ''}${t.time ? ' às ' + esc(t.time) : ''}${t.date ? ' · ' : ''}Não dá para desfazer.`, isM ? 'Sim, excluir reunião' : 'Sim, excluir tarefa', async () => { await store.remove('tasks', d.id); closeModal(); await refresh(); }, true); },
-  personTasks: d => personTasks(d.id, d.m || 'late'),
+  personTasks: d => { if (!$('#modal-root .pt-row') && !$('#modal-root .empty')) PT_JUST.clear(); personTasks(d.id, d.m || 'late'); },
   ptCheck: async d => {
     const t = S.d.tasks.find(x => x.id === d.id); if (!t) return;
     if (!isAdmin() && t.assignee !== S.me.id) return toast('Só o responsável ou o administrador marca esta tarefa', '', 'warn');
     const done = t.status !== 'feito';
-    Object.assign(t, { status: done ? 'feito' : 'pendente', done_at: done ? new Date().toISOString() : null }); personTasks(d.u, d.m);
+    Object.assign(t, { status: done ? 'feito' : 'pendente', done_at: done ? new Date().toISOString() : null }); if (done) PT_JUST.add(t.id);
+    // mostra o ✓ verde no quadrado na hora; depois de um instante a tarefa desce para “Feitas”
+    const r = document.querySelector(`#modal-root [data-row="${t.id}"]`); const b = r && r.querySelector('.ck');
+    if (r && b) { r.classList.toggle('done', done); b.classList.toggle('on', done); b.innerHTML = done ? ic('check') : ''; if (done) b.classList.add('pop'); }
+    clearTimeout(S.ptT); S.ptT = setTimeout(() => { if ($('#modal-root .pt-row')) personTasksKeep(d.u, d.m); }, 900);
     try { await store.update('tasks', t.id, { status: t.status, done_at: t.done_at }); } catch (e) { return toast('Não foi possível salvar', e.message, 'bad'); }
     if (done) log(`Concluiu: ${t.title}${t.assignee !== S.me.id ? ' (de ' + firstName(t.assignee) + ')' : ''}`, t.client_id);
     renderViewSoft();
@@ -1687,7 +1698,7 @@ const A = {
     confirmBox(`Tem certeza que quer marcar ${list.length} tarefa(s) como feitas?`, `Todas as tarefas de “${PT[d.m]}” de ${esc(firstName(d.id))} ficam como concluídas e entram na contagem do painel.`, 'Sim, marcar como feitas', async () => {
       const at = new Date().toISOString(); list.forEach(t => Object.assign(t, { status: 'feito', done_at: at }));
       await Promise.all(list.map(t => store.update('tasks', t.id, { status: 'feito', done_at: at }).catch(() => {})));
-      await log(`Concluiu ${list.length} tarefa(s) de ${firstName(d.id)} (${PT[d.m].toLowerCase()})`); toast('Tarefas concluídas', `${list.length} tarefa(s)`, 'ok'); await refresh(); personTasks(d.id, d.m);
+      list.forEach(t => PT_JUST.add(t.id)); await log(`Concluiu ${list.length} tarefa(s) de ${firstName(d.id)} (${PT[d.m].toLowerCase()})`); toast('Tarefas concluídas', `${list.length} tarefa(s)`, 'ok'); await refresh(); personTasks(d.id, d.m);
     });
   },
   toggleTask: async d => {

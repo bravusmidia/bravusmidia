@@ -382,3 +382,9 @@ html,body{overscroll-behavior-y:none}
 .pt-row .ck.m{border-style:dashed;color:var(--blue2);cursor:default}
 .pt-row .ck:disabled{opacity:.5;cursor:not-allowed}
 .pt-row.done .t b{text-decoration:line-through;opacity:.6}
+.pt-row .ck.on{background:var(--ok);border-color:var(--ok);color:#04110b}
+.pt-row .ck.on .i{stroke:#04110b;stroke-width:3}
+.pt-row .ck.pop{animation:ckpop .35s ease}
+@keyframes ckpop{0%{transform:scale(.6)}60%{transform:scale(1.2)}100%{transform:scale(1)}}
+.pt-row.done{background:rgba(43,212,138,.05)}
+.sec .i{width:14px;height:14px;margin-right:6px}
