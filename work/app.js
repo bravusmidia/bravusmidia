@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.7.7';
+const VERSION = '2.7.8';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -1182,7 +1182,7 @@ function taskRow(t) {
     <span class="tm">${esc(t.time || '—')}</span>
     <div class="bd"><div class="tt">${esc(t.title)}</div>${t.description ? `<div class="small muted">${esc(t.description)}</div>` : ''}
       <div class="mt">${t.kind !== 'tarefa' ? `<span class="chip blue">${esc((KINDS.find(k => k[0] === t.kind) || ['', t.kind])[1])}</span>` : ''}${t.priority === 'alta' ? '<span class="chip bad">Alta</span>' : ''}${t.client_id ? `<span class="chip">${esc(cname(t.client_id))}</span>` : ''}${S.agendaWho === 'all' ? `<span class="chip">${esc(firstName(t.assignee))}</span>` : ''}${late ? '<span class="chip bad">Atrasada</span>' : ''}${t.template_id ? '<span class="chip">Rotina</span>' : ''}</div>
-      ${t.goal ? `<div class="cnt"><button class="btn sm ic" data-act="cnt" data-id="${t.id}" data-v="-1">−</button><b>${t.count || 0} / ${t.goal}</b><button class="btn sm ic" data-act="cnt" data-id="${t.id}" data-v="1">+</button><button class="btn sm" data-act="cnt" data-id="${t.id}" data-v="5">+5</button><div class="prog sp"><i style="width:${Math.min(100, (t.count || 0) / t.goal * 100)}%"></i></div></div>` : ''}
+      ${t.goal ? `<div class="cnt"><button class="btn sm ic" data-act="cnt" data-id="${t.id}" data-v="-1">−</button><b>${t.count || 0} / ${t.goal}</b><button class="btn sm ic" data-act="cnt" data-id="${t.id}" data-v="1">+</button><button class="btn sm" data-act="cnt" data-id="${t.id}" data-v="5">+5</button><input type="range" class="cslide sp" min="0" max="${Math.max(t.goal, t.count || 0)}" step="1" value="${t.count || 0}" data-cslide="${t.id}" aria-label="Arraste para marcar a quantidade" style="--p:${Math.min(100, (t.count || 0) / Math.max(t.goal, t.count || 0) * 100)}%"></div>` : ''}
     </div>
     <button class="btn sm ic" data-act="editTask" data-id="${t.id}" aria-label="Editar">${ic('edit')}</button></div>`;
 }
@@ -1227,7 +1227,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.7.7', notes: [
+const RELEASE = { version: '2.7.8', notes: [
+  'Agenda: a barra das metas (seguir, deixar de seguir, prospecção…) ganhou uma bolinha. Arraste para marcar a quantidade rápido; os botões − + e +5 continuam funcionando.',
   'Cliente: o botão “Desligamento” virou “Pausar / Cancelar”. Ao tocar você escolhe: Pausar (fica na carteira como Pausado, com aviso opcional no WhatsApp), Cancelar (sai da carteira, com data, motivo e cobranças) ou só enviar o comunicado de desligamento. Cliente pausado ganha o botão “Retomar”.',
   '“A receber” agora mostra o total de tudo que falta receber: mensalidades do mês ainda não vencidas + as atrasadas. O card “Atrasado” continua mostrando só o valor em atraso.',
   'Agenda: ao tocar no quadrado da tarefa aparece na hora o ✓ verde, a tarefa fica riscada e some o “Atrasada” (também na lista de atrasadas). Toque de novo para desmarcar.',
@@ -2063,7 +2064,18 @@ document.addEventListener('submit', e => {
   const fd = new FormData(f); const btn = f.querySelector('button.pri, button.ok'); if (btn) btn.disabled = true;
   Promise.resolve(fn(Object.fromEntries(fd), fd, f)).catch(err => toast('Não foi possível salvar', err.message, 'bad')).finally(() => { if (btn) btn.disabled = false; });
 });
+/* v2.7.8: bolinha da barra de meta — arrasta para marcar a quantidade rápido */
+document.addEventListener('input', e => {
+  const r = e.target; if (!r.dataset || !r.dataset.cslide) return;
+  const t = S.d.tasks.find(x => x.id === r.dataset.cslide); if (!t) return;
+  r.style.setProperty('--p', (r.value / r.max * 100) + '%');
+  const b = r.closest('.cnt') && r.closest('.cnt').querySelector('b'); if (b) b.textContent = `${r.value} / ${t.goal}`;
+});
 document.addEventListener('change', async e => {
+  if (e.target.dataset && e.target.dataset.cslide) {
+    const t = S.d.tasks.find(x => x.id === e.target.dataset.cslide); if (!t) return;
+    const v = +e.target.value - (t.count || 0); if (v) await A.cnt({ id: t.id, v }); return;
+  }
   if (e.target.dataset.actChange === 'importCsv') {
     try { const f = e.target.files[0]; if (!f) return; const list = csvToClients(parseCsv(await f.text())); e.target.value = '';
       if (!list.length) throw new Error('Não encontrei a coluna "Nome" na planilha.'); importPreview(list);

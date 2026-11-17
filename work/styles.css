@@ -403,3 +403,13 @@ html,body{overscroll-behavior-y:none}
 .task.done{opacity:.7;background:rgba(43,212,138,.05)}.task.done .tt{text-decoration:line-through}
 @keyframes ckpop{0%{transform:scale(.6)}60%{transform:scale(1.2)}100%{transform:scale(1)}}
 .btn.warn{background:rgba(255,181,71,.12);border-color:rgba(255,181,71,.4);color:var(--warn)}
+
+/* v2.7.8 barra de meta com bolinha para arrastar */
+.cslide{-webkit-appearance:none;appearance:none;height:28px;background:transparent;cursor:pointer;min-width:90px;touch-action:pan-y;margin:0}
+.cslide::-webkit-slider-runnable-track{height:8px;border-radius:99px;background:linear-gradient(90deg,#1c5fe6,#5aa6ff) 0/var(--p,0%) 100% no-repeat,var(--card2)}
+.cslide::-moz-range-track{height:8px;border-radius:99px;background:var(--card2)}
+.cslide::-moz-range-progress{height:8px;border-radius:99px;background:linear-gradient(90deg,#1c5fe6,#5aa6ff)}
+.cslide::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;margin-top:-8px;border-radius:50%;background:#fff;border:3px solid #2f7bff;box-shadow:0 2px 10px rgba(47,123,255,.6)}
+.cslide::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:3px solid #2f7bff;box-shadow:0 2px 10px rgba(47,123,255,.6)}
+.cslide:active::-webkit-slider-thumb{transform:scale(1.15)}
+.cnt{flex-wrap:wrap}
