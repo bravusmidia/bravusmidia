@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.6.5';
+const VERSION = '2.7.0';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -788,7 +788,7 @@ function monthSummary(k) {
   return `<div class="card" style="margin-top:14px"><h3>${ic('spark')}Bravus Work no mês · ${monthName(k)}<span class="sp"></span><span class="chip blue">tudo do app</span></h3>
     <div class="grid g2" style="gap:0 18px"><div class="list">
       ${row('meet', 'Reuniões', ms.length, `${ms.filter(t => t.status === 'feito').length} realizadas · ${ms.filter(t => t.status === 'noshow').length} faltas · ${ms.filter(t => t.outcome === 'fechou').length} fecharam · comparecimento ${decided ? Math.round(ms.filter(t => t.status === 'feito').length / decided * 100) + '%' : '—'}`, 'reunioes')}
-      ${row('cal', 'Tarefas', `${tf}/${tt}`, 'concluídas no mês', 'agenda')}
+      ${row('cal', 'Tarefas', `${tf}/${tt}`, `concluídas no mês · ${team().map(p => `${esc(firstName(p.id))} ${realTasks().filter(t => t.assignee === p.id && isLate(t)).length} atrasada(s)`).join(' · ')}`, 'equipe')}
       ${row('clock', 'Tempo online', fmtDur(team().reduce((a, p) => a + timeMonth(p.id, k), 0)), team().map(p => `${esc(firstName(p.id))} ${fmtDur(timeMonth(p.id, k))}`).join(' · '), 'equipe')}
       ${row('chat', 'Prospecções', prosp, `ligações ${lf}/${lt} · follow-ups ${ff}/${ft}`, 'agenda')}
     </div><div class="list">
@@ -1191,7 +1191,9 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.6.5', notes: [
+const RELEASE = { version: '2.7.0', notes: [
+  'Equipe: toque em Hoje, Semana ou Atrasadas de cada pessoa para ver a lista do que falta e marcar como feito (checklist). Tem também “Marcar todas como feitas”.',
+  'Tudo que é marcado entra na hora no Painel (tarefas concluídas, atrasadas e produtividade).',
   'Equipe: botão Excluir membro no card de cada pessoa (só o administrador).',
   'Toda exclusão pergunta “Tem certeza?” dizendo exatamente o que vai ser apagado (cliente, reunião, tarefa, cobrança, despesa, conteúdo, membro).',
   'Clientes: medalhas realistas de Ouro, Prata e Bronze no lugar da estrela.',
@@ -1301,6 +1303,31 @@ async function checkVersion() {
 }
 
 /* ---------- EQUIPE ---------- */
+/* ---------- TAREFAS DE CADA PERFIL: toque no número, veja o que falta e marque o que foi feito ---------- */
+const kpiP = (uid, m, label, val, cls = '') => `<div class="kpi go ${cls}" role="button" tabindex="0" title="Ver ${esc(label.toLowerCase())}" data-act="personTasks" data-id="${uid}" data-m="${m}"><small>${esc(label)}</small><b>${val}</b><i class="kgo">${ic('right')}</i></div>`;
+const PT = { late: 'Atrasadas', today: 'Hoje', week: 'Últimos 7 dias' };
+function personTaskList(uid, m) {
+  const d = today(), wk = Array.from({ length: 7 }, (_, i) => addDays(d, -i));
+  const mine = realTasks().filter(t => t.assignee === uid);
+  const ts = m === 'late' ? mine.filter(isLate) : m === 'today' ? mine.filter(t => t.date === d) : mine.filter(t => wk.includes(t.date));
+  return ts.sort((a, b) => (a.status === 'feito') - (b.status === 'feito') || (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
+}
+function personTasks(uid, m) {
+  const p = prof(uid); if (!p) return;
+  const can = isAdmin() || uid === S.me.id;
+  const ts = personTaskList(uid, m), done = ts.filter(t => t.status === 'feito').length, pend = ts.length - done;
+  const row = t => { const isM = t.kind === 'reuniao'; return `<div class="li pt-row ${t.status === 'feito' ? 'done' : ''}">
+    ${isM ? `<span class="ck m" title="Reunião">${ic('meet')}</span>` : `<button type="button" class="ck ${t.status === 'feito' ? 'on' : ''}" ${can ? `data-act="ptCheck" data-id="${t.id}" data-u="${uid}" data-m="${m}"` : 'disabled'} aria-label="Concluir">${t.status === 'feito' ? ic('check') : ''}</button>`}
+    <div class="t"><b>${esc(t.title)}</b><small>${t.date === d0() ? 'Hoje' : WD[new Date(t.date + 'T12:00:00').getDay()] + ' ' + fdate(t.date)}${t.time ? ' · ' + esc(t.time) : ''}${t.client_id ? ' · ' + esc(cname(t.client_id)) : ''}${t.goal ? ` · meta ${t.count || 0}/${t.goal}` : ''}${isLate(t) ? ' · <span style="color:var(--bad)">atrasada</span>' : ''}</small></div>
+    ${isM ? `<button type="button" class="btn sm" data-act="editMeet" data-id="${t.id}">Ver reunião</button>` : ''}</div>`; };
+  modal(`${esc(firstName(uid) || p.name)} · ${PT[m]}`, `<div class="row wrap" style="gap:8px;margin-bottom:12px">${Object.entries(PT).map(([k, n]) => `<button type="button" class="btn sm ${k === m ? 'pri' : ''}" data-act="personTasks" data-id="${uid}" data-m="${k}">${n} <small>${k === 'late' ? personTaskList(uid, k).length : personTaskList(uid, k).filter(t => t.status !== 'feito').length}</small></button>`).join('')}</div>
+    <div class="row small" style="margin-bottom:6px"><span class="muted">${pend} pendente(s) · ${done} feita(s)</span><span class="sp"></span>${ts.length ? `<b>${Math.round(done / ts.length * 100)}%</b>` : ''}</div>
+    <div class="prog" style="margin-bottom:12px"><i style="width:${ts.length ? done / ts.length * 100 : 0}%"></i></div>
+    <div class="list">${ts.length ? ts.map(row).join('') : empty(m === 'late' ? 'Nada atrasado. ✅' : 'Nenhuma tarefa aqui.')}</div>
+    ${can ? '' : `<p class="note" style="margin-top:10px">Só ${esc(firstName(uid))} ou o administrador marcam estas tarefas.</p>`}`,
+    { wide: true, footer: `${can && pend && ts.some(t => t.kind !== 'reuniao' && t.status !== 'feito') ? `<button type="button" class="btn ok" data-act="ptAll" data-id="${uid}" data-m="${m}">${ic('check')}Marcar todas como feitas</button>` : ''}<span class="sp"></span><button type="button" class="btn" data-act="closeModal">Fechar</button>` });
+}
+const d0 = () => today();
 V.equipe = () => {
   const d = today(); const wk = Array.from({ length: 7 }, (_, i) => addDays(d, -i));
   return head('Equipe', 'Bravus Team · produtividade e presença', isAdmin() && SUPA ? `<button class="btn pri" data-act="newMember">${ic('plus')}Membro</button>` : '') + `<div class="grid g2">${team().map(p => {
@@ -1314,7 +1341,7 @@ V.equipe = () => {
       <div class="sec" style="margin-top:0">${ic('clock')} Tempo online no Bravus Work</div>
       <div class="grid g4 ot-grid" style="gap:8px;margin-bottom:12px">${kpi('Hoje', fmtDur(timeToday(p.id)), '', isOnline(p) ? 'g' : '')}${kpi('Total', fmtDur(timeOf(p.id)))}</div>
       <div class="sec" style="margin-top:0">Tarefas</div>
-      <div class="grid g3" style="grid-template-columns:repeat(3,1fr);gap:8px">${kpi('Hoje', `${tdn}/${td.length}`)}${kpi('Semana', w.length ? Math.round(wdn / w.length * 100) + '%' : '—')}${kpi('Atrasadas', late, '', late ? 'r' : 'g')}</div>
+      <div class="grid g3" style="grid-template-columns:repeat(3,1fr);gap:8px">${kpiP(p.id, 'today', 'Hoje', `${tdn}/${td.length}`)}${kpiP(p.id, 'week', 'Semana', w.length ? Math.round(wdn / w.length * 100) + '%' : '—')}${kpiP(p.id, 'late', 'Atrasadas', late, late ? 'r' : 'g')}</div>
       ${goals.map(g => `<div style="margin-top:10px"><div class="row small"><span>${esc(g.title)}</span><span class="sp"></span><b>${g.count || 0}/${g.goal}</b></div><div class="prog" style="margin-top:4px"><i style="width:${Math.min(100, (g.count || 0) / g.goal * 100)}%"></i></div></div>`).join('')}
       <div class="sec" style="margin-top:16px">Atividades recentes</div><div class="list">${acts.length ? acts.map(a => `<div class="li"><div class="t"><b style="font-weight:500">${esc(a.action)}</b><small>${ago(a.created_at)}</small></div></div>`).join('') : empty('Sem atividades.')}</div></div>`;
   }).join('')}</div>`;
@@ -1645,6 +1672,24 @@ const A = {
   newTask: () => isAdmin() ? taskForm({}) : toast('Membros só adicionam reuniões', 'Use “+ Reunião”.', 'warn'), editTask: d => { const t = S.d.tasks.find(t => t.id === d.id); return t && t.kind === 'reuniao' ? meetForm(t) : taskForm(t); },
   newTemplate: () => taskForm({}, true), editTemplate: d => taskForm(S.d.tasks.find(t => t.id === d.id), true),
   delTask: d => { const t = S.d.tasks.find(x => x.id === d.id) || {}; const isM = t.kind === 'reuniao'; return confirmBox(isM ? `Tem certeza que quer excluir a reunião com ${esc(meetWho(t))}?` : `Tem certeza que quer excluir a tarefa “${esc(t.title || '')}”?`, `${t.date ? fdate(t.date) : ''}${t.time ? ' às ' + esc(t.time) : ''}${t.date ? ' · ' : ''}Não dá para desfazer.`, isM ? 'Sim, excluir reunião' : 'Sim, excluir tarefa', async () => { await store.remove('tasks', d.id); closeModal(); await refresh(); }, true); },
+  personTasks: d => personTasks(d.id, d.m || 'late'),
+  ptCheck: async d => {
+    const t = S.d.tasks.find(x => x.id === d.id); if (!t) return;
+    if (!isAdmin() && t.assignee !== S.me.id) return toast('Só o responsável ou o administrador marca esta tarefa', '', 'warn');
+    const done = t.status !== 'feito';
+    Object.assign(t, { status: done ? 'feito' : 'pendente', done_at: done ? new Date().toISOString() : null }); personTasks(d.u, d.m);
+    try { await store.update('tasks', t.id, { status: t.status, done_at: t.done_at }); } catch (e) { return toast('Não foi possível salvar', e.message, 'bad'); }
+    if (done) log(`Concluiu: ${t.title}${t.assignee !== S.me.id ? ' (de ' + firstName(t.assignee) + ')' : ''}`, t.client_id);
+    renderViewSoft();
+  },
+  ptAll: d => {
+    const list = personTaskList(d.id, d.m).filter(t => t.kind !== 'reuniao' && t.status !== 'feito');
+    confirmBox(`Tem certeza que quer marcar ${list.length} tarefa(s) como feitas?`, `Todas as tarefas de “${PT[d.m]}” de ${esc(firstName(d.id))} ficam como concluídas e entram na contagem do painel.`, 'Sim, marcar como feitas', async () => {
+      const at = new Date().toISOString(); list.forEach(t => Object.assign(t, { status: 'feito', done_at: at }));
+      await Promise.all(list.map(t => store.update('tasks', t.id, { status: 'feito', done_at: at }).catch(() => {})));
+      await log(`Concluiu ${list.length} tarefa(s) de ${firstName(d.id)} (${PT[d.m].toLowerCase()})`); toast('Tarefas concluídas', `${list.length} tarefa(s)`, 'ok'); await refresh(); personTasks(d.id, d.m);
+    });
+  },
   toggleTask: async d => {
     const t = S.d.tasks.find(x => x.id === d.id); const done = t.status !== 'feito';
     Object.assign(t, { status: done ? 'feito' : 'pendente', done_at: done ? new Date().toISOString() : null }); renderView();

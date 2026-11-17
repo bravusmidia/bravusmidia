@@ -374,3 +374,11 @@ html,body{overscroll-behavior-y:none}
 .chip.tier{height:26px;padding:0 10px 0 6px;gap:5px}
 .tier-tabs button .medal{margin-right:4px;vertical-align:-4px}
 .tier-seg span .medal{margin-right:5px}
+/* checklist de tarefas por pessoa (v2.7) */
+.pt-row{gap:12px}
+.pt-row .ck{width:26px;height:26px;border-radius:8px;border:2px solid var(--line2);display:grid;place-items:center;flex:none;background:transparent;color:#04110b;cursor:pointer}
+.pt-row .ck .i{width:16px;height:16px}
+.pt-row .ck.on{background:var(--ok);border-color:var(--ok)}
+.pt-row .ck.m{border-style:dashed;color:var(--blue2);cursor:default}
+.pt-row .ck:disabled{opacity:.5;cursor:not-allowed}
+.pt-row.done .t b{text-decoration:line-through;opacity:.6}
