@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.5.0';
+const VERSION = '2.6.0';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -35,6 +35,7 @@ const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v == n
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 
 const ICON = {
+  clock:'<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   star:'<path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/>',
   grid:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/>',
   users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',
@@ -444,15 +445,37 @@ async function tick() {
 }
 
 /* presença (online/offline) + último acesso */
+/* ---------- TEMPO ONLINE: conta o tempo com o app aberto na tela, para sempre, visível para todos ---------- */
+let beatAt = null; S.ot = [];
+const fmtDur = sec => { sec = Math.max(0, Math.round(sec || 0)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60); return h ? `${h}h${pad(m)}` : m ? `${m}min` : sec ? '<1min' : '0min'; };
+const timeOf = (uid, from, to) => S.ot.filter(r => r.user_id === uid && (!from || r.day >= from) && (!to || r.day <= to)).reduce((a, r) => a + (+r.seconds || 0), 0) + (S.me && uid === S.me.id && beatAt && !document.hidden && (!to || today() <= to) && (!from || today() >= from) ? Math.min(90, (Date.now() - beatAt) / 1000) : 0);
+const timeToday = uid => timeOf(uid, today(), today());
+const timeWeek = uid => timeOf(uid, addDays(today(), -6), today());
+const timeMonth = (uid, k = curYM()) => timeOf(uid, k + '-01', k + '-31');
+async function loadTime() {
+  if (!SUPA || !sb) return;
+  try { const { data, error } = await sb.from('online_time').select('user_id,day,seconds'); if (!error && data) S.ot = data; } catch {}
+}
+async function addTime() {
+  if (!S.me || !beatAt) return; const now = Date.now(); const secs = Math.round(Math.min(90, (now - beatAt) / 1000)); beatAt = document.hidden ? null : now;
+  if (secs < 1) return;
+  const r = S.ot.find(x => x.user_id === S.me.id && x.day === today()); if (r) r.seconds = (+r.seconds || 0) + secs; else S.ot.push({ user_id: S.me.id, day: today(), seconds: secs });
+  if (SUPA && sb) { try { await sb.rpc('bw_add_time', { p_seconds: secs }); } catch (e) { console.warn('tempo online', e); } }
+}
 async function heartbeat() {
-  if (!S.me || document.hidden) return;
+  if (!S.me) return;
+  await addTime();
+  if (document.hidden) return;
+  if (!beatAt) beatAt = Date.now();
+  loadTime().then(renderPresence);
   const now = new Date().toISOString(); S.me.last_seen = now;
   const mine = (S.d.profiles || []).find(p => p.id === S.me.id); if (mine) mine.last_seen = now;
   renderPresence();
   try { await store.update('profiles', S.me.id, { last_seen: now }); } catch (e) { console.warn('presença', e); }
 }
 /* voltou para o app (desbloqueou o celular / trocou de aba): avisa na hora que está online */
-document.addEventListener('visibilitychange', () => { if (!document.hidden) heartbeat(); else renderPresence(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) heartbeat(); else { addTime(); renderPresence(); } });
+window.addEventListener('pagehide', () => { addTime(); });
 window.addEventListener('focus', () => heartbeat());
 
 /* =====================================================================
@@ -766,6 +789,7 @@ function monthSummary(k) {
     <div class="grid g2" style="gap:0 18px"><div class="list">
       ${row('meet', 'Reuniões', ms.length, `${ms.filter(t => t.status === 'feito').length} realizadas · ${ms.filter(t => t.status === 'noshow').length} faltas · ${ms.filter(t => t.outcome === 'fechou').length} fecharam · comparecimento ${decided ? Math.round(ms.filter(t => t.status === 'feito').length / decided * 100) + '%' : '—'}`, 'reunioes')}
       ${row('cal', 'Tarefas', `${tf}/${tt}`, 'concluídas no mês', 'agenda')}
+      ${row('clock', 'Tempo online', fmtDur(team().reduce((a, p) => a + timeMonth(p.id, k), 0)), team().map(p => `${esc(firstName(p.id))} ${fmtDur(timeMonth(p.id, k))}`).join(' · '), 'equipe')}
       ${row('chat', 'Prospecções', prosp, `ligações ${lf}/${lt} · follow-ups ${ff}/${ft}`, 'agenda')}
     </div><div class="list">
       ${row('users', 'Clientes', cl.filter(inWallet).length, `${TIERS.map(t => `${cl.filter(c => inWallet(c) && clientTier(c) === t[0]).length} ${t[1].toLowerCase()}`).join(' · ')} · ${novos} novo(s) no mês`, 'clientes')}
@@ -1154,7 +1178,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.5.0', notes: [
+const RELEASE = { version: '2.6.0', notes: [
+  'Tempo online: o app conta o tempo que cada um passa no Bravus Work (hoje, 7 dias, mês e total) e mostra para todos, no topo, na Equipe e no Painel.',
   'Clientes com ticket Ouro, Prata e Bronze: selo colorido no card, filtro com contagem e cards ordenados do Ouro para o Bronze.',
   'Ticket automático pelo valor do contrato (Bronze até R$ 800 · Prata acima de R$ 800 · Ouro a partir de R$ 1.200), ou marcado à mão na conta de cada cliente.',
   'Status online corrigido: você aparece online na hora em que abre ou volta para o app.',
@@ -1209,7 +1234,7 @@ function cwList() {
     return `${sep}<div class="cw-m ${mine ? 'me' : ''}">${mine ? '' : `<small class="cw-who">${esc(firstName(m.user_id))}</small>`}<div class="cw-b">${esc(m.text)}<span class="cw-t">${msgTime(m.created_at).slice(-5)} ${tick}</span><button class="cw-pin ${m.pinned ? 'on' : ''}" data-act="msgPin" data-id="${m.id}" title="${m.pinned ? 'Tirar das anotações' : 'Guardar nas anotações'}">📌</button></div>${mine && m === lastMine && sb2.length ? `<small class="cw-seen">Visto por ${sb2.map(p => esc(firstName(p.id))).join(', ')} · ${msgTime(sb2.map(p => p.chat_seen_at).sort().pop())}</small>` : ''}</div>`; }).join('');
 }
 function presenceHtml() {
-  return team().map(p => { const on = isOnline(p); return `<span class="pr ${on ? 'on' : ''}" data-act="editProfile" data-id="${p.id}" title="${esc(p.name)} · ${on ? 'online agora' : 'visto ' + ago(p.last_seen)}">${avatar(p, 28)}<span><b>${esc(firstName(p.id))}${p.id === S.me.id ? ' (você)' : ''}</b><small>${on ? 'online' : 'offline · ' + ago(p.last_seen)}</small></span></span>`; }).join('');
+  return team().map(p => { const on = isOnline(p); return `<span class="pr ${on ? 'on' : ''}" data-act="editProfile" data-id="${p.id}" title="${esc(p.name)} · ${on ? 'online agora' : 'visto ' + ago(p.last_seen)}">${avatar(p, 28)}<span><b>${esc(firstName(p.id))}${p.id === S.me.id ? ' (você)' : ''}</b><small>${on ? 'online' : 'offline · ' + ago(p.last_seen)} · hoje ${fmtDur(timeToday(p.id))}</small></span></span>`; }).join('');
 }
 const renderPresence = () => { const el = $('#presence'); if (el && S.me) el.innerHTML = presenceHtml(); };
 function renderChat(full = false) {
@@ -1268,6 +1293,9 @@ V.equipe = () => {
     const goals = td.filter(t => t.goal);
     const acts = S.d.activity.filter(a => a.user_id === p.id).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 6);
     return `<div class="card"><div class="row" style="margin-bottom:14px"><span data-act="editProfile" data-id="${p.id}" style="cursor:pointer">${avatar(p, 48)}</span><div class="sp" data-act="editProfile" data-id="${p.id}" style="cursor:pointer"><b style="font-size:16px">${esc(p.name)}</b><div class="small muted">${esc(cargo(p))} · ${isOnline(p) ? '<span style="color:var(--ok)">online agora</span>' : 'offline · último acesso ' + ago(p.last_seen)}</div></div>${p.id === S.me.id || isAdmin() ? `<label class="btn sm" title="Trocar foto">${ic('plus')}Foto<input type="file" accept="image/*" data-act-change="setPhoto" data-id="${p.id}" hidden></label>` : ''}</div>
+      <div class="sec" style="margin-top:0">${ic('clock')} Tempo online no Bravus Work</div>
+      <div class="grid g4 ot-grid" style="gap:8px;margin-bottom:12px">${kpi('Hoje', fmtDur(timeToday(p.id)), '', isOnline(p) ? 'g' : '')}${kpi('7 dias', fmtDur(timeWeek(p.id)))}${kpi('No mês', fmtDur(timeMonth(p.id)))}${kpi('Total', fmtDur(timeOf(p.id)))}</div>
+      <div class="sec" style="margin-top:0">Tarefas</div>
       <div class="grid g3" style="grid-template-columns:repeat(3,1fr);gap:8px">${kpi('Hoje', `${tdn}/${td.length}`)}${kpi('Semana', w.length ? Math.round(wdn / w.length * 100) + '%' : '—')}${kpi('Atrasadas', late, '', late ? 'r' : 'g')}</div>
       ${goals.map(g => `<div style="margin-top:10px"><div class="row small"><span>${esc(g.title)}</span><span class="sp"></span><b>${g.count || 0}/${g.goal}</b></div><div class="prog" style="margin-top:4px"><i style="width:${Math.min(100, (g.count || 0) / g.goal * 100)}%"></i></div></div>`).join('')}
       <div class="sec" style="margin-top:16px">Atividades recentes</div><div class="list">${acts.length ? acts.map(a => `<div class="li"><div class="t"><b style="font-weight:500">${esc(a.action)}</b><small>${ago(a.created_at)}</small></div></div>`).join('') : empty('Sem atividades.')}</div></div>`;
