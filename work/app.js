@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.6.1';
+const VERSION = '2.6.2';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -1178,8 +1178,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.6.1', notes: [
-  'Tempo online mais compacto, proporcional no celular.',
+const RELEASE = { version: '2.6.2', notes: [
+  'Tempo online mais enxuto: só Hoje e Total, proporcional no celular.',
   'Tempo online: o app conta o tempo que cada um passa no Bravus Work (hoje, 7 dias, mês e total) e mostra para todos, no topo, na Equipe e no Painel.',
   'Clientes com ticket Ouro, Prata e Bronze: selo colorido no card, filtro com contagem e cards ordenados do Ouro para o Bronze.',
   'Ticket automático pelo valor do contrato (Bronze até R$ 800 · Prata acima de R$ 800 · Ouro a partir de R$ 1.200), ou marcado à mão na conta de cada cliente.',
@@ -1295,7 +1295,7 @@ V.equipe = () => {
     const acts = S.d.activity.filter(a => a.user_id === p.id).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 6);
     return `<div class="card"><div class="row" style="margin-bottom:14px"><span data-act="editProfile" data-id="${p.id}" style="cursor:pointer">${avatar(p, 48)}</span><div class="sp" data-act="editProfile" data-id="${p.id}" style="cursor:pointer"><b style="font-size:16px">${esc(p.name)}</b><div class="small muted">${esc(cargo(p))} · ${isOnline(p) ? '<span style="color:var(--ok)">online agora</span>' : 'offline · último acesso ' + ago(p.last_seen)}</div></div>${p.id === S.me.id || isAdmin() ? `<label class="btn sm" title="Trocar foto">${ic('plus')}Foto<input type="file" accept="image/*" data-act-change="setPhoto" data-id="${p.id}" hidden></label>` : ''}</div>
       <div class="sec" style="margin-top:0">${ic('clock')} Tempo online no Bravus Work</div>
-      <div class="grid g4 ot-grid" style="gap:8px;margin-bottom:12px">${kpi('Hoje', fmtDur(timeToday(p.id)), '', isOnline(p) ? 'g' : '')}${kpi('7 dias', fmtDur(timeWeek(p.id)))}${kpi('No mês', fmtDur(timeMonth(p.id)))}${kpi('Total', fmtDur(timeOf(p.id)))}</div>
+      <div class="grid g4 ot-grid" style="gap:8px;margin-bottom:12px">${kpi('Hoje', fmtDur(timeToday(p.id)), '', isOnline(p) ? 'g' : '')}${kpi('Total', fmtDur(timeOf(p.id)))}</div>
       <div class="sec" style="margin-top:0">Tarefas</div>
       <div class="grid g3" style="grid-template-columns:repeat(3,1fr);gap:8px">${kpi('Hoje', `${tdn}/${td.length}`)}${kpi('Semana', w.length ? Math.round(wdn / w.length * 100) + '%' : '—')}${kpi('Atrasadas', late, '', late ? 'r' : 'g')}</div>
       ${goals.map(g => `<div style="margin-top:10px"><div class="row small"><span>${esc(g.title)}</span><span class="sp"></span><b>${g.count || 0}/${g.goal}</b></div><div class="prog" style="margin-top:4px"><i style="width:${Math.min(100, (g.count || 0) / g.goal * 100)}%"></i></div></div>`).join('')}
