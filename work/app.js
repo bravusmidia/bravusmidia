@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.7.1';
+const VERSION = '2.7.2';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -1191,7 +1191,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.7.1', notes: [
+const RELEASE = { version: '2.7.2', notes: [
+  'Checklist da Equipe: reuniões também podem ser marcadas no quadrado (vira “Realizada” e conta no painel e em Reuniões).',
   'Checklist da Equipe: ao marcar aparece o ✓ verde no quadrado e a tarefa desce para “Feitas” (com data e hora), sem sumir. Tudo conta no painel.',
   'Equipe: toque em Hoje, Semana ou Atrasadas de cada pessoa para ver a lista do que falta e marcar como feito (checklist). Tem também “Marcar todas como feitas”.',
   'Tudo que é marcado entra na hora no Painel (tarefas concluídas, atrasadas e produtividade).',
@@ -1320,7 +1321,7 @@ function personTasks(uid, m) {
   const can = isAdmin() || uid === S.me.id;
   const ts = personTaskList(uid, m), doneL = ts.filter(t => t.status === 'feito'), pendL = ts.filter(t => t.status !== 'feito'), done = doneL.length, pend = pendL.length;
   const row = t => { const isM = t.kind === 'reuniao'; return `<div class="li pt-row ${t.status === 'feito' ? 'done' : ''}" data-row="${t.id}">
-    ${isM ? `<span class="ck m" title="Reunião">${ic('meet')}</span>` : `<button type="button" class="ck ${t.status === 'feito' ? 'on' : ''}" ${can ? `data-act="ptCheck" data-id="${t.id}" data-u="${uid}" data-m="${m}"` : 'disabled'} aria-label="Concluir">${t.status === 'feito' ? ic('check') : ''}</button>`}
+    <button type="button" class="ck ${isM ? 'm' : ''} ${t.status === 'feito' ? 'on' : ''}" ${can ? `data-act="ptCheck" data-id="${t.id}" data-u="${uid}" data-m="${m}"` : 'disabled'} aria-label="${isM ? 'Marcar reunião como realizada' : 'Concluir'}" title="${isM ? 'Marcar como Realizada' : 'Concluir'}">${t.status === 'feito' ? ic('check') : isM ? ic('meet') : ''}</button>
     <div class="t"><b>${esc(t.title)}</b><small>${t.status === 'feito' && t.done_at ? `<span style="color:var(--ok)">✓ feita ${new Date(t.done_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span> · ` : ''}${t.date === d0() ? 'Hoje' : WD[new Date(t.date + 'T12:00:00').getDay()] + ' ' + fdate(t.date)}${t.time ? ' · ' + esc(t.time) : ''}${t.client_id ? ' · ' + esc(cname(t.client_id)) : ''}${t.goal ? ` · meta ${t.count || 0}/${t.goal}` : ''}${isLate(t) ? ' · <span style="color:var(--bad)">atrasada</span>' : ''}</small></div>
     ${isM ? `<button type="button" class="btn sm" data-act="editMeet" data-id="${t.id}">Ver reunião</button>` : ''}</div>`; };
   modal(`${esc(firstName(uid) || p.name)} · ${PT[m]}`, `<div class="row wrap" style="gap:8px;margin-bottom:12px">${Object.entries(PT).map(([k, n]) => `<button type="button" class="btn sm ${k === m ? 'pri' : ''}" data-act="personTasks" data-id="${uid}" data-m="${k}">${n} <small>${k === 'late' ? personTaskList(uid, k).length : personTaskList(uid, k).filter(t => t.status !== 'feito').length}</small></button>`).join('')}</div>
@@ -1687,10 +1688,11 @@ const A = {
     Object.assign(t, { status: done ? 'feito' : 'pendente', done_at: done ? new Date().toISOString() : null }); if (done) PT_JUST.add(t.id);
     // mostra o ✓ verde no quadrado na hora; depois de um instante a tarefa desce para “Feitas”
     const r = document.querySelector(`#modal-root [data-row="${t.id}"]`); const b = r && r.querySelector('.ck');
-    if (r && b) { r.classList.toggle('done', done); b.classList.toggle('on', done); b.innerHTML = done ? ic('check') : ''; if (done) b.classList.add('pop'); }
+    if (r && b) { r.classList.toggle('done', done); b.classList.toggle('on', done); b.innerHTML = done ? ic('check') : t.kind === 'reuniao' ? ic('meet') : ''; if (done) b.classList.add('pop'); }
     clearTimeout(S.ptT); S.ptT = setTimeout(() => { if ($('#modal-root .pt-row')) personTasksKeep(d.u, d.m); }, 900);
     try { await store.update('tasks', t.id, { status: t.status, done_at: t.done_at }); } catch (e) { return toast('Não foi possível salvar', e.message, 'bad'); }
-    if (done) log(`Concluiu: ${t.title}${t.assignee !== S.me.id ? ' (de ' + firstName(t.assignee) + ')' : ''}`, t.client_id);
+    if (done && t.kind === 'reuniao') { log(`Reunião com ${meetWho(t)}: realizada`, t.client_id); notifyTeam(`Reunião com ${meetWho(t)}: realizada`, `${fdate(t.date)} às ${t.time || '--:--'} · registrado por ${firstName(S.me.id)}`, 'tarefa', `meet:${t.id}:feito`, 'reunioes'); }
+    else if (done) log(`Concluiu: ${t.title}${t.assignee !== S.me.id ? ' (de ' + firstName(t.assignee) + ')' : ''}`, t.client_id);
     renderViewSoft();
   },
   ptAll: d => {

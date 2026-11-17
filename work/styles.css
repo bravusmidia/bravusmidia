@@ -379,7 +379,7 @@ html,body{overscroll-behavior-y:none}
 .pt-row .ck{width:26px;height:26px;border-radius:8px;border:2px solid var(--line2);display:grid;place-items:center;flex:none;background:transparent;color:#04110b;cursor:pointer}
 .pt-row .ck .i{width:16px;height:16px}
 .pt-row .ck.on{background:var(--ok);border-color:var(--ok)}
-.pt-row .ck.m{border-style:dashed;color:var(--blue2);cursor:default}
+.pt-row .ck.m{border-style:dashed;color:var(--blue2)}.pt-row .ck.m.on{border-style:solid;color:#04110b}
 .pt-row .ck:disabled{opacity:.5;cursor:not-allowed}
 .pt-row.done .t b{text-decoration:line-through;opacity:.6}
 .pt-row .ck.on{background:var(--ok);border-color:var(--ok);color:#04110b}
