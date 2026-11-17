@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.4.0';
+const VERSION = '2.4.1';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -174,7 +174,7 @@ const cname = id => (client(id) || {}).name || 'Bravus Mídia';
 const cargo = p => (p && p.title) || (p && p.role === 'admin' ? 'Administrador' : 'Comercial · co-founder');
 const CARGOS = ['CEO / Fundador', 'Co-founder', 'Gestor de tráfego', 'Comercial', 'Social media', 'Designer', 'Editor de vídeo', 'Copywriter', 'Atendimento', 'Financeiro', 'Estagiário'];
 const team = () => S.d.profiles.filter(p => p.role === 'admin' || p.role === 'comercial');
-const isOnline = p => p && p.last_seen && (Date.now() - new Date(p.last_seen)) < 150000;
+const isOnline = p => !!p && ((S.me && p.id === S.me.id && !document.hidden) || (!!p.last_seen && (Date.now() - new Date(p.last_seen)) < 150000));
 const avatar = (p, size = 36) => `<span class="av" style="background:${p && p.avatar_url ? `#0b1a3d url('${esc(p.avatar_url)}') center/cover` : esc(p && p.color || '#2f7bff')};width:${size}px;height:${size}px">${p && p.avatar_url ? '' : esc(initials(p && p.name))}<i class="dot ${isOnline(p) ? 'on' : ''}"></i></span>`;
 
 async function loadAll(only) {
@@ -445,8 +445,14 @@ async function tick() {
 /* presença (online/offline) + último acesso */
 async function heartbeat() {
   if (!S.me || document.hidden) return;
-  try { await store.update('profiles', S.me.id, { last_seen: new Date().toISOString() }); } catch {}
+  const now = new Date().toISOString(); S.me.last_seen = now;
+  const mine = (S.d.profiles || []).find(p => p.id === S.me.id); if (mine) mine.last_seen = now;
+  renderPresence();
+  try { await store.update('profiles', S.me.id, { last_seen: now }); } catch (e) { console.warn('presença', e); }
 }
+/* voltou para o app (desbloqueou o celular / trocou de aba): avisa na hora que está online */
+document.addEventListener('visibilitychange', () => { if (!document.hidden) heartbeat(); else renderPresence(); });
+window.addEventListener('focus', () => heartbeat());
 
 /* =====================================================================
    AUTENTICAÇÃO — senha simples (mín. 6 caracteres)
@@ -548,7 +554,7 @@ async function startSession(userId) {
   S.route = (location.hash.replace(/^#\/?/, '') || 'painel').split('?')[0];
   render(); tick(); setTimeout(releaseNotice, 800); checkVersion();
   timers.forEach(clearInterval);
-  timers = [setInterval(tick, 60000), setInterval(heartbeat, 60000), setInterval(checkVersion, 30 * 60000), setInterval(() => { if (!document.hidden && !$('#modal-root').innerHTML && ['painel', 'equipe'].includes(S.route)) renderViewSoft(); if (CW.open) renderChat(); renderPresence(); }, 30000)];
+  timers = [setInterval(tick, 60000), setInterval(heartbeat, 45000), setInterval(checkVersion, 30 * 60000), setInterval(() => { if (!document.hidden && !$('#modal-root').innerHTML && ['painel', 'equipe'].includes(S.route)) renderViewSoft(); if (CW.open) renderChat(); renderPresence(); }, 30000)];
   armLock();
 }
 async function logout(silent) {
@@ -1134,7 +1140,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.4.0', notes: [
+const RELEASE = { version: '2.4.1', notes: [
+  'Status online corrigido: você aparece online na hora em que abre ou volta para o app.',
   'Painel conectado a todo o Bravus Work: novo resumo do mês com reuniões, tarefas, prospecções, clientes, conteúdo e financeiro, cada um levando para a sua aba.',
   'Reuniões que já passaram sem resultado aparecem nas Prioridades de hoje e no card de Reuniões; um toque e você marca Realizada ou Faltou.',
   'Dá para registrar uma reunião que já aconteceu: se a data/hora já passou, ela entra como Realizada e conta na hora.',
