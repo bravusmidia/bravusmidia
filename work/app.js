@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.8.3';
+const VERSION = '2.8.4';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -1278,7 +1278,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.8.3', notes: [
+const RELEASE = { version: '2.8.4', notes: [
+  'Avisos de tudo: mensagens do chat sempre notificam a equipe, e também exclusões (reunião, tarefa, cobrança, despesa, conteúdo) e anotações nos clientes.',
   'Avisos para a equipe: tudo que alguém faz no app (reunião marcada, remarcada, realizada, cliente, pagamento, anotação…) gera um aviso para os outros. A Priscila recebe o que o Andrade faz e vice-versa.',
   'Lembretes de compromisso: além dos seus, você recebe o lembrete das reuniões e compromissos com horário dos outros da equipe (ex.: “Reunião de Andrade às 20:30”).',
   'Reuniões: ao escolher “Remarcada”, o app pede a nova data e o novo horário e move a própria reunião. Ela conta uma vez só e fica marcada com “↻ Remarcada”. No quadro “Já passaram” há o botão ↻ Remarcar.',
@@ -1797,7 +1798,7 @@ const A = {
   finMonth: d => { S.finMonth = d.m; renderView(); },
   newInvoice: () => { if (!S.d.clients.length) return toast('Cadastre um cliente primeiro', '', 'warn'); invoiceForm({}); },
   editInvoice: d => invoiceForm(S.d.invoices.find(i => i.id === d.id)),
-  delInvoice: d => { const i = S.d.invoices.find(x => x.id === d.id) || {}; return confirmBox(`Tem certeza que quer excluir a cobrança de ${esc(cname(i.client_id) || '')}?`, `${brl(i.amount)} · vence ${fdate(i.due_date)}. Não dá para desfazer. Prefira “Cancelado” para manter o histórico.`, 'Sim, excluir cobrança', async () => { await store.remove('invoices', d.id); await refresh(); }, true); },
+  delInvoice: d => { const i = S.d.invoices.find(x => x.id === d.id) || {}; return confirmBox(`Tem certeza que quer excluir a cobrança de ${esc(cname(i.client_id) || '')}?`, `${brl(i.amount)} · vence ${fdate(i.due_date)}. Não dá para desfazer. Prefira “Cancelado” para manter o histórico.`, 'Sim, excluir cobrança', async () => { await store.remove('invoices', d.id); await log(`Excluiu a cobrança de ${cname(i.client_id) || 'cliente'} (${brl(i.amount)})`, i.client_id || null); await refresh(); }, true); },
   genInvoices: async d => {
     const k = d.m; const n = await genMonthInvoices(k);
     await log(`Gerou ${n} mensalidade(s) de ${k}`); toast(n ? `${n} mensalidade(s) criada(s)` : 'Tudo já estava gerado', '', 'ok'); await refresh();
@@ -1810,10 +1811,10 @@ const A = {
   },
   chargeWa: d => { const i = S.d.invoices.find(x => x.id === d.id); log('Abriu lembrete de cobrança no WhatsApp', i && i.client_id); },
   newExpense: () => modal('Nova despesa', `<div class="f">${fld('Descrição *', 'description', '', 'text', 'required')}<div class="f2">${fld('Valor (R$) *', 'amount', '', 'number', 'step="0.01" min="0.01" required')}${fld('Data', 'date', today(), 'date', 'required')}</div>${sel('Categoria', 'category', ['Ferramentas', 'Equipe', 'Impostos', 'Anúncios próprios', 'Equipamentos', 'Outros'])}</div>`, { form: 'saveExpense', footer: `<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` }),
-  delExpense: d => { const x = S.d.expenses.find(e => e.id === d.id) || {}; return confirmBox(`Tem certeza que quer excluir a despesa “${esc(x.description || '')}”?`, `${brl(x.amount)} · ${fdate(x.date)}. Não dá para desfazer.`, 'Sim, excluir despesa', async () => { await store.remove('expenses', d.id); await refresh(); }, true); },
+  delExpense: d => { const x = S.d.expenses.find(e => e.id === d.id) || {}; return confirmBox(`Tem certeza que quer excluir a despesa “${esc(x.description || '')}”?`, `${brl(x.amount)} · ${fdate(x.date)}. Não dá para desfazer.`, 'Sim, excluir despesa', async () => { await store.remove('expenses', d.id); await log(`Excluiu a despesa “${x.description || ''}” (${brl(x.amount)})`); await refresh(); }, true); },
   newTask: () => isAdmin() ? taskForm({}) : toast('Membros só adicionam reuniões', 'Use “+ Reunião”.', 'warn'), editTask: d => { const t = S.d.tasks.find(t => t.id === d.id); return t && t.kind === 'reuniao' ? meetForm(t) : taskForm(t); },
   newTemplate: () => taskForm({}, true), editTemplate: d => taskForm(S.d.tasks.find(t => t.id === d.id), true),
-  delTask: d => { const t = S.d.tasks.find(x => x.id === d.id) || {}; const isM = t.kind === 'reuniao'; return confirmBox(isM ? `Tem certeza que quer excluir a reunião com ${esc(meetWho(t))}?` : `Tem certeza que quer excluir a tarefa “${esc(t.title || '')}”?`, `${t.date ? fdate(t.date) : ''}${t.time ? ' às ' + esc(t.time) : ''}${t.date ? ' · ' : ''}Não dá para desfazer.`, isM ? 'Sim, excluir reunião' : 'Sim, excluir tarefa', async () => { await store.remove('tasks', d.id); closeModal(); await refresh(); }, true); },
+  delTask: d => { const t = S.d.tasks.find(x => x.id === d.id) || {}; const isM = t.kind === 'reuniao'; return confirmBox(isM ? `Tem certeza que quer excluir a reunião com ${esc(meetWho(t))}?` : `Tem certeza que quer excluir a tarefa “${esc(t.title || '')}”?`, `${t.date ? fdate(t.date) : ''}${t.time ? ' às ' + esc(t.time) : ''}${t.date ? ' · ' : ''}Não dá para desfazer.`, isM ? 'Sim, excluir reunião' : 'Sim, excluir tarefa', async () => { await store.remove('tasks', d.id); await log(isM ? `Excluiu a reunião com ${meetWho(t)}${t.date ? ' · ' + fdate(t.date) + (t.time ? ' ' + t.time : '') : ''}` : `Excluiu a tarefa “${t.title || ''}”`, t.client_id || null); closeModal(); await refresh(); }, true); },
   personTasks: d => { if (!$('#modal-root .pt-row') && !$('#modal-root .empty')) PT_JUST.clear(); personTasks(d.id, d.m || 'late'); },
   ptCheck: async d => {
     const t = S.d.tasks.find(x => x.id === d.id); if (!t) return;
@@ -1872,7 +1873,7 @@ const A = {
     toast('Evento enviado ao calendário', EMBED ? 'Google Agenda aberto em nova aba.' : 'Abra o arquivo .ics para adicionar no iPhone/Android.');
   },
   editContent: d => (!d.id && !isAdmin()) ? toast('Membros só adicionam reuniões', '', 'warn') : contentForm(d.id ? S.d.content.find(c => c.id === d.id) : {}),
-  delContent: d => { const c = S.d.content.find(x => x.id === d.id) || {}; return confirmBox(`Tem certeza que quer excluir o conteúdo “${esc(c.title || '')}”?`, 'Não dá para desfazer.', 'Sim, excluir conteúdo', async () => { await store.remove('content', d.id); await refresh(); }, true); },
+  delContent: d => { const c = S.d.content.find(x => x.id === d.id) || {}; return confirmBox(`Tem certeza que quer excluir o conteúdo “${esc(c.title || '')}”?`, 'Não dá para desfazer.', 'Sim, excluir conteúdo', async () => { await store.remove('content', d.id); await log(`Excluiu o conteúdo “${c.title || ''}”`); await refresh(); }, true); },
   cNext: async (d, el, ev) => {
     const c = S.d.content.find(x => x.id === d.id); const i = CST.findIndex(s => s[0] === c.status);
     if (c.status === 'aprovacao' && !isAdmin()) return toast('Aguardando aprovação do Andrade', '', 'warn');
@@ -1973,7 +1974,7 @@ const F = {
     if (!on && v.send_msg) return noticeModal('shutdown', c.id);
     if (v.from === 'detail') clientDetail(c.id);
   },
-  clientNote: async v => { if (!v.text.trim()) return; await store.insert('activity', { user_id: S.me.id, action: v.text.trim(), client_id: v.id }); await refresh(); clientDetail(v.id); },
+  clientNote: async v => { if (!v.text.trim()) return; await log(`Anotação em ${cname(v.id)}: ${v.text.trim()}`.slice(0, 300), v.id); await refresh(); clientDetail(v.id); },
 
   saveInvoice: async v => {
     const row = { client_id: v.client_id, amount: num(v.amount), due_date: v.due_date, description: v.description, payment_url: v.payment_url || null };
@@ -2044,7 +2045,7 @@ const F = {
   sendMsg: async (v, fd, form) => {
     const text = (v.text || '').trim(); if (!text) return;
     form.text.value = ''; await store.insert('messages', { user_id: S.me.id, text });
-    if ((S.set.notify || {}).chat !== false) await notifyUsers(team().filter(p => p.id !== S.me.id).map(p => p.id), `Mensagem de ${firstName(S.me.id)}`, text.slice(0, 120), 'chat', null, 'chat');
+    await notifyUsers(team().filter(p => p.id !== S.me.id).map(p => p.id), `💬 Mensagem de ${firstName(S.me.id)}`, text.slice(0, 120), 'chat', null, 'chat');
     await loadAll('messages'); renderChat(true); $('#chatInput') && $('#chatInput').focus();
   },
   sendNote: async (v, fd, form) => {
