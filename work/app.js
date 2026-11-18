@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.8.0';
+const VERSION = '2.8.1';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -1036,7 +1036,7 @@ const m2hm = m => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
 const WD = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const dayName = (ds, i) => i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : WD[new Date(ds + 'T12:00:00').getDay()];
 const busyMeet = t => !['cancelada', 'remarcada', 'noshow'].includes(t.status);
-/* regra dos membros (não admin): seg–sex só a partir das 18:30; sábado, domingo e feriado em qualquer horário. Admin é livre. */
+/* v2.8.1: reuniões liberadas em qualquer horário para todos (admin e membros) */
 const MEMBER_MEET_START = '18:30';
 const HOL = {};
 function holidays(y) {
@@ -1067,8 +1067,8 @@ function upcomingDates(n) {
 const GCAL_HOL = 'https://calendar.google.com/calendar/u/0/r?cid=' + encodeURIComponent('pt-br.brazilian#holiday@group.v.calendar.google.com');
 const holidayName = ds => ds ? holidays(+ds.slice(0, 4))[ds] || '' : '';
 const meetFreeDay = ds => { const w = new Date(ds + 'T12:00:00').getDay(); return w === 0 || w === 6 || !!holidayName(ds); };
-const meetAllowed = (ds, tm) => isAdmin() || !ds || meetFreeDay(ds) || hm2m(tm) >= hm2m(MEMBER_MEET_START);
-const meetRuleMsg = ds => holidayName(ds) ? `Feriado (${holidayName(ds)}): pode marcar em qualquer horário.` : meetFreeDay(ds) ? 'Fim de semana: pode marcar em qualquer horário.' : `Segunda a sexta: reuniões a partir das ${MEMBER_MEET_START}.`;
+const meetAllowed = () => true;
+const meetRuleMsg = ds => holidayName(ds) ? `Feriado (${holidayName(ds)}): pode marcar em qualquer horário.` : 'Pode marcar em qualquer horário.';
 function daySlots(ds, who) {
   const dur = Math.max(15, +S.set.meet_slot || 60), st = hm2m(S.set.meetings_start || '18:30'), en = Math.max(hm2m(S.set.meetings_end || '21:30'), st + dur);
   const ms = meetings().filter(t => t.date === ds && t.time && busyMeet(t) && (!who || t.assignee === who));
@@ -1233,7 +1233,7 @@ function taskForm(t = {}, template = false) {
     <div class="f2">${fld('Meta (quantidade, opcional)', 'goal', t.goal || '', 'number', 'min="0" placeholder="ex.: 15"')}${sel('Avisar antes', 'remind_min', [[0, 'Na hora'], [5, '5 min'], [10, '10 min'], [15, '15 min'], [30, '30 min'], [60, '1 hora']], t.remind_min ?? S.set.remind_default)}</div>
     ${area('Descrição', 'description', t.description)}
     ${isAdmin() && !template ? `<label class="sw"><input type="checkbox" name="override"> Permitir ligação fora da regra (antes das ${S.set.calls_start})</label>` : ''}
-    ${!template ? `<p class="note">Regra: ligações a partir das ${S.set.calls_start}. Reuniões: administrador em qualquer horário; membros de segunda a sexta a partir das ${MEMBER_MEET_START}, e em qualquer horário no fim de semana e feriados.</p>` : ''}
+    ${!template ? `<p class="note">Regra: ligações a partir das ${S.set.calls_start}. Reuniões: qualquer horário, qualquer dia.</p>` : ''}
   </div>`, { form: 'saveTask', footer: `${t.id ? `<button type="button" class="btn bad" data-act="delTask" data-id="${t.id}">${ic('trash')}</button>${!template && t.date ? `<button type="button" class="btn" data-act="taskCal" data-id="${t.id}" title="Adicionar ao calendário">${ic('cal')}<span class="hide-m">Calendário</span></button>` : ''}<span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
 }
 
@@ -1262,7 +1262,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.8.0', notes: [
+const RELEASE = { version: '2.8.1', notes: [
+  'Reuniões: agora todos (inclusive a Priscila) podem marcar reunião em qualquer horário, qualquer dia. A trava das 18:30 saiu.',
   'Reuniões: novo “Andamento pós-reunião”. Cada negócio fechado ou em negociação mostra o passo a passo: Reunião → Proposta → Contrato → Pagamento → Onboarding → Operação rodando. Toque na etapa para marcar; Reunião e Pagamento marcam sozinhos.',
   'Reuniões: os “Horários da semana” agora ficam recolhidos num botão. Toque em “Ver horários” para abrir.',
   'Agenda: o número do botão de somar (antes fixo em +5) agora é editável. Toque no número, digite quanto quer somar (ex.: 10, 20) e toque no +. O app lembra o número de cada rotina neste aparelho.',
@@ -1290,7 +1291,7 @@ const RELEASE = { version: '2.8.0', notes: [
   'Reuniões que já passaram sem resultado aparecem nas Prioridades de hoje e no card de Reuniões; um toque e você marca Realizada ou Faltou.',
   'Dá para registrar uma reunião que já aconteceu: se a data/hora já passou, ela entra como Realizada e conta na hora.',
   'Reuniões fora do horário padrão (ex.: 12:00) agora aparecem ocupando o horário na semana.',
-  'Membros (Priscila): reuniões de segunda a sexta a partir das 18:30; sábado, domingo e feriados em qualquer horário. O administrador marca e edita em qualquer horário.',
+  'Reuniões: todos marcam em qualquer horário, qualquer dia.',
   'Excluir cliente: só o administrador (também travado no banco).',
   'Feriados no calendário (os mesmos do Google Agenda, mais Ceará e Fortaleza) e datas comerciais (Dia das Mães, Black Friday…). Aviso 7 dias antes para criar panfleto, flyer e desconto.',
   'Reuniões: agora dá para marcar em qualquer horário, sem trava de regra.',
@@ -1600,7 +1601,7 @@ const A = {
     modal('Adicionar membro à equipe', `<div class="f">
       <div class="f2">${fld('Nome *', 'name', '', 'text', 'required maxlength="80" placeholder="ex.: Teste Bravus"')}${fld('E-mail de acesso *', 'email', '', 'email', 'required autocomplete="off" placeholder="nome@email.com"')}</div>
       <div class="f2"><label class="fl">Senha *<div class="row" style="gap:6px"><input name="pin" id="nmPin" value="${sug}" minlength="6" required autocomplete="off" style="flex:1"><button type="button" class="btn sm" data-act="genPin">Gerar</button></div></label>${fld('Cargo', 'title', '', 'text', 'maxlength="60" list="cargos" placeholder="ex.: Social media"')}<datalist id="cargos">${CARGOS.map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
-      ${sel('Acesso', 'role', [['comercial', 'Membro — vê tudo e adiciona reuniões (seg–sex a partir das 18:30; fim de semana e feriado livre)'], ['admin', 'Administrador — pode alterar tudo']], 'comercial')}
+      ${sel('Acesso', 'role', [['comercial', 'Membro — vê tudo e adiciona reuniões (qualquer horário)'], ['admin', 'Administrador — pode alterar tudo']], 'comercial')}
       <p class="note">O e-mail pode ser inventado para teste (ex.: teste@bravusmidia.com.br): o acesso já sai liberado, sem confirmação por e-mail. Depois de criar, eu mostro o acesso pronto para copiar ou mandar no WhatsApp.</p></div>`,
       { form: 'saveMember', footer: `<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Criar membro</button>` }); },
   genPin: () => { const el = $('#nmPin'); if (el) el.value = 'bravus' + Math.floor(1000 + Math.random() * 9000); },
