@@ -12,3 +12,8 @@ html.dark * { scrollbar-color: #334155 transparent; }
 input[type='datetime-local'], input[type='date'] { min-width: 0; }
 @media (min-width: 1920px) { html { font-size: 17px; } }   /* TVs e telas grandes */
 @media (min-width: 2560px) { html { font-size: 19px; } }
+/* listas suspensas (select): no tema escuro as opções ficavam com texto claro em fundo branco */
+select option, select optgroup { background-color: #FFFFFF; color: #101828; }
+html.dark select option, html.dark select optgroup { background-color: #0F172A; color: #F1F5F9; }
+html.dark select option:checked { background-color: #1D4ED8; color: #FFFFFF; }
+html.dark select option:disabled { color: #64748B; }
