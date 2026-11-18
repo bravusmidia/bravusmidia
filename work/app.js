@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.8.1';
+const VERSION = '2.8.2';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -1012,7 +1012,11 @@ const TICKETS = [['baixo', 'Baixo', 'ok'], ['medio', 'Médio', 'warn'], ['alto',
 const ticketChip = t => { const x = TICKETS.find(k => k[0] === t.ticket); return x ? `<span class="chip ${x[2]}" title="Ticket ${x[1]}">${ic('wallet')}${x[1]}</span>` : ''; };
 const ticketPick = v => `<div class="fl">Ticket<div class="seg" role="radiogroup">${[['', 'Sem ticket', ''], ...TICKETS].map(x => `<label class="${x[2]}"><input type="radio" name="ticket" value="${x[0]}" ${(v || '') === x[0] ? 'checked' : ''}><span>${x[1]}</span></label>`).join('')}</div></div>`;
 const lbl = (L, k) => (L.find(x => x[0] === k) || ['', k || '—'])[1];
-const meetings = () => realTasks().filter(t => t.kind === 'reuniao');
+/* v2.8.2: remarcar move a própria reunião para a nova data/hora — registros antigos com status "remarcada" eram duplicados e não contam mais */
+const meetings = () => realTasks().filter(t => t.kind === 'reuniao' && t.status !== 'remarcada');
+const RESCH = '↻ Remarcada de ';
+const reschFrom = t => { const m = String(t.description || '').match(/↻ Remarcada de ([^\n]+)/g); return m ? m.map(x => x.slice(RESCH.length)) : []; };
+const reschChip = t => { const r = reschFrom(t); return r.length ? `<span class="chip warn" title="${esc('Remarcada de ' + r.join(', '))}">↻ Remarcada${r.length > 1 ? ' ' + r.length + 'x' : ''}</span>` : ''; };
 const meetWho = t => t.company || (t.client_id && cname(t.client_id)) || t.contact_name || t.title;
 const meetChip = t => { const s = t.status === 'pendente' && isLate(t) ? ['warn', 'Aguardando resultado'] : [{ feito: 'ok', noshow: 'bad', cancelada: 'bad', remarcada: 'warn' }[t.status] || 'blue', lbl(MSTATUS, t.status)]; return `<span class="chip ${s[0]}">${esc(s[1])}</span>`; };
 /* lê a conversa colada do WhatsApp e tenta achar data, hora e telefone */
@@ -1145,7 +1149,7 @@ V.reunioes = () => {
   const prev = all.filter(t => ym(t.date) === shift(-1)).length;
   const next = all.filter(t => t.status === 'pendente' && (t.date > today() || (t.date === today() && (t.time || '') >= nowHM()))).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
   const pend = all.filter(t => t.status === 'pendente' && isLate(t));
-  const row = t => `<div class="li"><div class="mtime ${t.date === today() ? 'hj' : ''}" data-act="editMeet" data-id="${t.id}"><b>${esc(t.time || '--:--')}</b><small>${t.date === today() ? 'Hoje' : t.date === iso(new Date(Date.now() + 864e5)) ? 'Amanhã' : WD[new Date(t.date + 'T12:00:00').getDay()] + ' ' + fdate(t.date)}</small></div><div class="t" data-act="editMeet" data-id="${t.id}" style="cursor:pointer"><b>${esc(meetWho(t))}${t.contact_name && t.company ? ` <span class="muted" style="font-weight:400">· ${esc(t.contact_name)}</span>` : ''}</b><small>${esc(lbl(MTYPES, t.meet_type || 'comercial'))} · ${esc(lbl(MFORMATS, t.meet_format || 'meet'))} · ${esc(firstName(t.assignee))}${t.outcome ? ' · ' + esc(lbl(MOUT, t.outcome)) : ''}</small></div>${ticketChip(t)}${meetChip(t)}</div>`;
+  const row = t => `<div class="li"><div class="mtime ${t.date === today() ? 'hj' : ''}" data-act="editMeet" data-id="${t.id}"><b>${esc(t.time || '--:--')}</b><small>${t.date === today() ? 'Hoje' : t.date === iso(new Date(Date.now() + 864e5)) ? 'Amanhã' : WD[new Date(t.date + 'T12:00:00').getDay()] + ' ' + fdate(t.date)}</small></div><div class="t" data-act="editMeet" data-id="${t.id}" style="cursor:pointer"><b>${esc(meetWho(t))}${t.contact_name && t.company ? ` <span class="muted" style="font-weight:400">· ${esc(t.contact_name)}</span>` : ''}</b><small>${esc(lbl(MTYPES, t.meet_type || 'comercial'))} · ${esc(lbl(MFORMATS, t.meet_format || 'meet'))} · ${esc(firstName(t.assignee))}${t.outcome ? ' · ' + esc(lbl(MOUT, t.outcome)) : ''}${reschFrom(t).length ? ` · <span style="color:var(--warn,#ffbe50)">antes: ${esc(reschFrom(t).slice(-1)[0])}</span>` : ''}</small></div>${ticketChip(t)}${reschChip(t)}${meetChip(t)}</div>`;
   return head('Reuniões', 'Bravus Meetings · tudo que você marca com clientes, organizado e contado', `<button class="btn pri" data-act="editMeet">${ic('plus')}Reunião</button>`) + `
     <div class="row wrap" style="gap:10px;margin-bottom:14px"><div class="datebar" style="margin:0"><button class="btn sm ic" data-act="meetMonth" data-m="${shift(-1)}">${ic('left')}</button><b>${label}</b><button class="btn sm ic" data-act="meetMonth" data-m="${shift(1)}">${ic('right')}</button></div><span class="sp"></span>
       <div class="tabs" style="margin:0">${[['', 'Todos'], ...team().map(p => [p.id, p.name.split(' ')[0]])].map(x => `<button data-act="meetWho" data-id="${x[0]}" class="${mine === x[0] ? 'on' : ''}">${esc(x[1])}</button>`).join('')}</div></div>
@@ -1158,7 +1162,7 @@ V.reunioes = () => {
       ${kpi('Comparecimento', decided ? Math.round(real.length / decided * 100) + '%' : '—', 'realizadas ÷ (realizadas + faltas)')}
       ${kpi('Fecharam', `<span style="color:var(--ok)">${won.length}</span>`, `${com.length ? Math.round(won.length / com.length * 100) : 0}% das comerciais · ${ms.filter(t => t.outcome === 'negociando').length} em negociação`)}
     </div>
-    ${pend.length ? `<div class="card" style="margin-bottom:14px;border-color:rgba(255,190,80,.45)"><h3>${ic('bell')}Já passaram — como foi? (${pend.length})</h3><div class="list">${pend.slice(0, 8).map(t => `<div class="li"><div class="t"><b>${esc(meetWho(t))}</b><small>${fdate(t.date)} ${esc(t.time || '')}</small></div><button class="btn sm ok" data-act="meetSet" data-id="${t.id}" data-s="feito">${ic('check')}Realizada</button><button class="btn sm" data-act="meetSet" data-id="${t.id}" data-s="noshow">Faltou</button></div>`).join('')}</div></div>` : ''}
+    ${pend.length ? `<div class="card" style="margin-bottom:14px;border-color:rgba(255,190,80,.45)"><h3>${ic('bell')}Já passaram — como foi? (${pend.length})</h3><div class="list">${pend.slice(0, 8).map(t => `<div class="li"><div class="t"><b>${esc(meetWho(t))}</b><small>${fdate(t.date)} ${esc(t.time || '')}</small></div><button class="btn sm ok" data-act="meetSet" data-id="${t.id}" data-s="feito">${ic('check')}Realizada</button><button class="btn sm" data-act="meetSet" data-id="${t.id}" data-s="noshow">Faltou</button><button class="btn sm" data-act="meetResch" data-id="${t.id}">↻ Remarcar</button></div>`).join('')}</div></div>` : ''}
     <div class="grid g2">
       <div class="card"><h3>${ic('cal')}Próximas</h3><div class="list">${next.length ? next.slice(0, 10).map(t => row(t).replace('</div><span', `</div>${t.phone || (client(t.client_id) || {}).whatsapp ? `<button class="btn sm ic" data-act="meetConfirm" data-id="${t.id}" title="Confirmar no WhatsApp">${ic('wa')}</button>` : ''}<span`)).join('') : empty('Nenhuma reunião marcada. Use “+ Reunião”.')}</div></div>
       <div class="card"><h3>${ic('chat')}Por tipo no mês</h3><div class="list">${MTYPES.map(([kk, nm]) => { const n = ms.filter(t => (t.meet_type || 'comercial') === kk).length; return n ? `<div class="li"><div class="t"><b style="font-weight:500">${esc(nm)}</b></div><b class="num">${n}</b></div>` : ''; }).join('') || empty('Sem reuniões neste mês.')}</div></div>
@@ -1178,6 +1182,7 @@ function meetForm(t = {}) {
     ${ticketPick(t.ticket)}
     <p class="note" id="meetRule" style="margin:0"></p>
     <div class="f2">${sel('Status', 'status', MSTATUS, t.status || 'pendente')}${sel('Resultado', 'outcome', MOUT, t.outcome || '')}</div>
+    <div id="reschBox" class="card" style="display:none;padding:12px;border-color:rgba(255,190,80,.45)"><b style="display:block;margin-bottom:8px">↻ Para quando foi remarcada?</b><div class="f2">${fld('Nova data *', 'new_date', t.date || today(), 'date')}${fld('Novo horário *', 'new_time', t.time || S.set.meetings_start, 'time')}</div><p class="note" style="margin:6px 0 0">A reunião é movida para a nova data e volta para “Agendada”. Ela continua contando <b>uma vez só</b>.</p></div>
     ${area('Anotações', 'description', t.description)}
   </div>`, { form: 'saveMeet', footer: `${t.id ? `<button type="button" class="btn bad" data-act="delTask" data-id="${t.id}">${ic('trash')}</button>${t.outcome === 'fechou' && !t.client_id ? `<button type="button" class="btn ok" data-act="meetToClient" data-id="${t.id}">${ic('plus')}Virar cliente</button>` : ''}<span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
   const fm = $('#modal-root form[data-form="saveMeet"]'); let stTouched = !!t.id;
@@ -1185,7 +1190,8 @@ function meetForm(t = {}) {
     if (!stTouched && fm.status.value !== 'feito' && passed) fm.status.value = 'feito'; if (!stTouched && !passed && fm.status.value === 'feito') fm.status.value = 'pendente';
     const ok = meetAllowed(ds, tm); const msg = isAdmin() ? (passed && !t.id ? 'Esta reunião já aconteceu: ela entra como Realizada e já conta no painel.' : '') : (ok ? meetRuleMsg(ds) : `Fora do horário permitido. ${meetRuleMsg(ds)}`) + (passed && !t.id && ok ? ' Já aconteceu: entra como Realizada.' : '');
     if (r) { r.textContent = msg; r.style.display = msg ? '' : 'none'; r.style.color = ok ? '' : 'var(--bad,#ff6b7a)'; } };
-  if (fm) { fm.status.addEventListener('change', () => { stTouched = true; }); fm.date.addEventListener('input', chk); fm.time.addEventListener('input', chk); chk(); }
+  const rs = () => { const b = $('#reschBox'); if (!b || !fm) return; const on = fm.status.value === 'remarcada'; b.style.display = on ? '' : 'none'; fm.new_date.required = on; fm.new_time.required = on; };
+  if (fm) { fm.status.addEventListener('change', () => { stTouched = true; rs(); }); rs(); fm.date.addEventListener('input', chk); fm.time.addEventListener('input', chk); chk(); }
   const wa = $('#waPaste'); if (wa) wa.addEventListener('input', () => { const p = parseWa(wa.value), f = wa.form; if (p.date) f.date.value = p.date; if (p.time) f.time.value = p.time; if (p.phone && !f.phone.value) f.phone.value = p.phone; chk(); });
   const cs = $('#modal-root select[name="client_id"]'); if (cs) cs.addEventListener('change', () => { const x = client(cs.value), f = cs.form; if (!x) return; f.company.value = x.name; if (!f.contact_name.value) f.contact_name.value = x.contact || ''; if (!f.phone.value) f.phone.value = x.whatsapp || x.phone || ''; f.meet_type.value = 'alinhamento'; });
 }
@@ -1671,6 +1677,7 @@ const A = {
     const nm = lbl(PIPE, d.s); if (on) { await log(`${meetWho(t)}: ${PIPE.find(x => x[0] === d.s)[2].toLowerCase()}`, t.client_id); if (d.s === 'operacao') await notifyTeam(`Operação rodando: ${meetWho(t)} 🚀`, `Marcado por ${firstName(S.me.id)}`, 'pago', `pipe:${t.id}:op`, 'reunioes'); }
     toast(on ? `${nm} ✓` : `${nm} desmarcado`, meetWho(t), on ? 'ok' : ''); await refresh(); },
   meetSlot: d => meetForm({ date: d.d, time: d.t }), meetWho: d => { S.meetWho = d.id; renderView(); }, meetTicket: d => { S.meetTicket = d.id; renderView(); },
+  meetResch: d => { const t = S.d.tasks.find(x => x.id === d.id); if (!t) return; meetForm(t); const f = $('#modal-root form[data-form="saveMeet"]'); if (f) { f.status.value = 'remarcada'; f.status.dispatchEvent(new Event('change')); f.new_date.focus(); } },
   meetSet: async d => { const t = S.d.tasks.find(x => x.id === d.id); if (!t) return; await store.update('tasks', t.id, { status: d.s, done_at: d.s === 'feito' ? new Date().toISOString() : null }); await log(`Reunião com ${meetWho(t)}: ${lbl(MSTATUS, d.s).toLowerCase()}`, t.client_id); toast('Reunião atualizada', lbl(MSTATUS, d.s), 'ok'); await refresh(); if (d.s === 'feito') meetForm(S.d.tasks.find(x => x.id === d.id)); },
   meetConfirm: d => { const t = S.d.tasks.find(x => x.id === d.id); if (!t) return; const c = client(t.client_id) || {}; const ph = t.phone || c.whatsapp || c.phone; const dia = t.date === today() ? 'hoje' : `no dia ${fdate(t.date)}`;
     window.open(waTo({ whatsapp: ph }, `Olá${t.contact_name ? ', ' + t.contact_name.split(' ')[0] : ''}! Passando para confirmar nossa reunião ${dia} às ${t.time}${t.meet_format === 'meet' ? ' pelo Google Meet' : t.meet_format === 'presencial' ? '' : t.meet_format === 'ligacao' ? ' por ligação' : ' por vídeo no WhatsApp'}. Posso confirmar? 😊`), '_blank', 'noopener'); log(`Enviou confirmação de reunião para ${meetWho(t)}`, t.client_id); },
@@ -1976,6 +1983,15 @@ const F = {
     const who = (v.company || '').trim() || (c && c.name) || (v.contact_name || '').trim();
     if (!who) return toast('Informe o nome do contato ou a empresa', '', 'bad');
     const old = v.id ? S.d.tasks.find(x => x.id === v.id) || {} : {};
+    let resch = '';
+    if (v.status === 'remarcada') {
+      if (!v.new_date || !v.new_time) return toast('Informe a nova data e o novo horário', '', 'bad');
+      const fromD = old.date || v.date, fromT = old.time || v.time;
+      if (v.new_date === fromD && v.new_time === fromT) return toast('A nova data/horário é igual à atual', 'Escolha outro dia ou horário para remarcar.', 'bad');
+      resch = `${fdate(fromD)} ${fromT}`;
+      v.description = `${(v.description || '').trim()}${(v.description || '').trim() ? '\n' : ''}${RESCH}${resch} → ${fdate(v.new_date)} ${v.new_time}`;
+      v.date = v.new_date; v.time = v.new_time; v.status = 'pendente';
+    }
     if (!isAdmin() && (!v.id || old.date !== v.date || old.time !== v.time) && !meetAllowed(v.date, v.time)) return toast('Horário fora da regra', meetRuleMsg(v.date), 'bad');
     const row = { title: `Reunião · ${who}`, kind: 'reuniao', date: v.date, time: v.time, assignee: v.assignee || S.me.id, client_id: v.client_id || null, description: v.description, priority: 'alta', remind_min: 30,
       contact_name: (v.contact_name || '').trim() || null, company: (v.company || '').trim() || null, phone: (v.phone || '').trim() || null, meet_type: v.meet_type, meet_format: v.meet_format, ticket: v.ticket || null };
@@ -1984,6 +2000,7 @@ const F = {
     const save = r => v.id ? store.update('tasks', v.id, r) : store.insert('tasks', { status: 'pendente', ...r, count: 0, is_template: false });
     try { await save(row); } catch (e) { const m = e && e.message || ''; if (/ticket/i.test(m)) { delete row.ticket; await save(row); toast('Reunião salva sem o ticket', 'Falta rodar o SQL v2.2 (ticket) no Supabase.', 'warn'); } else { if (!/column|contact_name|company|meet_|outcome|phone/i.test(m)) throw e; extra.forEach(x => delete row[x]); await save(row); toast('Reunião salva sem os detalhes', 'O banco ainda não tem os campos de reunião (SQL v1.4).', 'warn'); } }
     const st = row.status || 'pendente';
+    if (resch) { await log(`Remarcou reunião com ${who}: ${resch} → ${fdate(v.date)} ${v.time}`, row.client_id); await notifyTeam(`Reunião remarcada com ${who}`, `De ${resch} para ${fdate(v.date)} às ${v.time} · por ${firstName(S.me.id)}`, 'tarefa', `resch:${v.id || who}:${v.date}${v.time}`, 'reunioes'); closeModal(); toast('Reunião remarcada', `${who} · ${fdate(v.date)} às ${v.time}`, 'ok'); return refresh(); }
     if (!v.id && st === 'pendente') { await log(`Marcou reunião com ${who} · ${fdate(v.date)} ${v.time}`, row.client_id); await notifyTeam(`Reunião marcada com ${who}`, `${fdate(v.date)} às ${v.time} · ${firstName(row.assignee)} · por ${firstName(S.me.id)}`, 'tarefa', null, 'reunioes'); }
     else if (st !== (old.status || 'pendente') && st !== 'pendente' && v.outcome !== 'fechou') { await log(`Reunião com ${who} (${fdate(v.date)} ${v.time}): ${lbl(MSTATUS, st).toLowerCase()}`, row.client_id); await notifyTeam(`Reunião com ${who}: ${lbl(MSTATUS, st).toLowerCase()}`, `${fdate(v.date)} às ${v.time} · registrado por ${firstName(S.me.id)}`, 'tarefa', `meet:${v.id || who + v.date + v.time}:${st}`, 'reunioes'); }
     if (v.outcome === 'fechou' && old.outcome !== 'fechou') { await log(`Reunião com ${who}: fechou negócio 🎉`, row.client_id); await notifyTeam(`Fechou negócio com ${who}! 🎉`, `Registrado por ${firstName(S.me.id)}`, 'pago', `won:${v.id || who + v.date}`, 'reunioes'); }
