@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.8.5';
+const VERSION = '2.8.6';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -650,7 +650,7 @@ function armLock() {
    ===================================================================== */
 const NAV = [
   ['painel', 'Painel', 'grid'], ['clientes', 'Clientes', 'users'],
-  ['financeiro', 'Financeiro', 'wallet', 'fin'], ['agenda', 'Agenda', 'cal'], ['reunioes', 'Reuniões', 'meet'], ['crm', 'Bravus Lead · CRM', 'funnel', null, 'https://www.bravusmidia.com.br/crm/'], ['metas', 'Metas', 'target'], ['conteudo', 'Conteúdo', 'film'],
+  ['financeiro', 'Financeiro', 'wallet', 'fin'], ['agenda', 'Agenda', 'cal'], ['reunioes', 'Reuniões', 'meet'], ['crm', 'CRM', 'funnel', null, 'https://www.bravusmidia.com.br/crm/'], ['metas', 'Metas', 'target'], ['conteudo', 'Conteúdo', 'film'],
   ['equipe', 'Equipe', 'team'], ['alertas', 'Alertas', 'bell'],
   ['ajustes', 'Ajustes', 'gear', 'admin']
 ];
@@ -1280,8 +1280,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.8.5', notes: [
-  'Menu: novo atalho “Bravus Lead · CRM”. Toque para abrir o CRM direto (no celular fica em Mais).',
+const RELEASE = { version: '2.8.6', notes: [
+  'Menu: novo atalho “CRM”. Toque para abrir o CRM direto (no celular fica em Mais).',
   'Avisos de tudo: mensagens do chat sempre notificam a equipe, e também exclusões (reunião, tarefa, cobrança, despesa, conteúdo) e anotações nos clientes.',
   'Avisos para a equipe: tudo que alguém faz no app (reunião marcada, remarcada, realizada, cliente, pagamento, anotação…) gera um aviso para os outros. A Priscila recebe o que o Andrade faz e vice-versa.',
   'Lembretes de compromisso: além dos seus, você recebe o lembrete das reuniões e compromissos com horário dos outros da equipe (ex.: “Reunião de Andrade às 20:30”).',
