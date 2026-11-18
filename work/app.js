@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.8.2';
+const VERSION = '2.8.3';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -197,8 +197,15 @@ async function loadAll(only) {
 
 /* ---------------- registro de atividade ---------------- */
 async function log(action, client_id = null) {
+  const id = ++logSeq; if (S.me) S.pendLog = { id, action };
   try { await store.insert('activity', { user_id: S.me.id, action, client_id }); } catch {}
+  /* v2.8.3: tudo que alguém faz no app avisa o resto da equipe (ex.: Priscila recebe o que o Andrade fez).
+     Se a mesma ação já mandar um aviso próprio (notifyTeam), este genérico é descartado para não duplicar. */
+  if (!S.me) return;
+  setTimeout(() => { if (!S.pendLog || S.pendLog.id !== id) return; S.pendLog = null;
+    notifyTeam(`${firstName(S.me.id)}: ${action}`, `${fdate(today())} às ${nowHM()} · Bravus Work`, 'info', `act:${uid()}`, 'painel'); }, 1200);
 }
+let logSeq = 0;
 
 /* ---------------- toasts / modal ---------------- */
 function toast(title, body = '', type = '') {
@@ -452,13 +459,16 @@ async function tick() {
     if (nf.tarefas !== false && hm >= '16:00') for (const t of mineToday.filter(t => t.goal && (t.count || 0) < t.goal && t.status !== 'feito')) {
       await notifyUsers([me.id], `Faltam ${t.goal - (t.count || 0)} para a meta: ${t.title}`, `Você fez ${t.count || 0} de ${t.goal} hoje. Bora fechar o dia! 💪`, 'tarefa', `goal:${t.id}:${d}`, 'agenda');
     }
-    if (nf.tarefas !== false) for (const t of mineToday) {
-      if (t.status === 'feito' || !t.time) continue;
+    /* v2.8.3: lembretes dos compromissos de toda a equipe (reuniões e tarefas com horário marcadas por alguém, não as da rotina automática) */
+    const others = realTasks().filter(t => t.date === d && t.assignee && t.assignee !== me.id && (t.kind === 'reuniao' || !t.template_id));
+    if (nf.tarefas !== false) for (const t of [...mineToday, ...others]) {
+      if (['feito', 'cancelada', 'remarcada', 'noshow'].includes(t.status) || !t.time) continue;
       const [h, m] = t.time.split(':').map(Number); const at = new Date(); at.setHours(h, m - (t.remind_min ?? 10), 0, 0);
       const diff = (Date.now() - at) / 6e4;
       if (diff >= 0 && diff < 15) {
-        const title = t.kind === 'reuniao' ? `Você tem uma reunião às ${t.time}` : t.kind === 'ligacao' ? `${firstName(me.id)}, chegou o horário das ligações` : `Lembrete das ${t.time}`;
-        await notifyUsers([me.id], title, t.title, 'tarefa', `task:${t.id}`, 'agenda');
+        const mine = t.assignee === me.id, who = firstName(t.assignee);
+        const title = t.kind === 'reuniao' ? (mine ? `Você tem uma reunião às ${t.time}` : `Reunião de ${who} às ${t.time}`) : t.kind === 'ligacao' ? (mine ? `${firstName(me.id)}, chegou o horário das ligações` : `Ligações de ${who} às ${t.time}`) : mine ? `Lembrete das ${t.time}` : `Compromisso de ${who} às ${t.time}`;
+        await notifyUsers([me.id], title, t.kind === 'reuniao' ? meetWho(t) : t.title, 'tarefa', `task:${t.id}${t.date}${t.time}`, t.kind === 'reuniao' ? 'reunioes' : 'agenda');
       }
     }
     if (isAdmin()) {
@@ -1268,7 +1278,10 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.8.1', notes: [
+const RELEASE = { version: '2.8.3', notes: [
+  'Avisos para a equipe: tudo que alguém faz no app (reunião marcada, remarcada, realizada, cliente, pagamento, anotação…) gera um aviso para os outros. A Priscila recebe o que o Andrade faz e vice-versa.',
+  'Lembretes de compromisso: além dos seus, você recebe o lembrete das reuniões e compromissos com horário dos outros da equipe (ex.: “Reunião de Andrade às 20:30”).',
+  'Reuniões: ao escolher “Remarcada”, o app pede a nova data e o novo horário e move a própria reunião. Ela conta uma vez só e fica marcada com “↻ Remarcada”. No quadro “Já passaram” há o botão ↻ Remarcar.',
   'Reuniões: agora todos (inclusive a Priscila) podem marcar reunião em qualquer horário, qualquer dia. A trava das 18:30 saiu.',
   'Reuniões: novo “Andamento pós-reunião”. Cada negócio fechado ou em negociação mostra o passo a passo: Reunião → Proposta → Contrato → Pagamento → Onboarding → Operação rodando. Toque na etapa para marcar; Reunião e Pagamento marcam sozinhos.',
   'Reuniões: os “Horários da semana” agora ficam recolhidos num botão. Toque em “Ver horários” para abrir.',
@@ -1378,7 +1391,7 @@ function popMsgs() {
   if (CW.open && CW.tab === 'chat' && !document.hidden) return;
   fresh.slice(-3).forEach(m => popup(`${firstName(m.user_id)}${m.pinned ? ' anotou' : ''}`, m.text.slice(0, 140), { type: 'chat', who: m.user_id, act: () => { CW.open = true; CW.tab = m.pinned ? 'notas' : 'chat'; lsSet('bw_cw_open', true); renderChat(true); } }));
 }
-const notifyTeam = (title, body, type = 'info', key = null, route = null) => notifyUsers(team().filter(p => p.id !== S.me.id).map(p => p.id), title, body, type, key, route);
+const notifyTeam = (title, body, type = 'info', key = null, route = null) => (S.pendLog = null, notifyUsers)(team().filter(p => p.id !== S.me.id).map(p => p.id), title, body, type, key, route);
 /* aviso de versão nova */
 function releaseNotice() {
   if (lsGet('bw_version_seen', '') === RELEASE.version) return;
