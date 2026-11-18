@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.8.4';
+const VERSION = '2.8.5';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
@@ -35,6 +35,8 @@ const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v == n
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 
 const ICON = {
+  funnel:'<path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/>',
+  ext:'<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
   clock:'<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   star:'<path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/>',
   grid:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/>',
@@ -648,7 +650,7 @@ function armLock() {
    ===================================================================== */
 const NAV = [
   ['painel', 'Painel', 'grid'], ['clientes', 'Clientes', 'users'],
-  ['financeiro', 'Financeiro', 'wallet', 'fin'], ['agenda', 'Agenda', 'cal'], ['reunioes', 'Reuniões', 'meet'], ['metas', 'Metas', 'target'], ['conteudo', 'Conteúdo', 'film'],
+  ['financeiro', 'Financeiro', 'wallet', 'fin'], ['agenda', 'Agenda', 'cal'], ['reunioes', 'Reuniões', 'meet'], ['crm', 'Bravus Lead · CRM', 'funnel', null, 'https://www.bravusmidia.com.br/crm/'], ['metas', 'Metas', 'target'], ['conteudo', 'Conteúdo', 'film'],
   ['equipe', 'Equipe', 'team'], ['alertas', 'Alertas', 'bell'],
   ['ajustes', 'Ajustes', 'gear', 'admin']
 ];
@@ -665,7 +667,7 @@ function render() {
   $('#app').innerHTML = `<div class="shell">
     <aside class="side">
       <div class="brand"><img src="icons/icon.svg" alt=""><div><b>BRAVUS <span>WORK</span></b><small>Organize. Execute. Evolua.</small></div></div>
-      <nav class="nav">${nav.map(n => `<a href="#${n[0]}" class="${S.route === n[0] ? 'on' : ''}">${ic(n[2])}${n[1]}${badge(n[0])}</a>`).join('')}</nav>
+      <nav class="nav">${nav.map(n => n[4] ? `<a href="${n[4]}" target="_blank" rel="noopener" title="Abrir o CRM Bravus Lead">${ic(n[2])}${n[1]}<span class="sp"></span><span style="opacity:.45;display:flex;transform:scale(.8)">${ic('ext')}</span></a>` : `<a href="#${n[0]}" class="${S.route === n[0] ? 'on' : ''}">${ic(n[2])}${n[1]}${badge(n[0])}</a>`).join('')}</nav>
       <div class="me"><span data-act="editProfile" data-id="${S.me.id}" style="cursor:pointer" title="Editar meu perfil">${avatar(S.me)}</span><div class="who" data-act="editProfile" data-id="${S.me.id}" style="cursor:pointer" title="Editar meu perfil"><b>${esc(S.me.name)}</b><small>${esc(cargo(S.me))}</small></div><button class="btn sm ic" title="Bloquear" data-act="logout">${ic('lock')}</button></div>
     </aside>
     <main class="main">
@@ -1278,7 +1280,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.8.4', notes: [
+const RELEASE = { version: '2.8.5', notes: [
+  'Menu: novo atalho “Bravus Lead · CRM”. Toque para abrir o CRM direto (no celular fica em Mais).',
   'Avisos de tudo: mensagens do chat sempre notificam a equipe, e também exclusões (reunião, tarefa, cobrança, despesa, conteúdo) e anotações nos clientes.',
   'Avisos para a equipe: tudo que alguém faz no app (reunião marcada, remarcada, realizada, cliente, pagamento, anotação…) gera um aviso para os outros. A Priscila recebe o que o Andrade faz e vice-versa.',
   'Lembretes de compromisso: além dos seus, você recebe o lembrete das reuniões e compromissos com horário dos outros da equipe (ex.: “Reunião de Andrade às 20:30”).',
@@ -1606,7 +1609,7 @@ const A = {
   pinBack: () => { AUTH.pin = AUTH.pin.slice(0, -1); renderAuth(); }, pinClear: () => { AUTH.pin = ''; renderAuth(); },
   authPick: d => { AUTH.user = d.id; AUTH.pin = ''; renderAuth(); },
   authChangeEmail: () => { AUTH.stage = 'email'; AUTH.pin = ''; renderAuth(); },
-  moreMenu: () => modal('Menu', `<div class="list">${NAV.filter(navOk).map(n => `<a class="li" href="#${n[0]}" data-act="closeModal">${ic(n[2])}<div class="t"><b>${n[1]}</b></div>${n[0] === 'alertas' && unread() ? `<span class="badge">${unread()}</span>` : ''}</a>`).join('')}<button class="li" data-act="logout" style="width:100%">${ic('lock')}<div class="t" style="text-align:left"><b>Bloquear / sair</b></div></button></div>`),
+  moreMenu: () => modal('Menu', `<div class="list">${NAV.filter(navOk).map(n => `<a class="li" href="${n[4] || '#' + n[0]}" ${n[4] ? 'target="_blank" rel="noopener"' : ''} data-act="closeModal">${ic(n[2])}<div class="t"><b>${n[1]}</b></div>${n[0] === 'alertas' && unread() ? `<span class="badge">${unread()}</span>` : ''}</a>`).join('')}<button class="li" data-act="logout" style="width:100%">${ic('lock')}<div class="t" style="text-align:left"><b>Bloquear / sair</b></div></button></div>`),
   cliFilter: d => { S.cliFilter = d.f; renderView(); },
   cliTier: d => { S.cliTier = d.f; renderView(); },
   setTier: async d => {
