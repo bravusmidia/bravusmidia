@@ -18,6 +18,7 @@ const Services = lazy(() => import('./pages/Services'));
 const Imports = lazy(() => import('./pages/Imports'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Automations = lazy(() => import('./pages/Automations'));
+const TeamChat = lazy(() => import('./pages/TeamChat'));
 const Team = lazy(() => import('./pages/Team'));
 const Integrations = lazy(() => import('./pages/Integrations'));
 const Security = lazy(() => import('./pages/Security'));
@@ -48,6 +49,7 @@ function Gate() {
           <Route path="/importacoes" element={<Imports />} />
           <Route path="/relatorios" element={<Reports />} />
           <Route path="/automacoes" element={<Automations />} />
+          <Route path="/chat" element={<TeamChat />} />
           <Route path="/equipe" element={<Team />} />
           <Route path="/integracoes" element={<Integrations />} />
           <Route path="/seguranca" element={<Security />} />

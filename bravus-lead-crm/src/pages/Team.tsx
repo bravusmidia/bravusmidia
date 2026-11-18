@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { UserPlus, Mail, ShieldCheck } from 'lucide-react';
 import { db, type Row } from '../lib/backend';
 import { useApp, ROLE_LABEL, type Role } from '../lib/session';
-import { dateTime, initials, relative } from '../lib/format';
+import { dateTime, relative } from '../lib/format';
+import { Avatar } from '../components/Avatar';
+import { ProfileModal } from '../components/ProfileModal';
 import { Alert, Badge, Button, Card, DataTable, Field, Input, Modal, PageHeader, Select, useAction } from '../components/ui';
 
 const ROLE_DESC: Record<Role, string> = {
@@ -20,6 +22,7 @@ export default function Team() {
   const [stats, setStats] = useState<{ tasks: Row[]; leads: Row[] }>({ tasks: [], leads: [] });
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<Row | null>(null);
+  const [me, setMe] = useState(false);
   const load = async () => {
     if (app.can.admin) setInvites(await db.list('invitations', { eq: { org_id: app.orgId }, order: ['created_at', false] }).catch(() => []));
     const [tasks, leads] = await Promise.all([db.list('tasks', { eq: { org_id: app.orgId, status: 'open' } }), db.list('leads', { eq: { org_id: app.orgId } })]);
@@ -37,11 +40,12 @@ export default function Team() {
           const myLeads = stats.leads.filter((l) => l.owner_id === m.user_id && !l.archived_at).length;
           const late = stats.tasks.filter((t) => t.assignee_id === m.user_id && new Date(t.due_at) < new Date()).length;
           return (
-            <button key={m.id} onClick={() => app.can.admin && m.user_id !== app.userId && m.role !== 'owner' && setEdit(m)} className="flex items-center gap-3 rounded-xl border border-line bg-white p-4 text-left shadow-card dark:border-white/10 dark:bg-navy-700/60">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-600 to-cyan-400 text-sm font-bold text-white">{initials(name)}</span>
+            <button key={m.id} onClick={() => m.user_id === app.userId ? setMe(true) : app.can.admin && m.role !== 'owner' && setEdit(m)} className="flex items-center gap-3 rounded-xl border border-line bg-white p-4 text-left shadow-card dark:border-white/10 dark:bg-navy-700/60">
+              <Avatar name={name} url={m.profile?.avatar_url} size={44} />
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2"><span className="truncate font-semibold">{name}</span>{!m.active && <Badge>Inativo</Badge>}</span>
                 <span className="block truncate text-xs text-ink-soft">{m.job_title ?? ''} {m.profile?.email ? `· ${m.profile.email}` : ''}</span>
+                {m.user_id === app.userId && <span className="block text-[11px] text-brand-600 dark:text-sky-300">Toque para editar foto, nome e cargo</span>}
                 <span className="mt-1 flex flex-wrap gap-1"><Badge tone={m.role === 'owner' ? 'violet' : m.role === 'admin' ? 'indigo' : 'blue'}>{ROLE_LABEL[m.role as Role]}</Badge><Badge>{myLeads} leads</Badge>{late > 0 && <Badge tone="red">{late} atrasadas</Badge>}</span>
               </span>
             </button>
@@ -63,6 +67,7 @@ export default function Team() {
         <p className="mt-3 text-xs text-ink-soft">As permissões são garantidas pelo banco de dados (Row Level Security), não só pela tela. Ninguém pode se promover sozinho.</p>
       </Card>
       {open && <InviteModal onClose={() => setOpen(false)} onSaved={load} />}
+      {me && <ProfileModal onClose={() => setMe(false)} />}
       {edit && <MemberModal m={edit} onClose={() => setEdit(null)} onSaved={() => { app.reloadOrg(); load(); }} />}
     </div>
   );

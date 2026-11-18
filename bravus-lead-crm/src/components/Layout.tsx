@@ -3,18 +3,21 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, KanbanSquare, MessagesSquare, CalendarClock, Target, Contact, Briefcase, FileSignature, Package,
-  FolderUp, BarChart3, Workflow, UsersRound, Plug, ShieldCheck, Settings, Search, Bell, Plus, Menu, X, Sun, Moon, Monitor, LogOut, ChevronsLeft, ChevronsRight,
+  FolderUp, BarChart3, Workflow, UsersRound, Plug, ShieldCheck, Settings, Search, Bell, Plus, Menu, X, Sun, Moon, Monitor, LogOut, ChevronsLeft, ChevronsRight, UserCog, MessageCircle,
 } from 'lucide-react';
 import { useApp, ROLE_LABEL } from '../lib/session';
 import { db, setDemo, type Row } from '../lib/backend';
-import { relative, initials } from '../lib/format';
+import { relative } from '../lib/format';
 import { Input } from './ui';
+import { Avatar } from './Avatar';
+import { ProfileModal } from './ProfileModal';
 
 export const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/leads', label: 'Leads', icon: Users },
   { to: '/funil', label: 'Funil de vendas', icon: KanbanSquare },
   { to: '/caixa-de-entrada', label: 'Caixa de entrada', icon: MessagesSquare },
+  { to: '/chat', label: 'Chat da equipe', icon: MessageCircle },
   { to: '/follow-ups', label: 'Follow-ups', icon: CalendarClock },
   { to: '/prospeccao', label: 'Prospecção', icon: Target },
   { to: '/contatos-whatsapp', label: 'Contatos do WhatsApp', icon: Contact },
@@ -30,9 +33,9 @@ export const NAV = [
   { to: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
 const GROUPS = [
-  { label: 'Comercial', items: NAV.slice(0, 7) },
-  { label: 'Negócios', items: NAV.slice(7, 12) },
-  { label: 'Gestão', items: NAV.slice(12) },
+  { label: 'Comercial', items: NAV.slice(0, 8) },
+  { label: 'Negócios', items: NAV.slice(8, 13) },
+  { label: 'Gestão', items: NAV.slice(13) },
 ];
 
 export function Logo({ compact }: { compact?: boolean }) {
@@ -184,15 +187,18 @@ function Menu2({ children, onClose, wide }: { children: ReactNode; onClose: () =
 function UserMenu() {
   const app = useApp();
   const [open, setOpen] = useState(false);
+  const [prof, setProf] = useState(false);
   const name = app.profile?.full_name || app.email || 'Usuário';
   return (
     <div className="relative">
       <button onClick={() => setOpen(!open)} className="flex items-center gap-2 rounded-lg p-1 hover:bg-slate-100 dark:hover:bg-white/10" aria-label="Perfil">
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-brand-600 to-cyan-400 text-xs font-bold text-white">{initials(name)}</span>
+        <Avatar name={name} url={app.profile?.avatar_url} size={32} />
       </button>
+      {prof && <ProfileModal onClose={() => setProf(false)} />}
       {open && (
         <Menu2 onClose={() => setOpen(false)}>
-          <div className="px-3 py-2"><div className="truncate text-sm font-semibold">{name}</div><div className="text-xs text-ink-soft">{ROLE_LABEL[app.role]} · {app.org?.name}</div></div>
+          <div className="px-3 py-2"><div className="truncate text-sm font-semibold">{name}</div><div className="text-xs text-ink-soft">{app.members.find((m) => m.user_id === app.userId)?.job_title || ROLE_LABEL[app.role]} · {app.org?.name}</div></div>
+          <button onClick={() => { setOpen(false); setProf(true); }} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-white/10"><UserCog className="h-4 w-4" />Editar meu perfil</button>
           <div className="my-1 border-t border-line dark:border-white/10" />
           <div className="flex gap-1 px-2 py-1">
             {([['light', Sun, 'Claro'], ['dark', Moon, 'Escuro'], ['system', Monitor, 'Auto']] as const).map(([v, Icon, l]) => (

@@ -4,7 +4,7 @@ import { DEMO_ORG, DEMO_USER } from './demo';
 import { DEFAULT_INACTIVITY, type Inactivity } from './metrics';
 
 export type Role = 'owner' | 'admin' | 'manager' | 'seller' | 'viewer';
-export const ROLE_LABEL: Record<Role, string> = { owner: 'Proprietário', admin: 'Administrador', manager: 'Gerente', seller: 'Vendedor(a)', viewer: 'Somente leitura' };
+export const ROLE_LABEL: Record<Role, string> = { owner: 'CEO', admin: 'Administrador', manager: 'Gerente', seller: 'Vendedor(a)', viewer: 'Somente leitura' };
 
 interface Ctx {
   mode: Mode;
