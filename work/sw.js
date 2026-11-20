@@ -1,5 +1,5 @@
 // BRAVUS WORK — Service Worker (offline do app + notificações)
-const CACHE = 'bw-v2.8.6';
+const CACHE = 'bw-v2.9.0';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'config.js', 'version.json', 'manifest.webmanifest',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-180.png'];
 
@@ -20,7 +20,7 @@ self.addEventListener('fetch', e => {
 self.addEventListener('push', e => {
   let d = {}; try { d = e.data.json(); } catch { d = { title: 'Bravus Work', body: e.data && e.data.text() }; }
   e.waitUntil(self.registration.showNotification(d.title || 'Bravus Work', {
-    body: d.body || '', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: d.key, data: { route: d.route || 'painel' }
+    body: d.body || '', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: d.key || ('bw' + Date.now()), renotify: true, vibrate: [200, 100, 200], data: { route: d.route || 'painel' }
   }));
 });
 self.addEventListener('notificationclick', e => {

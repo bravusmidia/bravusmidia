@@ -3,10 +3,10 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '2.8.6';
+const VERSION = '2.9.0';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
-const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings'];
+const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings','reminders'];
 
 /* ---------------- utilidades ---------------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -420,6 +420,51 @@ async function notifyUsers(ids, title, body, type = 'info', key = null, route = 
     try { await store.insertUnique('notifications', { user_id: u, title, body, type, key: key || uid(), route, read: false }); } catch (e) { console.warn(e.message); }
   }
 }
+/* v2.9.0: inscreve o aparelho no push do servidor (chega no celular mesmo com o app fechado) */
+async function pushSubscribe(loud = false) {
+  if (!SUPA || !('PushManager' in window) || !('serviceWorker' in navigator) || !('Notification' in window) || Notification.permission !== 'granted') return false;
+  try {
+    /* a chave pública vem do servidor (gerada lá, a privada nunca sai de lá) */
+    const pub = CFG.VAPID_PUBLIC_KEY || S.vapid || (S.vapid = (await sb.rpc('bw_vapid_public')).data || '');
+    if (!pub) { if (loud) toast('Push do servidor ainda não configurado', 'Falta rodar o SQL v2.9 e publicar a função send-push.', 'warn'); return false; }
+    const reg = await navigator.serviceWorker.ready;
+    const key = Uint8Array.from(atob(pub.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - pub.length % 4) % 4)), c => c.charCodeAt(0));
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+    const { error } = await sb.from('push_subs').upsert({ user_id: S.me.id, endpoint: sub.endpoint, subscription: sub.toJSON() }, { onConflict: 'endpoint' });
+    if (error) throw error; S.pushOk = true; return true;
+  } catch (e) { console.warn('push', e.message || e); if (loud) toast('Push do servidor não ativou', e.message || '', 'warn'); return false; }
+}
+
+/* v2.9.0: LEMBRETES em qualquer item (cliente, reunião, tarefa, cobrança, conteúdo ou avulso) */
+const REM_TYPES = { cliente: ['Cliente', 'clientes'], reuniao: ['Reunião', 'reunioes'], tarefa: ['Tarefa', 'agenda'], cobranca: ['Cobrança', 'financeiro'], conteudo: ['Conteúdo', 'conteudo'], avulso: ['Lembrete', 'alertas'] };
+const remAt = r => new Date(r.remind_at);
+const pendingRems = () => (S.d.reminders || []).filter(r => !r.sent && ((r.users || []).includes(S.me.id) || r.created_by === S.me.id)).sort((a, b) => a.remind_at.localeCompare(b.remind_at));
+const itemRems = (type, id) => (S.d.reminders || []).filter(r => r.item_type === type && r.item_id === id && !r.sent);
+const remBtn = (type, id, title) => id ? `<button type="button" class="btn" data-act="newRem" data-t="${type}" data-id="${esc(id)}" data-title="${esc(title || '')}" title="Criar lembrete para este item">${ic('bell')}<span class="hide-m">Lembrete${itemRems(type, id).length ? ` (${itemRems(type, id).length})` : ''}</span></button>` : '';
+function reminderForm(o = {}) {
+  const now = new Date(Date.now() + 60 * 6e4); const dt = o.date || iso(now), tm = o.time || `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const others = team().filter(p => p.id !== S.me.id);
+  modal('Novo lembrete', `<div class="f">
+    <input type="hidden" name="item_type" value="${esc(o.t || 'avulso')}"><input type="hidden" name="item_id" value="${esc(o.id || '')}">
+    ${o.id ? `<p class="note" style="margin:0">${ic('bell')} ${esc((REM_TYPES[o.t] || REM_TYPES.avulso)[0])}: <b>${esc(o.title || '')}</b></p>` : ''}
+    ${fld('O que lembrar *', 'title', o.id ? o.title : '', 'text', 'required maxlength="160" placeholder="ex.: Ligar para confirmar a proposta"')}
+    <div class="f2">${fld('Data *', 'date', dt, 'date', 'required')}${fld('Horário *', 'time', tm, 'time', 'required')}</div>
+    <label class="fl">Avisar no celular de<div class="cks"><label><input type="checkbox" name="users" value="${S.me.id}" checked>Eu (${esc(firstName(S.me.id))})</label>${others.map(p => `<label><input type="checkbox" name="users" value="${p.id}" checked>${esc(firstName(p.id))}</label>`).join('')}</div></label>
+    ${area('Observação (opcional)', 'body', '')}
+    ${(() => { const ex = o.id ? itemRems(o.t, o.id) : []; return ex.length ? `<div class="sec" style="margin:4px 0 0">Lembretes já marcados neste item</div><div class="list">${ex.map(remRow).join('')}</div>` : ''; })()}
+  </div>`, { form: 'saveRem', footer: `<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">${ic('bell')}Salvar lembrete</button>` });
+}
+const remRow = r => `<div class="li"><i class="dot warn"></i><div class="t"><b>${esc(r.title)}</b><small>${fdate(iso(remAt(r)))} às ${ftime(r.remind_at)} · ${esc((REM_TYPES[r.item_type] || REM_TYPES.avulso)[0])} · avisa ${esc((r.users || []).map(firstName).join(' e '))}</small></div>${r.created_by === S.me.id || isAdmin() ? `<button type="button" class="btn sm ic bad" data-act="delRem" data-id="${r.id}" aria-label="Apagar lembrete">${ic('trash')}</button>` : ''}</div>`;
+async function remindersTick() {
+  const now = Date.now();
+  for (const r of (S.d.reminders || []).filter(r => !r.sent)) {
+    const at = remAt(r).getTime(); if (!(at <= now)) continue;
+    if (now - at < 6 * 3600e3) await notifyUsers(r.users || [], `🔔 ${r.title}`, `${r.body ? r.body + ' · ' : ''}Lembrete das ${ftime(r.remind_at)}${r.created_by && r.created_by !== S.me.id ? ' · criado por ' + firstName(r.created_by) : ''}`, 'tarefa', `rem:${r.id}`, (REM_TYPES[r.item_type] || REM_TYPES.avulso)[1]);
+    r.sent = true; try { await store.update('reminders', r.id, { sent: true }); } catch {}
+  }
+}
+
 const admins = () => team().filter(p => p.role === 'admin').map(p => p.id);
 const finPeople = () => team().map(p => p.id);
 
@@ -469,10 +514,12 @@ async function tick() {
       const diff = (Date.now() - at) / 6e4;
       if (diff >= 0 && diff < 15) {
         const mine = t.assignee === me.id, who = firstName(t.assignee);
-        const title = t.kind === 'reuniao' ? (mine ? `Você tem uma reunião às ${t.time}` : `Reunião de ${who} às ${t.time}`) : t.kind === 'ligacao' ? (mine ? `${firstName(me.id)}, chegou o horário das ligações` : `Ligações de ${who} às ${t.time}`) : mine ? `Lembrete das ${t.time}` : `Compromisso de ${who} às ${t.time}`;
+        const rm = t.remind_min ?? 10, inTxt = rm ? ` (em ${rm >= 60 ? rm / 60 + ' h' : rm + ' min'})` : '';
+        const title = t.kind === 'reuniao' ? (mine ? `📅 Você tem reunião às ${t.time}${inTxt}` : `📅 Reunião de ${who} às ${t.time}${inTxt}`) : t.kind === 'ligacao' ? (mine ? `${firstName(me.id)}, chegou o horário das ligações` : `Ligações de ${who} às ${t.time}`) : mine ? `Lembrete das ${t.time}` : `Compromisso de ${who} às ${t.time}`;
         await notifyUsers([me.id], title, t.kind === 'reuniao' ? meetWho(t) : t.title, 'tarefa', `task:${t.id}${t.date}${t.time}`, t.kind === 'reuniao' ? 'reunioes' : 'agenda');
       }
     }
+    await remindersTick();
     if (isAdmin()) {
       if (nf.financeiro !== false) for (const i of S.d.invoices) {
         if (!['pendente', 'areceber'].includes(i.status)) continue;
@@ -624,7 +671,7 @@ async function startSession(userId) {
   if (isAdmin()) try { const n = await genMonthInvoices(curYM()); if (n) { await log(`Gerou ${n} mensalidade(s) de ${curYM()} automaticamente`); await loadAll('invoices'); } } catch (e) { console.warn('auto mensalidades', e); }
   await heartbeat(); await log('Entrou no app');
   S.route = (location.hash.replace(/^#\/?/, '') || 'painel').split('?')[0];
-  render(); tick(); setTimeout(releaseNotice, 800); checkVersion();
+  render(); tick(); setTimeout(releaseNotice, 800); checkVersion(); setTimeout(() => pushSubscribe(), 2500);
   timers.forEach(clearInterval);
   timers = [setInterval(tick, 60000), setInterval(heartbeat, 45000), setInterval(checkVersion, 30 * 60000), setInterval(() => { if (!document.hidden && !$('#modal-root').innerHTML && ['painel', 'equipe'].includes(S.route)) renderViewSoft(); if (CW.open) renderChat(); renderPresence(); }, 30000)];
   armLock();
@@ -931,7 +978,7 @@ function clientDetail(id) {
     <div class="sec">Histórico de atividades</div>
     <div class="list">${acts.length ? acts.map(a => `<div class="li"><div class="t"><b style="font-weight:500">${esc(a.action)}</b><small>${esc(firstName(a.user_id))} · ${new Date(a.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</small></div></div>`).join('') : empty('Sem registros ainda.')}</div>
     <form data-form="clientNote" class="row" style="margin-top:10px"><input type="hidden" name="id" value="${c.id}"><input name="text" placeholder="Registrar atividade (ex.: liguei, enviei proposta)" maxlength="300"><button class="btn">Registrar</button></form>`,
-    { wide: true, footer: `${wa ? `<a class="btn ok" href="https://wa.me/55${wa.replace(/^55/, '')}" target="_blank" rel="noopener">${ic('wa')}WhatsApp</a>` : ''}<button type="button" class="btn" data-act="editMeet" data-client="${c.id}">${ic('meet')}<span class="hide-m">Reunião</span></button><button type="button" class="btn" data-act="clientReport" data-id="${c.id}">${ic('file')}Relatório</button>${isAdmin() ? `<button type="button" class="btn bad" data-act="offboard" data-id="${c.id}" title="Pausar, cancelar ou enviar comunicado">${ic('bell')}<span class="hide-m">${c.op_status === 'pausado' ? 'Pausado' : 'Pausar / Cancelar'}</span></button>` : ''}<span class="sp"></span>${isAdmin() ? `<button type="button" class="btn pri" data-act="editClient" data-id="${c.id}">${ic('edit')}Editar</button>` : ''}` });
+    { wide: true, footer: `${wa ? `<a class="btn ok" href="https://wa.me/55${wa.replace(/^55/, '')}" target="_blank" rel="noopener">${ic('wa')}WhatsApp</a>` : ''}<button type="button" class="btn" data-act="editMeet" data-client="${c.id}">${ic('meet')}<span class="hide-m">Reunião</span></button><button type="button" class="btn" data-act="clientReport" data-id="${c.id}">${ic('file')}Relatório</button>${remBtn('cliente', c.id, c.name)}${isAdmin() ? `<button type="button" class="btn bad" data-act="offboard" data-id="${c.id}" title="Pausar, cancelar ou enviar comunicado">${ic('bell')}<span class="hide-m">${c.op_status === 'pausado' ? 'Pausado' : 'Pausar / Cancelar'}</span></button>` : ''}<span class="sp"></span>${isAdmin() ? `<button type="button" class="btn pri" data-act="editClient" data-id="${c.id}">${ic('edit')}Editar</button>` : ''}` });
 }
 
 /* ---------- IMPORTAR CLIENTES (CSV do Metrifiquei ou planilha simples) ---------- */
@@ -1003,7 +1050,7 @@ function invoiceForm(i = {}) {
     ${fld('Descrição', 'description', i.description || 'Mensalidade')}
     ${i.id ? sel('Status', 'status', [['pendente', 'Automático (pelo vencimento)'], ['areceber', 'A receber'], ['atrasado', 'Em atraso'], ['cancelado', 'Cancelado']].concat(i.status === 'pago' ? [['pago', 'Pago']] : []), i.status) : ''}
     ${fld('Link de pagamento (opcional)', 'payment_url', i.payment_url, 'url', 'placeholder="https://..."')}
-  </div>`, { form: 'saveInvoice', footer: `${i.id ? `<button type="button" class="btn bad" data-act="delInvoice" data-id="${i.id}">${ic('trash')}</button><span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
+  </div>`, { form: 'saveInvoice', footer: `${i.id ? `<button type="button" class="btn bad" data-act="delInvoice" data-id="${i.id}">${ic('trash')}</button>${remBtn('cobranca', i.id, `Cobrança ${cname(i.client_id)} · ${brl(i.amount)}`)}<span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
 }
 
 function waCharge(i) {
@@ -1192,11 +1239,12 @@ function meetForm(t = {}) {
     <div class="f2">${fld('Data *', 'date', t.date || today(), 'date', 'required')}${fld('Horário *', 'time', t.time || S.set.meetings_start, 'time', 'required')}</div>
     <div class="f2">${sel('Tipo', 'meet_type', MTYPES, t.meet_type || 'comercial')}${sel('Formato', 'meet_format', MFORMATS, t.meet_format || 'meet')}</div>
     ${ticketPick(t.ticket)}
+    ${sel('Avisar a equipe no celular', 'remind_min', [[0, 'Na hora'], [10, '10 min antes'], [15, '15 min antes'], [20, '20 min antes'], [30, '30 min antes'], [60, '1 hora antes']], t.remind_min ?? 20)}
     <p class="note" id="meetRule" style="margin:0"></p>
     <div class="f2">${sel('Status', 'status', MSTATUS, t.status || 'pendente')}${sel('Resultado', 'outcome', MOUT, t.outcome || '')}</div>
     <div id="reschBox" class="card" style="display:none;padding:12px;border-color:rgba(255,190,80,.45)"><b style="display:block;margin-bottom:8px">↻ Para quando foi remarcada?</b><div class="f2">${fld('Nova data *', 'new_date', t.date || today(), 'date')}${fld('Novo horário *', 'new_time', t.time || S.set.meetings_start, 'time')}</div><p class="note" style="margin:6px 0 0">A reunião é movida para a nova data e volta para “Agendada”. Ela continua contando <b>uma vez só</b>.</p></div>
     ${area('Anotações', 'description', t.description)}
-  </div>`, { form: 'saveMeet', footer: `${t.id ? `<button type="button" class="btn bad" data-act="delTask" data-id="${t.id}">${ic('trash')}</button>${t.outcome === 'fechou' && !t.client_id ? `<button type="button" class="btn ok" data-act="meetToClient" data-id="${t.id}">${ic('plus')}Virar cliente</button>` : ''}<span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
+  </div>`, { form: 'saveMeet', footer: `${t.id ? `<button type="button" class="btn bad" data-act="delTask" data-id="${t.id}">${ic('trash')}</button>${remBtn('reuniao', t.id, meetWho(t))}${t.outcome === 'fechou' && !t.client_id ? `<button type="button" class="btn ok" data-act="meetToClient" data-id="${t.id}">${ic('plus')}Virar cliente</button>` : ''}<span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
   const fm = $('#modal-root form[data-form="saveMeet"]'); let stTouched = !!t.id;
   const chk = () => { if (!fm) return; const ds = fm.date.value, tm = fm.time.value, r = $('#meetRule'); const passed = ds && tm && (ds < today() || (ds === today() && tm <= nowHM()));
     if (!stTouched && fm.status.value !== 'feito' && passed) fm.status.value = 'feito'; if (!stTouched && !passed && fm.status.value === 'feito') fm.status.value = 'pendente';
@@ -1252,7 +1300,7 @@ function taskForm(t = {}, template = false) {
     ${area('Descrição', 'description', t.description)}
     ${isAdmin() && !template ? `<label class="sw"><input type="checkbox" name="override"> Permitir ligação fora da regra (antes das ${S.set.calls_start})</label>` : ''}
     ${!template ? `<p class="note">Regra: ligações a partir das ${S.set.calls_start}. Reuniões: qualquer horário, qualquer dia.</p>` : ''}
-  </div>`, { form: 'saveTask', footer: `${t.id ? `<button type="button" class="btn bad" data-act="delTask" data-id="${t.id}">${ic('trash')}</button>${!template && t.date ? `<button type="button" class="btn" data-act="taskCal" data-id="${t.id}" title="Adicionar ao calendário">${ic('cal')}<span class="hide-m">Calendário</span></button>` : ''}<span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
+  </div>`, { form: 'saveTask', footer: `${t.id ? `<button type="button" class="btn bad" data-act="delTask" data-id="${t.id}">${ic('trash')}</button>${template ? '' : remBtn('tarefa', t.id, t.title)}${!template && t.date ? `<button type="button" class="btn" data-act="taskCal" data-id="${t.id}" title="Adicionar ao calendário">${ic('cal')}<span class="hide-m">Calendário</span></button>` : ''}<span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
 }
 
 /* ---------- CONTEÚDO (calendário editorial) ---------- */
@@ -1274,13 +1322,16 @@ function contentForm(c = {}) {
     <div class="f2">${sel('Cliente', 'client_id', clientOpts('Bravus Mídia (próprio)'), c.client_id || '')}${sel('Responsável', 'assignee', teamOpts(), c.assignee || S.me.id)}</div>
     ${sel('Status', 'status', CST, c.status || 'ideia')}
     ${area('Roteiro / legenda / observações', 'notes', c.notes)}
-  </div>`, { form: 'saveContent', footer: `${c.id ? `<button type="button" class="btn bad" data-act="delContent" data-id="${c.id}">${ic('trash')}</button><span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
+  </div>`, { form: 'saveContent', footer: `${c.id ? `<button type="button" class="btn bad" data-act="delContent" data-id="${c.id}">${ic('trash')}</button>${remBtn('conteudo', c.id, c.title)}<span class="sp"></span>` : ''}<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` });
 }
 
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '2.8.6', notes: [
+const RELEASE = { version: '2.9.0', notes: [
+  'Lembrete em qualquer item: botão 🔔 Lembrete em clientes, reuniões, tarefas, cobranças e conteúdos (e lembrete avulso em Alertas). Você escolhe dia, hora e quem recebe (você, a Priscila ou os dois).',
+  'Reuniões avisam Andrade e Priscila no celular 20 min antes (dá para mudar em cada reunião).',
+  'Push do servidor: os avisos chegam no celular mesmo com o app fechado. Abra o app uma vez e toque em Alertas → Ativar.',
   'Menu: novo atalho “CRM”. Toque para abrir o CRM direto (no celular fica em Mais).',
   'Avisos de tudo: mensagens do chat sempre notificam a equipe, e também exclusões (reunião, tarefa, cobrança, despesa, conteúdo) e anotações nos clientes.',
   'Avisos para a equipe: tudo que alguém faz no app (reunião marcada, remarcada, realizada, cliente, pagamento, anotação…) gera um aviso para os outros. A Priscila recebe o que o Andrade faz e vice-versa.',
@@ -1464,10 +1515,11 @@ V.equipe = () => {
 V.alertas = () => {
   const ns = S.d.notifications.filter(n => n.user_id === S.me.id).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 100);
   const perm = 'Notification' in window ? Notification.permission : 'unsupported';
-  return head('Alertas', 'Bravus Notify', (() => { const un = S.d.notifications.filter(n => n.user_id === S.me.id && !n.read), ut = un.filter(n => iso(new Date(n.created_at)) === today()); return `<div class="row" style="gap:8px"><button class="btn" data-act="readAll" data-s="hoje" ${ut.length ? '' : 'disabled'} title="Marca como lidos só os alertas de hoje">${ic('check')}Lidos de hoje${ut.length ? ` <small>${ut.length}</small>` : ''}</button><button class="btn pri" data-act="readAll" ${un.length ? '' : 'disabled'} title="Marca todos como lidos">${ic('check')}Todos lidos${un.length ? ` <small>${un.length}</small>` : ''}</button></div>`; })()) + `
+  return head('Alertas', 'Bravus Notify', (() => { const un = S.d.notifications.filter(n => n.user_id === S.me.id && !n.read), ut = un.filter(n => iso(new Date(n.created_at)) === today()); return `<div class="row" style="gap:8px"><button class="btn" data-act="newRem">${ic('bell')}Lembrete</button><button class="btn" data-act="readAll" data-s="hoje" ${ut.length ? '' : 'disabled'} title="Marca como lidos só os alertas de hoje">${ic('check')}Lidos de hoje${ut.length ? ` <small>${ut.length}</small>` : ''}</button><button class="btn pri" data-act="readAll" ${un.length ? '' : 'disabled'} title="Marca todos como lidos">${ic('check')}Todos lidos${un.length ? ` <small>${un.length}</small>` : ''}</button></div>`; })()) + `
     ${perm !== 'granted' ? `<div class="infobox row" style="margin-bottom:14px"><div class="sp">${perm === 'unsupported' ? 'Este navegador não suporta notificações. No iPhone, instale o app na Tela de Início (Compartilhar → Adicionar à Tela de Início) e abra por lá.' : perm === 'denied' ? 'As notificações estão bloqueadas neste aparelho. Libere nas configurações do navegador para este site.' : 'Ative as notificações para receber lembretes no celular e no computador.'}</div>${perm === 'default' ? `<button class="btn pri" data-act="enablePush">${ic('bell')}Ativar</button>` : ''}</div>` : `<div class="row small muted" style="margin-bottom:12px">${ic('bell')}Notificações ativas neste aparelho. <button class="btn sm" data-act="testPush">Testar</button></div>`}
+    ${(() => { const pr = pendingRems(); return `<div class="card" style="margin-bottom:14px"><h3>${ic('bell')}Lembretes agendados <small class="muted">${pr.length}</small></h3>${pr.length ? `<div class="list">${pr.map(remRow).join('')}</div>` : `<p class="small muted" style="margin:0">Nenhum lembrete. Toque em <b>Lembrete</b> aqui ou no botão ${ic('bell')} dentro de qualquer cliente, reunião, tarefa, cobrança ou conteúdo.</p>`}</div>`; })()}
     <div class="card"><div class="list alist">${ns.length ? ns.map(n => `<a class="li" href="#${esc(n.route || 'painel')}" data-act="readOne" data-id="${n.id}" style="${n.read ? 'opacity:.55' : ''}"><i class="dot ${n.type === 'alerta' ? 'bad' : n.type === 'pago' ? 'on' : n.read ? '' : 'warn'}"></i><div class="t"><b>${esc(n.title)}</b><small>${esc(n.body || '')} · ${ago(n.created_at)}</small></div></a>`).join('') : empty('Nenhum alerta por enquanto.')}</div></div>
-    <p class="note" style="margin-top:10px">Lembretes no horário exato dependem do sistema do aparelho. Com o app fechado, os avisos chegam pelo servidor (Supabase + push) quando estiver configurado.</p>`;
+    <p class="note" style="margin-top:10px">Lembretes no horário exato dependem do sistema do aparelho. Com o app fechado, os avisos chegam pelo servidor (Supabase + push)${S.pushOk ? ' — <b>ativo neste aparelho ✅</b>' : ''}.</p>`;
 };
 
 /* ---------- RELATÓRIOS ---------- */
@@ -1589,7 +1641,7 @@ V.ajustes = () => {
     <p class="note" style="margin-top:8px">As tarefas do dia são criadas automaticamente a partir destas rotinas. Mudanças valem a partir do próximo dia gerado.</p></div>
   <div class="card" style="margin-top:14px"><h3>${ic('sync')}Integrações oficiais</h3><div class="list">
     ${integ('Banco de dados (Supabase)', SUPA, SUPA ? 'Dados na nuvem, criptografados e com backup diário do Supabase.' : 'Modo local: dados só neste aparelho. Siga o README para conectar.')}
-    ${integ('Push com app fechado', !!CFG.VAPID_PUBLIC_KEY && SUPA, 'Chaves VAPID + função send-push no Supabase.')}
+    ${integ('Push com app fechado', !!(S.pushOk || CFG.VAPID_PUBLIC_KEY) && SUPA, 'SQL v2.9 + função send-push no Supabase (chaves geradas no servidor).')}
     ${integ('WhatsApp Business Platform', false, 'Hoje: botões que abrem o WhatsApp com a mensagem pronta. API oficial: próxima etapa (exige modelos aprovados).')}
     ${integ('Google Calendar / iPhone / Android', true, 'Botão “Calendário” em cada tarefa gera o evento (.ics) compatível com todos.')}
     ${integ('Instagram, RD Station, ClickUp', false, 'Preparados para a próxima etapa; enquanto isso, registro manual.')}
@@ -1898,15 +1950,12 @@ const A = {
     try {
       const p = await Notification.requestPermission();
       if (p !== 'granted') return toast('Permissão não concedida', '', 'warn');
-      if (SUPA && CFG.VAPID_PUBLIC_KEY && 'PushManager' in window) {
-        const reg = await navigator.serviceWorker.ready;
-        const key = Uint8Array.from(atob(CFG.VAPID_PUBLIC_KEY.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - CFG.VAPID_PUBLIC_KEY.length % 4) % 4)), c => c.charCodeAt(0));
-        const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
-        await sb.from('push_subs').upsert({ user_id: S.me.id, endpoint: sub.endpoint, subscription: sub.toJSON() }, { onConflict: 'endpoint' });
-      }
+      await pushSubscribe(true);
       toast('Notificações ativadas', 'Você receberá os lembretes neste aparelho.', 'ok'); systemPop({ title: 'Bravus Work', body: 'Notificações ativas ✅', key: 'test' }); renderView();
     } catch (e) { toast('Não foi possível ativar', e.message, 'warn'); }
   },
+  newRem: d => reminderForm({ t: d.t || 'avulso', id: d.id || '', title: d.title || '' }),
+  delRem: d => confirmBox('Apagar lembrete?', 'O aviso não será mais enviado.', 'Apagar', async () => { await store.remove('reminders', d.id); toast('Lembrete apagado', '', 'ok'); await refresh(); }, true),
   testPush: () => systemPop({ title: `Olá, ${firstName(S.me.id)}!`, body: 'Este é um teste do Bravus Notify.', key: 'test' + Date.now(), route: 'alertas' }),
   backup: () => {
     if (EMBED) return toast('Disponível no app publicado', 'Na prévia não é possível baixar arquivos.', 'warn');
@@ -2010,7 +2059,7 @@ const F = {
       v.date = v.new_date; v.time = v.new_time; v.status = 'pendente';
     }
     if (!isAdmin() && (!v.id || old.date !== v.date || old.time !== v.time) && !meetAllowed(v.date, v.time)) return toast('Horário fora da regra', meetRuleMsg(v.date), 'bad');
-    const row = { title: `Reunião · ${who}`, kind: 'reuniao', date: v.date, time: v.time, assignee: v.assignee || S.me.id, client_id: v.client_id || null, description: v.description, priority: 'alta', remind_min: 30,
+    const row = { title: `Reunião · ${who}`, kind: 'reuniao', date: v.date, time: v.time, assignee: v.assignee || S.me.id, client_id: v.client_id || null, description: v.description, priority: 'alta', remind_min: num(v.remind_min) ?? 20,
       contact_name: (v.contact_name || '').trim() || null, company: (v.company || '').trim() || null, phone: (v.phone || '').trim() || null, meet_type: v.meet_type, meet_format: v.meet_format, ticket: v.ticket || null };
     row.status = v.status || 'pendente'; row.outcome = v.outcome || null; row.done_at = row.status === 'feito' ? old.done_at || new Date().toISOString() : null;
     const extra = ['contact_name', 'company', 'phone', 'meet_type', 'meet_format', 'outcome', 'ticket'];
@@ -2035,6 +2084,19 @@ const F = {
     else { await store.insert('tasks', { ...row, status: 'pendente', count: 0, is_template: tpl }); await log(`${tpl ? 'Criou rotina' : 'Agendou'}: ${row.title}${row.assignee !== S.me.id ? ' para ' + firstName(row.assignee) : ''}`, row.client_id); }
     if (!tpl && row.assignee !== S.me.id && !v.id) await notifyUsers([row.assignee], `Nova tarefa de ${firstName(S.me.id)}`, `${row.title}${row.time ? ' · ' + row.time : ''} · ${fdate(row.date)}`, 'tarefa', null, 'agenda');
     closeModal(); toast('Salvo', '', 'ok'); await refresh();
+  },
+  saveRem: async (v, fd) => {
+    const title = (v.title || '').trim(); if (!title) return toast('Escreva o que lembrar', '', 'bad');
+    const at = new Date(`${v.date}T${v.time}:00`); if (isNaN(at)) return toast('Data ou horário inválido', '', 'bad');
+    if (at.getTime() < Date.now() - 60e3) return toast('Esse horário já passou', 'Escolha um horário no futuro.', 'warn');
+    const users = fd.getAll('users'); if (!users.length) return toast('Escolha quem vai receber o aviso', '', 'bad');
+    const t = REM_TYPES[v.item_type] ? v.item_type : 'avulso';
+    try { await store.insert('reminders', { item_type: t, item_id: v.item_id || null, title, body: (v.body || '').trim() || null, route: REM_TYPES[t][1], remind_at: at.toISOString(), users, created_by: S.me.id, sent: false }); }
+    catch (e) { return toast('Não foi possível salvar o lembrete', /reminders|relation|schema/i.test(e.message) ? 'Falta rodar o SQL v2.9 (notificações) no Supabase.' : e.message, 'bad'); }
+    await log(`Criou lembrete: ${title} · ${fdate(v.date)} ${v.time}`);
+    const others = users.filter(u => u !== S.me.id);
+    if (others.length) await notifyUsers(others, `${firstName(S.me.id)} marcou um lembrete para você`, `${title} · ${fdate(v.date)} às ${v.time}`, 'tarefa', null, 'alertas');
+    closeModal(); toast('Lembrete salvo', `${fdate(v.date)} às ${v.time} · avisa ${users.map(firstName).join(' e ')}`, 'ok'); await refresh();
   },
   saveContent: async v => {
     const row = { title: v.title.trim(), channel: v.channel, date: v.date || null, client_id: v.client_id || null, assignee: v.assignee, status: v.status, notes: v.notes };

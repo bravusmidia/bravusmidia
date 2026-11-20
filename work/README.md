@@ -56,6 +56,9 @@ App leve (PWA): abre no navegador do computador e instala no celular (Android e 
    ```
 3. Push no celular: gere chaves com `npx web-push generate-vapid-keys`, coloque a pública em `config.js` (`VAPID_PUBLIC_KEY`) e as duas nos *secrets* do Supabase (abaixo). Depois crie um **Database Webhook** (tabela `notifications`, evento *Insert*) chamando a função `send-push` com o header `x-webhook-secret`.
 
+### 2.1 Notificações v2.9 (lembrete em qualquer item + reunião 20 min antes)
+Rode `supabase/v2.9-notificacoes.sql` (troque `COLE_O_SEGREDO_DO_PUSH` pelo PUSH_WEBHOOK_SECRET). Ele cria a tabela de lembretes, os agendamentos a cada minuto e o gatilho que manda cada aviso novo para o celular (dispensa criar o Database Webhook à mão).
+
 ### 3. Integrações (funções do servidor)
 Instale o Supabase CLI e, na pasta do projeto:
 ```bash
