@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '3.1.0';
+const VERSAO = '3.1.1';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -1322,12 +1322,17 @@ const MISTICOS = [['bruxo', '', 'Bruxo'], ['bruxa', '', 'Bruxa'], ['mago', '', '
   ['zumbi', '', 'Zumbi'], ['elfo', '', 'Elfo'], ['elfa', '', 'Elfa'], ['sereia', '', 'Sereia'], ['tritao', '', 'Tritão'], ['ninja', '', 'Ninja'], ['heroi', '', 'Super-herói'], ['vilao', '', 'Vilão'],
   ['fantasma', '', 'Fantasma'], ['alien', '', 'Alienígena'], ['monstro', '', 'Monstrinho'], ['robo', '', 'Robô'], ['goblin', '', 'Goblin'], ['ogro', '', 'Ogro'], ['caveira', '', 'Caveira'],
   ['abobora', '', 'Abóbora'], ['bola_cristal', '', 'Bola de cristal'], ['dragao_bebe', '', 'Dragão bebê'], ['mamute', '', 'Mamute'], ['dodo', '', 'Dodô']];
+MISTICOS.push(['fenix', '', 'Fênix'], ['chapeu_magico', '', 'Chapéu mágico falante']);
 MISTICOS.forEach(m => { m[3] = 'mistico'; ANIMAIS.push(m); });
+/* personagens estilo desenho (meninos e meninas) — aparecem quando a imagem já existe */
+const PERSONAGENS = [['gamer', 'Gamer'], ['piloto', 'Piloto'], ['heroi_menino', 'Herói'], ['astronauta', 'Astronauta'], ['jogador', 'Jogador de futebol'], ['skatista', 'Skatista'], ['cientista', 'Cientista'], ['bombeiro', 'Bombeiro'], ['menina_gamer', 'Gamer (menina)'], ['menina_heroina', 'Heroína']];
+PERSONAGENS.forEach(([k, n]) => ANIMAIS.push([k, '', n, 'pessoa']));
+const SO_TOON = new Set(['fenix', 'chapeu_magico', ...PERSONAGENS.map(p => p[0])]);
 const REAIS = new Set(['aguia', 'gato', 'cachorro', 'falcao', 'tartaruga', 'peixe', 'leao', 'tigre', 'lobo', 'raposa', 'coruja', 'golfinho', 'cavalo', 'panda', 'coelho', 'dragao']);
 const ehToon = k => (window.TOON || []).includes(k);
 const miniMasc = a => ehToon(a[0]) ? `icons/toon/${a[0]}.webp?v=2` : `icons/anim/mini/${a[0]}.webp?v=2`;
 const imgMasc = a => ehToon(a[0]) ? `icons/toon/${a[0]}.webp?v=2` : `icons/anim/${a[0]}.webp?v=2`;
-const ANIMAL_MOV = { fada: 'voar', fado: 'voar', genio: 'flutuar', fantasma: 'flutuar', heroi: 'voar', sereia: 'nadar', tritao: 'nadar', dragao_bebe: 'voar', aguia: 'voar', falcao: 'voar', coruja: 'voar', papagaio: 'voar', passaro: 'voar', borboleta: 'voar', abelha: 'voar', morcego: 'voar', dragao: 'voar', flamingo: 'flutuar', cisne: 'nadar', pato: 'nadar',
+const ANIMAL_MOV = { fenix: 'voar', fada: 'voar', fado: 'voar', genio: 'flutuar', fantasma: 'flutuar', heroi: 'voar', sereia: 'nadar', tritao: 'nadar', dragao_bebe: 'voar', aguia: 'voar', falcao: 'voar', coruja: 'voar', papagaio: 'voar', passaro: 'voar', borboleta: 'voar', abelha: 'voar', morcego: 'voar', dragao: 'voar', flamingo: 'flutuar', cisne: 'nadar', pato: 'nadar',
   peixe: 'nadar', peixe_tropical: 'nadar', baiacu: 'nadar', tubarao: 'nadar', golfinho: 'nadar', baleia: 'nadar', polvo: 'nadar', lula: 'nadar', foca: 'nadar', lontra: 'nadar', tartaruga: 'nadar', canguru: 'pular', coelho: 'pular', sapo: 'pular' };
 const ACESS_CHAPEU = [['nenhum', ''], ['bone', '🧢'], ['coroa', '👑'], ['cartola', '🎩'], ['formatura', '🎓'], ['capacete', '⛑️'], ['laco', '🎀'], ['fone', '🎧']];
 const ACESS_OCULOS = [['nenhum', ''], ['escuro', '🕶️'], ['gamer', '🥽'], ['redondo', '👓']];
@@ -1529,10 +1534,10 @@ function modalMascote(id, rascunho) {
     <button type="button" class="btn ghost sm" style="margin:6px 0 12px" data-act="mascoteTestarVoz">▶️ Ouvir o mascote</button>
     <div class="abas-img" style="margin-bottom:12px"><button type="button" class="${ehAnimal(MASC_EDIT) ? 'on' : ''}" data-act="mascoteTipo" data-v="animal">🐾 Animais e místicos</button><button type="button" class="${ehAnimal(MASC_EDIT) ? '' : 'on'}" data-act="mascoteTipo" data-v="humano">🧑 Boneco</button></div>
     ${ehAnimal(MASC_EDIT) ? `
-      <div class="masc-grupo"><span>Escolha o seu mascote (${ANIMAIS.length})</span>
+      <div class="masc-grupo"><span>Escolha o seu mascote (${ANIMAIS.filter(a => !SO_TOON.has(a[0]) || ehToon(a[0])).length})</span>
         <div class="busca-masc"><input id="buscaMasc" class="inp" placeholder="🔎 Procurar: gato, dragão, bruxo, fada…" autocomplete="off"></div>
         <div id="semMasc" class="sugerir-masc" hidden></div>
-        ${[['animal', '🐾 Animais'], ['mistico', '✨ Místicos e fantasia']].map(([g, t]) => `<div class="sub-grade" data-g="${g}"><b class="mut peq">${t}</b><div class="grade-animais">${ANIMAIS.filter(a => (a[3] || 'animal') === g).sort((x, y) => ehToon(y[0]) - ehToon(x[0])).map(a => `<button type="button" class="${MASC_EDIT.animal === a[0] ? 'on' : ''}" data-act="mascoteOpc" data-k="animal" data-v="${a[0]}" data-nome="${esc(semAcento(a[2]))}" title="${esc(a[2])}"><img src="${miniMasc(a)}" alt="" loading="lazy"><small>${esc(a[2])}</small></button>`).join('')}</div></div>`).join('')}</div>
+        ${[['pessoa', '🧒 Personagens'], ['animal', '🐾 Animais'], ['mistico', '✨ Místicos e fantasia']].filter(([g]) => ANIMAIS.some(a => (a[3] || 'animal') === g && (!SO_TOON.has(a[0]) || ehToon(a[0])))).map(([g, t]) => `<div class="sub-grade" data-g="${g}"><b class="mut peq">${t}</b><div class="grade-animais">${ANIMAIS.filter(a => (a[3] || 'animal') === g && (!SO_TOON.has(a[0]) || ehToon(a[0]))).sort((x, y) => ehToon(y[0]) - ehToon(x[0])).map(a => `<button type="button" class="${MASC_EDIT.animal === a[0] ? 'on' : ''}" data-act="mascoteOpc" data-k="animal" data-v="${a[0]}" data-nome="${esc(semAcento(a[2]))}" title="${esc(a[2])}"><img src="${miniMasc(a)}" alt="" loading="lazy"><small>${esc(a[2])}</small></button>`).join('')}</div></div>`).join('')}</div>
       <div class="masc-grupo"><span>Movimento</span><div class="masc-opcs">${MOVS_ANIMAL.map(([v, n]) => `<button type="button" class="opc ${(MASC_EDIT.movAnimal || 'auto') === v ? 'on' : ''}" data-act="mascoteOpc" data-k="movAnimal" data-v="${v}">${n}</button>`).join('')}</div></div>
       <div class="masc-grupo"><span>Na cabeça</span><div class="masc-opcs">${ACESS_CHAPEU.map(([v, e]) => `<button type="button" class="opc ${(MASC_EDIT.chapeuA || 'nenhum') === v ? 'on' : ''}" data-act="mascoteOpc" data-k="chapeuA" data-v="${v}">${e || 'Nenhum'}</button>`).join('')}</div></div>
       <div class="masc-grupo"><span>Óculos</span><div class="masc-opcs">${ACESS_OCULOS.map(([v, e]) => `<button type="button" class="opc ${(MASC_EDIT.oculosA || 'nenhum') === v ? 'on' : ''}" data-act="mascoteOpc" data-k="oculosA" data-v="${v}">${e || 'Nenhum'}</button>`).join('')}</div></div>

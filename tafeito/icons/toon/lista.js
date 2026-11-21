@@ -1,2 +1,2 @@
 /* pets estilo desenho 3D (gerados no Canva). O app usa estes quando existem. */
-window.TOON = ["aguia", "baiacu", "baleia", "cachorro", "cao", "cavalo", "cisne", "coelho", "coruja", "dragao", "falcao", "flamingo", "galo", "gatinho", "gato", "golfinho", "leao", "lobo", "lula", "panda", "papagaio", "passaro", "pato", "pavao", "peixe", "peixe_tropical", "pinguim", "polvo", "raposa", "tartaruga", "tigre", "tubarao"];
+window.TOON = ["aguia", "baiacu", "baleia", "cachorro", "cao", "cavalo", "chapeu_magico", "cisne", "coelho", "coruja", "dragao", "falcao", "fenix", "flamingo", "galo", "gatinho", "gato", "golfinho", "leao", "lobo", "lula", "panda", "papagaio", "passaro", "pato", "pavao", "peixe", "peixe_tropical", "pinguim", "polvo", "raposa", "tartaruga", "tigre", "tubarao"];
