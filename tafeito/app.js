@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '3.2.0';
+const VERSAO = '3.3.0';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -478,6 +478,7 @@ function detectarNovidades() {
     if (V.msgs.has(m.id)) continue; V.msgs.add(m.id);
     const deOutro = m.autor !== (S.papel === 'pai' ? 'pai' : S.eu);
     if (deOutro && !(S.chatAberto && m.filho_id === fid())) avisar(`💬 ${m.autor === 'pai' ? 'Pai' : nomeFilho(m.autor)}`, m.texto, 'msg');
+    if (!primeira && deOutro && String(m.texto).startsWith(PREF_FALA) && Date.now() - new Date(m.criado_em) < 5 * 60000) setTimeout(() => petFalaRemota(m), 400);
   }
   for (const p of D.pedidos) {
     const ant = V.ped[p.id]; V.ped[p.id] = p.status;
@@ -1469,6 +1470,43 @@ function brincadeira(forcar) {
 }
 setInterval(() => brincadeira(false), 25000);
 /* vida dos pets: passeiam sozinhos pela tela e fazem truques (olhar, girar, espreguiçar, acenar, pular) */
+/* ---------- O PET FALA: frases próprias e recados para o app do outro ---------- */
+const PREF_FALA = '🗣️ ';
+const frasesDe = id => { const f = mascoteDe(id).frases; return Array.isArray(f) ? f.filter(Boolean) : []; };
+function balaoPet(el, txt, ms = 6000) {
+  if (!el || lsGet('mok_balao_off')) return;
+  let b = el.querySelector('.balao-fala'); if (!b) { b = document.createElement('span'); b.className = 'balao-fala'; el.appendChild(b); }
+  b.textContent = txt; b.classList.remove('some'); clearTimeout(b._t); b._t = setTimeout(() => b.classList.add('some'), ms);
+}
+function petDiz(alvo, txt, tom) {
+  const el = document.querySelector(alvo === 'amigo' ? '.flut-amigo' : '.flut-masc'); if (!el) return;
+  balaoPet(el, txt); const bicho = el.querySelector('.masc-animal');
+  if (bicho) { bicho.classList.remove('truque-acenar'); void bicho.offsetWidth; bicho.classList.add('truque-acenar'); setTimeout(() => bicho.classList.remove('truque-acenar'), 2200); }
+  falar(txt, false, tom);
+}
+function petFalaRemota(m) {
+  const k = 'mok_falou_' + m.id; if (lsGet(k)) return; lsSet(k, 1);
+  const txt = String(m.texto).slice(PREF_FALA.length).replace(/^[^:]{1,30}:\s*/, '');
+  if (lsGet('mok_amigo_off')) { lsSet('mok_amigo_off', 0); render(); }
+  setTimeout(() => petDiz('amigo', txt, 0.85), 150);
+}
+function modalFalarPet() {
+  const m = mascoteDe(S.eu); const fr = frasesDe(S.eu); const quem = nomeDonoAmigo();
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>🗣️ ${esc(m.nome)} fala com ${esc(quem)}</h2>
+    <p class="mut peq">Escreva a frase: o ${esc(m.nome)} fala em voz alta no app de ${esc(quem)}, com balão.</p>
+    <label class="campo"><span>O que o ${esc(m.nome)} vai falar?</span><textarea id="falaPet" rows="2" maxlength="140" placeholder="Ex.: Henrique, bora fazer as tarefas!"></textarea></label>
+    ${fr.length ? `<div class="mut peq" style="margin:6px 0 4px">Frases salvas (toque para usar):</div><div class="chips-motivo">${fr.map(f => `<button class="chip" data-act="usarFrase" data-v="${esc(f)}">${esc(f)}</button>`).join('')}</div>` : ''}
+    <div class="grid2" style="margin-top:12px"><button class="btn pri" data-act="enviarFala">📣 Falar no app de ${esc(quem)}</button><button class="btn ghost" data-act="mascoteEditar" data-id="${esc(S.papel === 'pai' ? 'pai' : S.eu)}">✏️ Minhas frases</button></div>`);
+  setTimeout(() => { const t = $('#falaPet'); t && t.focus(); }, 80);
+}
+async function enviarFala() {
+  const t = ($('#falaPet') || {}).value || ''; const txt = t.trim().slice(0, 140); if (!txt) return toast('Escreva a frase.', 'bad');
+  const m = mascoteDe(S.eu); const para = S.papel === 'pai' ? fid() : S.eu;
+  await enviarMsg(`${PREF_FALA}${m.nome}: ${txt}`, para); fecharTopo();
+  petDiz('meu', txt); toast(`📣 ${m.nome} falou no app de ${nomeDonoAmigo()}`, 'ok');
+}
+/* de vez em quando o pet fala uma das frases salvas */
+setInterval(() => { if (document.hidden || document.querySelector('.modal') || !S.papel || Math.random() > 0.3) return; const fr = frasesDe(S.eu); if (fr.length) petDiz('meu', fr[Math.floor(Math.random() * fr.length)]); }, 150000);
 const TRUQUES = ['olhar', 'girar', 'espreguicar', 'acenar', 'pulinho', 'cambalhota'];
 let ultimoArrasto = 0;
 function vidaPets() {
@@ -1514,11 +1552,11 @@ import(new URL('lib/three/mascote3d.js?v=1', location.href).href).then(() => { i
 /* fala do mascote (voz do próprio celular) */
 const TAMS_MASC = [56, 72, 96, 124, 156];
 const tamMasc = () => { const t = Number(lsGet('mok_masc_tam')); return TAMS_MASC.includes(t) ? t : 72; };
-function falar(txt, forcar = false) {
+function falar(txt, forcar = false, tom = 1.15) {
   if (!forcar && lsGet('mok_masc_mudo')) return false;
   try {
     if (!('speechSynthesis' in window)) return false; speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(txt.replace(/[\u{1F000}-\u{1FAFF}☀-➿]/gu, '')); u.lang = 'pt-BR'; u.rate = 1.05; u.pitch = 1.15;
+    const u = new SpeechSynthesisUtterance(txt.replace(/[\u{1F000}-\u{1FAFF}☀-➿]/gu, '')); u.lang = 'pt-BR'; u.rate = 1.05; u.pitch = tom;
     const v = speechSynthesis.getVoices().find(x => /pt[-_]BR/i.test(x.lang)); if (v) u.voice = v;
     speechSynthesis.speak(u); return true;
   } catch { return false; }
@@ -1564,6 +1602,7 @@ function modalMascote(id, rascunho) {
     <div class="masc-preview">${mascoteVisual(MASC_EDIT, 190)}</div>
     <label class="campo"><span>Nome do mascote</span><input id="mascNome" value="${esc(MASC_EDIT.nome)}" maxlength="20" placeholder="Dê um nome"></label>
     <label class="check"><input type="checkbox" id="mascVoz" ${MASC_EDIT.voz !== false ? 'checked' : ''}> 🔊 Falar comigo (bom dia e tarefas)</label>
+    <label class="campo"><span>💬 Frases do mascote (uma por linha — ele fala de vez em quando e você pode mandar para o outro)</span><textarea id="mascFrases" rows="3" maxlength="2000" placeholder="Bora fazer as tarefas!&#10;Você é o melhor!&#10;Hora de estudar 📚">${esc((MASC_EDIT.frases || []).join('\n'))}</textarea></label>
     <button type="button" class="btn ghost sm" style="margin:6px 0 12px" data-act="mascoteTestarVoz">▶️ Ouvir o mascote</button>
     <div class="abas-img" style="margin-bottom:12px"><button type="button" class="${ehAnimal(MASC_EDIT) ? 'on' : ''}" data-act="mascoteTipo" data-v="animal">🐾 Animais e místicos</button><button type="button" class="${ehAnimal(MASC_EDIT) ? '' : 'on'}" data-act="mascoteTipo" data-v="humano">🧑 Boneco</button></div>
     ${ehAnimal(MASC_EDIT) ? `
@@ -1611,7 +1650,7 @@ function modalAssistentePai() {
       ${r.provas.length ? r.provas.slice(0, 3).map(({ p, f }) => `<div class="bad">📚 ${esc(f.nome)}: <b>${esc(nomeProva(p))}</b> · ${faltaTxt(p)}</div>`).join('') : '<div>📚 Nenhuma prova nesta semana.</div>'}
     </div>
     <div class="grid2" style="margin-top:12px"><button class="btn pri" data-act="ir" data-tela="work">🖼️ Ver imagens</button><button class="btn ghost" data-act="ir" data-tela="tarefas">✅ Tarefas</button>
-    <button class="btn ghost" data-act="chatAbrir">💬 Chat</button><button class="btn ghost" data-act="mascoteEditar" data-id="pai">🎨 Personalizar</button><button class="btn pri" style="grid-column:1/-1" data-act="verAmigo">👀 Ver o pet de ${esc(filhoAtual().nome)}</button></div>`);
+    <button class="btn ghost" data-act="chatAbrir">💬 Chat</button><button class="btn ghost" data-act="mascoteEditar" data-id="pai">🎨 Personalizar</button><button class="btn pri" style="grid-column:1/-1" data-act="verAmigo">👀 Ver o pet de ${esc(filhoAtual().nome)}</button><button class="btn pri" style="grid-column:1/-1" data-act="falarPet">🗣️ ${esc(m.nome)} fala com ${esc(filhoAtual().nome)}</button></div>`);
 }
 function modalAssistente() {
   if (S.papel === 'pai') return modalAssistentePai();
@@ -1628,7 +1667,7 @@ function modalAssistente() {
       <div>💰 A receber: <b>${brl(c.saldo)}</b></div>
     </div>
     <div class="grid2" style="margin-top:12px"><button class="btn pri" data-act="chatAbrir">💬 Falar com o pai</button><button class="btn zap" data-act="whats">📲 WhatsApp</button>
-    <button class="btn ghost" data-act="ir" data-tela="estudo">📚 Minhas provas</button><button class="btn ghost" data-act="mascoteEditar">🎨 Personalizar</button></div>`);
+    <button class="btn ghost" data-act="ir" data-tela="estudo">📚 Minhas provas</button><button class="btn ghost" data-act="mascoteEditar">🎨 Personalizar</button><button class="btn pri" style="grid-column:1/-1" data-act="falarPet">🗣️ ${esc(m.nome)} fala com o pai</button></div>`);
 }
 function flutuantes() {
   const nl = S.papel === 'pai' ? naoLidas() : naoLidas(S.eu);
@@ -1638,8 +1677,8 @@ function flutuantes() {
   let h = `<button class="flut-chat" data-arrastar="chat" ${pos('chat')} data-act="chatAbrir" title="Chat (arraste para mover)">💬${nl ? `<span class="badge">${nl}</span>` : ''}</button>`;
   if (S.papel === 'filho' || S.papel === 'pai') { const m = { ...mascoteDe(S.eu), _dormindo: statusPet(petDe(S.eu)).dormindo }; const d = dicaMascote(); const tam = tamMasc(), mudo = !!lsGet('mok_masc_mudo');
     h += `<div class="flut-masc${ladoDir('masc') ? ' lado-dir' : ''}" data-arrastar="masc" style="${posCss('masc')}--tam:${tam}px">
-      ${d ? `<span class="balao">${esc(d)}</span>` : ''}<div class="masc-par"><button class="masc-toque" data-act="mascote" title="${esc(m.nome)} — toque para abrir, arraste para mover">${mascoteVisual(m, tam)}</button></div>
-      <div class="masc-ctrl sem3d"><button data-act="mascMudo" title="${mudo ? 'Ligar a voz' : 'Silenciar'}">${mudo ? '🔇' : '🔊'}</button><button data-act="mascTam" data-v="-1" title="Diminuir">−</button><button data-act="mascTam" data-v="1" title="Aumentar">+</button><button data-act="passeio" title="${lsGet('mok_passeio_off') ? 'Deixar passear pela tela' : 'Ficar parado no lugar'}">${lsGet('mok_passeio_off') ? '📌' : '🚶'}</button>${lsGet('mok_amigo_off') ? '<button data-act="mostrarAmigo" title="Mostrar o mascote do outro">👥</button>' : ''}</div></div>`;
+      ${d && !lsGet('mok_balao_off') ? `<span class="balao">${esc(d)}</span>` : ''}<div class="masc-par"><button class="masc-toque" data-act="mascote" title="${esc(m.nome)} — toque para abrir, arraste para mover">${mascoteVisual(m, tam)}</button></div>
+      <div class="masc-ctrl sem3d"><button data-act="mascMudo" title="${mudo ? 'Ligar a voz' : 'Silenciar'}">${mudo ? '🔇' : '🔊'}</button><button data-act="mascTam" data-v="-1" title="Diminuir">−</button><button data-act="mascTam" data-v="1" title="Aumentar">+</button><button data-act="falarPet" title="Fazer o pet falar no app do outro">🗣️</button><button data-act="legendas" title="${lsGet('mok_balao_off') ? 'Mostrar legendas' : 'Esconder legendas'}">${lsGet('mok_balao_off') ? '🙊' : '💬'}</button><button data-act="passeio" title="${lsGet('mok_passeio_off') ? 'Deixar passear pela tela' : 'Ficar parado no lugar'}">${lsGet('mok_passeio_off') ? '📌' : '🚶'}</button>${lsGet('mok_amigo_off') ? '<button data-act="mostrarAmigo" title="Mostrar o mascote do outro">👥</button>' : ''}</div></div>`;
     const am = amigoHTML(tam); if (am) h += `<div class="flut-amigo" data-arrastar="amigo" style="${posCss('amigo')}--tam:${tam}px">${am}</div>`; }
   if (S.chatAberto) h += `<div class="chat-flut-bg" data-act="chatFechar"></div><div class="chat-flut"><div class="linha" style="margin-bottom:6px"><b class="esp">💬 Chat</b><button class="btn zap sm" style="width:auto" data-act="whats">📲 WhatsApp</button><button class="icone-btn" data-act="chatFechar">✕</button></div>${telaChat()}</div>`;
   return h;
@@ -2366,6 +2405,10 @@ const acoes = {
   brincarJuntos: () => brincarJuntos(),
   esconderAmigo: () => { lsSet('mok_amigo_off', 1); fecharTopo(); render(); toast('🙈 Escondido. Toque em 👥 para mostrar de novo.'); },
   mostrarAmigo: () => { lsSet('mok_amigo_off', 0); render(); },
+  falarPet: () => modalFalarPet(),
+  enviarFala: () => enviarFala(),
+  usarFrase: d => { const t = $('#falaPet'); if (t) { t.value = d.v; t.focus(); } },
+  legendas: () => { const off = !lsGet('mok_balao_off'); lsSet('mok_balao_off', off ? 1 : 0); render(); toast(off ? '🙊 Legendas escondidas' : '💬 Legendas visíveis'); },
   passeio: () => { const off = !lsGet('mok_passeio_off'); lsSet('mok_passeio_off', off ? 1 : 0); render(); toast(off ? '📌 Os pets vão ficar parados' : '🚶 Os pets vão passear pela tela'); },
   areasWork: () => modalAreasWork(),
   addArea: () => { const l = $('#listaAreas'); if (l && l.children.length < 12) l.insertAdjacentHTML('beforeend', linhaArea({ icone: '📁', nome: '' }, l.children.length)); const ins = l.querySelectorAll('input[name=an]'); ins[ins.length - 1].focus(); },
@@ -2514,10 +2557,11 @@ const acoes = {
   trocarFoto: d => escolherFotoPerfil(d.id),
   removerFoto: d => salvarFotoPerfil(d.id, ''),
   mascoteEditar: d => modalMascote(d.id || (S.papel === 'pai' ? fid() : S.eu)),
-  mascoteTipo: (d, b) => { const nm = $('#mascNome'); if (nm) MASC_EDIT.nome = nm.value; MASC_EDIT.tipo = d.v; const id = b.closest('.modal').querySelector('[data-act=mascoteSalvar]').dataset.id; const r = { ...MASC_EDIT }; fecharModais(); modalMascote(id, r); },
+  mascoteTipo: (d, b) => { const nm = $('#mascNome'); if (nm) MASC_EDIT.nome = nm.value; const fr = $('#mascFrases'); if (fr) MASC_EDIT.frases = fr.value.split('\n').map(x => x.trim()).filter(Boolean); MASC_EDIT.tipo = d.v; const id = b.closest('.modal').querySelector('[data-act=mascoteSalvar]').dataset.id; const r = { ...MASC_EDIT }; fecharModais(); modalMascote(id, r); },
   mascoteOpc: (d, b) => { MASC_EDIT[d.k] = d.v; const box = b.closest('.modal'); box.querySelector('.masc-preview').innerHTML = mascoteVisual(MASC_EDIT, 190); box.querySelectorAll(`[data-k="${d.k}"]`).forEach(x => x.classList.toggle('on', x.dataset.v === d.v)); },
   mascoteSalvar: async d => {
     const nm = $('#mascNome'); MASC_EDIT.nome = (nm && nm.value.trim().slice(0, 20)) || 'Bolt'; const vz = $('#mascVoz'); if (vz) MASC_EDIT.voz = vz.checked;
+    const fr = $('#mascFrases'); if (fr) MASC_EDIT.frases = fr.value.split('\n').map(x => x.trim().slice(0, 120)).filter(Boolean).slice(0, 15);
     try { await salvarPerfil(d.id, { mascote: { ...MASC_EDIT } }); fecharModais(); toast(`🎨 ${MASC_EDIT.nome} está pronto!`, 'ok'); } catch (e) { toast(msgErro(e), 'bad'); }
   },
   mascote: () => { modalAssistente(); const m = mascoteDe(S.eu); if (m.voz !== false) falar(textoMascote()); },
