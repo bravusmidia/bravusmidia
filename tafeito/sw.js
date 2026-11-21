@@ -1,5 +1,5 @@
 // TáFeito — service worker (funciona offline e mostra notificações)
-const CACHE = 'tafeito-v39';
+const CACHE = 'tafeito-v40';
 const ARQUIVOS = ['./', './index.html', './styles.css', './app.js', './config.js', './manifest.webmanifest',
   './lib/supabase.js', './icons/icon-192.png', './icons/icon-512.png', './icons/3d/lista.js'];
 

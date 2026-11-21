@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '3.1.2';
+const VERSAO = '3.2.0';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -1468,6 +1468,38 @@ function brincadeira(forcar) {
   });
 }
 setInterval(() => brincadeira(false), 25000);
+/* vida dos pets: passeiam sozinhos pela tela e fazem truques (olhar, girar, espreguiçar, acenar, pular) */
+const TRUQUES = ['olhar', 'girar', 'espreguicar', 'acenar', 'pulinho', 'cambalhota'];
+let ultimoArrasto = 0;
+function vidaPets() {
+  if (document.hidden || document.querySelector('.modal, #visorImg') || arrasto || Date.now() - ultimoArrasto < 8000) return;
+  document.querySelectorAll('.flut-masc, .flut-amigo').forEach(el => {
+    const bicho = el.querySelector('.masc-animal'); if (!bicho || bicho.classList.contains('dormindo') || el.classList.contains('passeando')) return;
+    const r = Math.random();
+    if (r < 0.45) {
+      const t = TRUQUES[Math.floor(Math.random() * TRUQUES.length)];
+      bicho.classList.remove(...TRUQUES.map(x => 'truque-' + x)); void bicho.offsetWidth; bicho.classList.add('truque-' + t);
+      setTimeout(() => bicho.classList.remove('truque-' + t), 2400);
+    } else if (r < 0.75 && !lsGet('mok_passeio_off')) passear(el, bicho);
+  });
+}
+function passear(el, bicho) {
+  const b = el.getBoundingClientRect(); const w = b.width, h = b.height;
+  const topo = 70, baixo = innerHeight - h - (innerWidth >= 1000 ? 20 : 110);
+  const nx = Math.max(6, Math.min(innerWidth - w - 6, b.left + (Math.random() * 360 - 180)));
+  const ny = Math.max(topo, Math.min(baixo, b.top + (Math.random() * 240 - 120)));
+  const voa = bicho.classList.contains('mov-voar'), nada = bicho.classList.contains('mov-nadar');
+  bicho.style.setProperty('--dir', nx < b.left ? -1 : 1);
+  el.classList.add('passeando', voa ? 'voando' : nada ? 'nadando' : 'andando');
+  const dur = Math.max(1.6, Math.hypot(nx - b.left, ny - b.top) / 90);
+  Object.assign(el.style, { transition: `left ${dur}s ease-in-out, top ${dur}s ease-in-out`, left: b.left + 'px', top: b.top + 'px', right: 'auto', bottom: 'auto' });
+  requestAnimationFrame(() => Object.assign(el.style, { left: nx + 'px', top: ny + 'px' }));
+  setTimeout(() => {
+    el.classList.remove('passeando', 'voando', 'nadando', 'andando'); el.style.transition = '';
+    const k = el.dataset.arrastar; if (k) lsSet('mok_pos_' + k, { x: nx, y: ny }); el.classList.toggle('lado-dir', nx > innerWidth / 2);
+  }, dur * 1000 + 80);
+}
+setInterval(vidaPets, 7000);
 setInterval(() => document.querySelectorAll('[data-cron]').forEach(el => { el.textContent = fmtDur((Date.now() - new Date(el.dataset.cron)) / 1000); }), 1000);
 function atualizarPetUI() { const c = document.querySelector('.modal .card-pet'); if (c) c.outerHTML = cardPet(S.papel === 'pai' ? 'pai' : S.eu); }
 setInterval(() => { if (S.papel && !document.querySelector('.modal')) { const fm = document.querySelector('.flut-masc .balao'); if (fm) fm.textContent = dicaMascote(); } }, 60000);
@@ -1607,7 +1639,7 @@ function flutuantes() {
   if (S.papel === 'filho' || S.papel === 'pai') { const m = { ...mascoteDe(S.eu), _dormindo: statusPet(petDe(S.eu)).dormindo }; const d = dicaMascote(); const tam = tamMasc(), mudo = !!lsGet('mok_masc_mudo');
     h += `<div class="flut-masc${ladoDir('masc') ? ' lado-dir' : ''}" data-arrastar="masc" style="${posCss('masc')}--tam:${tam}px">
       ${d ? `<span class="balao">${esc(d)}</span>` : ''}<div class="masc-par"><button class="masc-toque" data-act="mascote" title="${esc(m.nome)} — toque para abrir, arraste para mover">${mascoteVisual(m, tam)}</button></div>
-      <div class="masc-ctrl sem3d"><button data-act="mascMudo" title="${mudo ? 'Ligar a voz' : 'Silenciar'}">${mudo ? '🔇' : '🔊'}</button><button data-act="mascTam" data-v="-1" title="Diminuir">−</button><button data-act="mascTam" data-v="1" title="Aumentar">+</button>${lsGet('mok_amigo_off') ? '<button data-act="mostrarAmigo" title="Mostrar o mascote do outro">👥</button>' : ''}</div></div>`;
+      <div class="masc-ctrl sem3d"><button data-act="mascMudo" title="${mudo ? 'Ligar a voz' : 'Silenciar'}">${mudo ? '🔇' : '🔊'}</button><button data-act="mascTam" data-v="-1" title="Diminuir">−</button><button data-act="mascTam" data-v="1" title="Aumentar">+</button><button data-act="passeio" title="${lsGet('mok_passeio_off') ? 'Deixar passear pela tela' : 'Ficar parado no lugar'}">${lsGet('mok_passeio_off') ? '📌' : '🚶'}</button>${lsGet('mok_amigo_off') ? '<button data-act="mostrarAmigo" title="Mostrar o mascote do outro">👥</button>' : ''}</div></div>`;
     const am = amigoHTML(tam); if (am) h += `<div class="flut-amigo" data-arrastar="amigo" style="${posCss('amigo')}--tam:${tam}px">${am}</div>`; }
   if (S.chatAberto) h += `<div class="chat-flut-bg" data-act="chatFechar"></div><div class="chat-flut"><div class="linha" style="margin-bottom:6px"><b class="esp">💬 Chat</b><button class="btn zap sm" style="width:auto" data-act="whats">📲 WhatsApp</button><button class="icone-btn" data-act="chatFechar">✕</button></div>${telaChat()}</div>`;
   return h;
@@ -2334,6 +2366,7 @@ const acoes = {
   brincarJuntos: () => brincarJuntos(),
   esconderAmigo: () => { lsSet('mok_amigo_off', 1); fecharTopo(); render(); toast('🙈 Escondido. Toque em 👥 para mostrar de novo.'); },
   mostrarAmigo: () => { lsSet('mok_amigo_off', 0); render(); },
+  passeio: () => { const off = !lsGet('mok_passeio_off'); lsSet('mok_passeio_off', off ? 1 : 0); render(); toast(off ? '📌 Os pets vão ficar parados' : '🚶 Os pets vão passear pela tela'); },
   areasWork: () => modalAreasWork(),
   addArea: () => { const l = $('#listaAreas'); if (l && l.children.length < 12) l.insertAdjacentHTML('beforeend', linhaArea({ icone: '📁', nome: '' }, l.children.length)); const ins = l.querySelectorAll('input[name=an]'); ins[ins.length - 1].focus(); },
   delArea: (d, b) => { const l = b.closest('.area-linha'); if (l) l.remove(); },
@@ -2703,7 +2736,7 @@ document.addEventListener('pointerdown', e => {
   const r = el.getBoundingClientRect(); arrasto = { el, k: el.dataset.arrastar, dx: e.clientX - r.left, dy: e.clientY - r.top, x0: e.clientX, y0: e.clientY, moveu: false };
 });
 document.addEventListener('pointermove', e => {
-  if (!arrasto) return; const a = arrasto;
+  if (!arrasto) return; const a = arrasto; ultimoArrasto = Date.now(); a.el.style.transition = ''; a.el.classList.remove('passeando', 'voando', 'nadando', 'andando');
   if (!a.moveu && Math.hypot(e.clientX - a.x0, e.clientY - a.y0) < 8) return;
   a.moveu = true; e.preventDefault(); a.el.classList.add('arrastando');
   const w = a.el.offsetWidth, h = a.el.offsetHeight;
