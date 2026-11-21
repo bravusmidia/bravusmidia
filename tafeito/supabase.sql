@@ -637,4 +637,220 @@ do $$ begin
   perform cron.schedule('tafeito-lembretes', '* * * * *', 'select public.mok_push_lembretes()');
 end $$;
 
+-- =====================================================================
+-- v1.3: JOGO SÓ COM TUDO FEITO · ÁREA DE ESTUDO (PROVAS) · "CIENTE" · TEMPO ONLINE
+-- =====================================================================
+
+-- jogo/PC/celular só liberam com TODAS as tarefas do dia (inclusive as opcionais e os trabalhos do dia)
+alter table public.mok_filhos add column if not exists exigir_todas boolean not null default true;
+
+-- ---------- PROVAS ----------
+create table if not exists public.mok_provas (
+  id text primary key,
+  filho_id text not null references public.mok_filhos(id) on delete cascade,
+  materia text not null check (char_length(materia) between 1 and 80),
+  conteudo text not null default '',
+  data date not null,
+  horario text not null default '08:00' check (horario ~ '^\d{2}:\d{2}$'),
+  criado_por text not null default '',
+  criado_em timestamptz not null default now()
+);
+
+-- "Ciente": cada clique fica gravado. Ninguém edita nem apaga (nem o filho, nem o pai).
+create table if not exists public.mok_cientes (
+  id bigint generated always as identity primary key,
+  filho_id text not null,
+  prova_id text not null,
+  materia text not null default '',
+  etapa text not null check (etapa in ('semana','2d','1d','2h','lista')),
+  criado_em timestamptz not null default now()
+);
+
+-- tempo online: segundos por dia, calculados pelo relógio do servidor
+create table if not exists public.mok_uso (
+  perfil uuid not null references auth.users(id) on delete cascade,
+  filho_id text,
+  dia date not null,
+  segundos int not null default 0,
+  primary key (perfil, dia)
+);
+alter table public.mok_perfis add column if not exists entrou_em timestamptz;
+alter table public.mok_perfis add column if not exists tempo_total int not null default 0;
+
+create or replace function public.mok_prova_guarda() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if not mok_is_pai() then
+    if tg_op = 'INSERT' then new.filho_id := mok_meu_filho();
+    elsif new.filho_id is distinct from old.filho_id then raise exception 'Não pode mudar o dono da prova.';
+    end if;
+  end if;
+  if tg_op = 'INSERT' then
+    new.criado_por := case when mok_is_pai() then 'pai' else coalesce(mok_meu_filho(), '') end;
+    new.criado_em := now();
+  else
+    new.criado_por := old.criado_por; new.criado_em := old.criado_em;
+  end if;
+  return new;
+end $$;
+drop trigger if exists mok_prova_guarda on public.mok_provas;
+create trigger mok_prova_guarda before insert or update on public.mok_provas
+  for each row execute function public.mok_prova_guarda();
+
+-- o filho toca em "Ciente": o banco grava (hora do servidor) e devolve quantas vezes ele já confirmou
+create or replace function public.mok_ciente(p_prova text, p_etapa text) returns int
+language plpgsql security definer set search_path = public as $$
+declare pr mok_provas%rowtype; n int;
+begin
+  select * into pr from mok_provas where id = p_prova;
+  if pr.id is null then raise exception 'Prova não encontrada.'; end if;
+  if mok_meu_filho() is distinct from pr.filho_id then raise exception 'Só o dono da prova marca ciente.'; end if;
+  if p_etapa not in ('semana','2d','1d','2h','lista') then raise exception 'Alerta inválido.'; end if;
+  insert into mok_cientes (filho_id, prova_id, materia, etapa) values (pr.filho_id, pr.id, pr.materia, p_etapa);
+  select count(*) into n from mok_cientes where filho_id = pr.filho_id;
+  return n;
+end $$;
+revoke all on function public.mok_ciente(text, text) from public, anon;
+grant execute on function public.mok_ciente(text, text) to authenticated;
+
+-- ping a cada minuto com o app aberto: soma o tempo real que passou (no máximo 90 s por ping)
+-- e marca a hora de entrada quando o app foi aberto de novo (mais de 3 min sem ping)
+create or replace function public.mok_ping() returns void
+language plpgsql security definer set search_path = public as $$
+declare p mok_perfis%rowtype; seg int := 0; v_dia date := (now() at time zone 'America/Fortaleza')::date;
+begin
+  select * into p from mok_perfis where id = auth.uid();
+  if p.id is null then return; end if;
+  if p.visto_em is not null and now() - p.visto_em <= interval '3 minutes' then
+    seg := least(90, greatest(0, extract(epoch from now() - p.visto_em)::int));
+  end if;
+  update mok_perfis set visto_em = now(), tempo_total = tempo_total + seg,
+    entrou_em = case when p.visto_em is null or now() - p.visto_em > interval '3 minutes' then now() else coalesce(entrou_em, now()) end
+   where id = p.id;
+  insert into mok_uso (perfil, filho_id, dia, segundos) values (p.id, p.filho_id, v_dia, seg)
+  on conflict (perfil, dia) do update set segundos = mok_uso.segundos + excluded.segundos;
+end $$;
+grant execute on function public.mok_ping() to authenticated;
+
+grant select, insert, update, delete on public.mok_provas to authenticated;
+grant select on public.mok_cientes, public.mok_uso to authenticated;
+revoke insert, update, delete on public.mok_cientes, public.mok_uso from authenticated, anon;
+
+alter table public.mok_provas  enable row level security;
+alter table public.mok_cientes enable row level security;
+alter table public.mok_uso     enable row level security;
+
+drop policy if exists mok_prv_ler on public.mok_provas;
+create policy mok_prv_ler on public.mok_provas for select to authenticated using (mok_pode_ver(filho_id));
+drop policy if exists mok_prv_ins on public.mok_provas;
+create policy mok_prv_ins on public.mok_provas for insert to authenticated with check (mok_pode_ver(filho_id));
+drop policy if exists mok_prv_upd on public.mok_provas;
+create policy mok_prv_upd on public.mok_provas for update to authenticated using (mok_pode_ver(filho_id)) with check (mok_pode_ver(filho_id));
+drop policy if exists mok_prv_del on public.mok_provas;
+create policy mok_prv_del on public.mok_provas for delete to authenticated using (mok_pode_ver(filho_id));
+
+drop policy if exists mok_cie_ler on public.mok_cientes;
+create policy mok_cie_ler on public.mok_cientes for select to authenticated using (mok_pode_ver(filho_id));
+drop policy if exists mok_uso_ler on public.mok_uso;
+create policy mok_uso_ler on public.mok_uso for select to authenticated using (mok_is_pai() or perfil = auth.uid());
+
+do $$
+declare t text;
+begin
+  foreach t in array array['mok_provas','mok_cientes']
+  loop
+    begin
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    exception when duplicate_object then null;
+    end;
+  end loop;
+end $$;
+
+-- ---------- AVISOS: qualquer atualização chega no celular do filho ----------
+create or replace function public.mok_push_gatilho2() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare nome text; quando text; r record;
+begin
+  if tg_op = 'DELETE' then r := old; else r := new; end if;
+  if tg_table_name <> 'mok_filhos' then select f.nome into nome from mok_filhos f where f.id = r.filho_id; end if;
+  if tg_table_name = 'mok_tarefas' then
+    if tg_op = 'UPDATE' and (old.titulo, old.horario, old.dias, old.descricao, old.ativa, old.itens, old.valor, old.recorrencia, old.data_unica, old.obrigatoria)
+        is distinct from (new.titulo, new.horario, new.dias, new.descricao, new.ativa, new.itens, new.valor, new.recorrencia, new.data_unica, new.obrigatoria) then
+      perform mok_push_enviar(new.filho_id, case when not new.ativa then '⏸️ Tarefa pausada: ' else '✏️ Tarefa alterada: ' end || new.titulo,
+        case when new.horario <> '' then 'Horário: ' || new.horario else 'Veja no app' end, 'tar');
+    elsif tg_op = 'DELETE' then
+      perform mok_push_enviar(old.filho_id, '🗑️ Tarefa removida: ' || old.titulo, 'Abra o TáFeito', 'tar');
+    end if;
+  elsif tg_table_name = 'mok_missoes' then
+    if tg_op = 'INSERT' then perform mok_push_enviar(new.filho_id, '🎯 Nova missão: ' || new.titulo, coalesce(nullif(new.premio, ''), 'Veja no app'), 'mis');
+    elsif tg_op = 'UPDATE' and (old.titulo, old.meta, old.premio, old.valor, old.ativa) is distinct from (new.titulo, new.meta, new.premio, new.valor, new.ativa) then
+      perform mok_push_enviar(new.filho_id, '🎯 Missão alterada: ' || new.titulo, coalesce(nullif(new.premio, ''), 'Veja no app'), 'mis');
+    end if;
+  elsif tg_table_name = 'mok_filhos' then
+    if (old.horas_pc, old.horas_cel, old.premio_extra, old.exigir_aprovacao, old.exigir_todas)
+        is distinct from (new.horas_pc, new.horas_cel, new.premio_extra, new.exigir_aprovacao, new.exigir_todas) then
+      perform mok_push_enviar(new.id, '🏆 Prêmios atualizados', '💻 ' || new.horas_pc || 'h · 📱 ' || new.horas_cel || 'h', 'mis');
+    end if;
+  elsif tg_table_name = 'mok_pagamentos' then
+    perform mok_push_enviar(new.filho_id, '💸 Pagamento recebido', 'R$ ' || replace(to_char(new.valor, 'FM999990.00'), '.', ','), 'pag');
+  elsif tg_table_name = 'mok_provas' then
+    quando := to_char(r.data, 'DD/MM') || ' às ' || r.horario;
+    if tg_op = 'INSERT' then
+      if new.criado_por = 'pai' then perform mok_push_enviar(new.filho_id, '📚 Nova prova: ' || new.materia, quando, 'prova');
+      else perform mok_push_enviar('pai', '📚 ' || coalesce(nome, 'Filho') || ' marcou prova', new.materia || ' · ' || quando, 'prova'); end if;
+      perform mok_push_enviar(new.filho_id, '📅 Prova salva: ' || new.materia, 'Vou te lembrar 2 dias, 1 dia e 2 horas antes.', 'prova');
+    elsif tg_op = 'UPDATE' and (old.materia, old.data, old.horario) is distinct from (new.materia, new.data, new.horario) then
+      perform mok_push_enviar(new.filho_id, '✏️ Prova alterada: ' || new.materia, quando, 'prova');
+      perform mok_push_enviar('pai', '✏️ Prova de ' || coalesce(nome, 'filho') || ' alterada', new.materia || ' · ' || quando, 'prova');
+    elsif tg_op = 'DELETE' then
+      perform mok_push_enviar(old.filho_id, '🗑️ Prova removida: ' || old.materia, quando, 'prova');
+      perform mok_push_enviar('pai', '🗑️ Prova de ' || coalesce(nome, 'filho') || ' removida', old.materia || ' · ' || quando, 'prova');
+    end if;
+  elsif tg_table_name = 'mok_cientes' then
+    perform mok_push_enviar('pai', '👍 ' || coalesce(nome, 'Filho') || ' ciente da prova', new.materia, 'ciente');
+  end if;
+  return null;
+end $$;
+
+drop trigger if exists mok_push_tar2 on public.mok_tarefas;
+create trigger mok_push_tar2 after update or delete on public.mok_tarefas for each row execute function public.mok_push_gatilho2();
+drop trigger if exists mok_push_mis on public.mok_missoes;
+create trigger mok_push_mis after insert or update on public.mok_missoes for each row execute function public.mok_push_gatilho2();
+drop trigger if exists mok_push_fil on public.mok_filhos;
+create trigger mok_push_fil after update on public.mok_filhos for each row execute function public.mok_push_gatilho2();
+drop trigger if exists mok_push_pag on public.mok_pagamentos;
+create trigger mok_push_pag after insert on public.mok_pagamentos for each row execute function public.mok_push_gatilho2();
+drop trigger if exists mok_push_prv on public.mok_provas;
+create trigger mok_push_prv after insert or update or delete on public.mok_provas for each row execute function public.mok_push_gatilho2();
+drop trigger if exists mok_push_cie on public.mok_cientes;
+create trigger mok_push_cie after insert on public.mok_cientes for each row execute function public.mok_push_gatilho2();
+
+-- ---------- LEMBRETE DAS PROVAS (mesmo com o app fechado): 2 dias, 1 dia e 2 horas antes ----------
+create or replace function public.mok_push_provas() returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare p record; dh timestamptz; et record; quando text;
+begin
+  for p in select * from mok_provas where data >= (now() at time zone 'America/Fortaleza')::date - 1 loop
+    dh := (p.data + p.horario::time) at time zone 'America/Fortaleza';
+    if dh <= now() then continue; end if;
+    quando := to_char(p.data, 'DD/MM') || ' às ' || p.horario;
+    for et in select * from (values ('2d', interval '2 days', interval '1 day', '📚 Prova em 2 dias: '),
+                                    ('1d', interval '1 day', interval '2 hours', '⚠️ Prova AMANHÃ: '),
+                                    ('2h', interval '2 hours', interval '0', '🚨 Prova em 2 HORAS: ')) v(cod, antes, ate, tit) loop
+      if now() >= dh - et.antes and now() < dh - et.ate and p.criado_em <= dh - et.antes + interval '5 minutes' then
+        insert into mok_push_lembrete_log (chave) values ('prova@' || p.id || '@' || et.cod || '@' || p.data || p.horario) on conflict do nothing;
+        if found then
+          perform mok_push_enviar(p.filho_id, et.tit || p.materia, quando || ' · abra o TáFeito e toque em Ciente', 'prova');
+        end if;
+      end if;
+    end loop;
+  end loop;
+end $$;
+revoke all on function public.mok_push_provas() from public, anon, authenticated;
+
+do $$ begin
+  if exists (select 1 from cron.job where jobname = 'tafeito-provas') then perform cron.unschedule('tafeito-provas'); end if;
+  perform cron.schedule('tafeito-provas', '* * * * *', 'select public.mok_push_provas()');
+end $$;
+
 -- Pronto! Agora abra o app e crie a conta do Pai.

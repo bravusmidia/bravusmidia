@@ -3,9 +3,9 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '1.2.0';
+const VERSAO = '1.3.0';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
-const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis'];
+const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
 const CATS = { casa: { nome: 'Casa', icone: '🏠' }, trabalho: { nome: 'Work', icone: '💼' } };
 // Estudo saiu do app (o filho já cuida disso sozinho): tarefas e missões antigas de estudo ficam ocultas.
@@ -14,6 +14,8 @@ const PATENTES = ['Recruta', 'Soldado', 'Cabo', '3º Sargento', '2º Sargento', 
 const DSEM = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const RRDIA = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 const TIPOS_MISSAO = { total: 'Concluir X tarefas', categoria: 'Concluir X tarefas de uma categoria', sequencia: 'X dias seguidos com tudo feito', dias: 'X dias (não precisa ser seguido) com tudo feito' };
+const ETAPAS = { '2d': { h: 48, tit: '📚 Prova em 2 dias' }, '1d': { h: 24, tit: '⚠️ Prova AMANHÃ' }, '2h': { h: 2, tit: '🚨 Prova em 2 HORAS' } };
+const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const CORES = ['#4f7cff', '#f5a524', '#22c55e', '#e649a6', '#14b8a6'];
 
 /* ---------------- utilidades ---------------- */
@@ -42,7 +44,7 @@ const msgErro = e => { const m = (e && (e.message || e.error_description || e.ms
 const S = {
   modo: null, papel: null, eu: null, filhoSel: null, tela: null, diaVer: hojeISO(),
   dados: Object.fromEntries(TABELAS.map(t => [t, []])), config: {}, online: new Set(),
-  vistos: { ok: false }, abaPedidos: 'novo'
+  vistos: { ok: false }, abaPedidos: 'novo', calMes: hojeISO().slice(0, 7)
 };
 let DB = null;
 let promptInstalar = null;
@@ -82,6 +84,12 @@ class LocalStore {
     db.mensagens = [{ id: uid(), filho_id: 'henrique', autor: 'pai', texto: 'Bem-vindo ao TáFeito! Faça suas missões e libere o computador. 💪', lido: false, criado_em: agoraISO() }];
     this._save(db);
   }
+  async rpc(n, a) {
+    if (n === 'mok_ciente') { const db = this._load(); db.cientes = db.cientes || []; const pr = (db.provas || []).find(x => x.id === a.p_prova);
+      db.cientes.push({ id: Date.now(), filho_id: pr.filho_id, prova_id: pr.id, materia: pr.materia, etapa: a.p_etapa, criado_em: agoraISO() }); this._save(db);
+      return db.cientes.filter(c => c.filho_id === pr.filho_id).length; }
+    return null;
+  }
   async listar(t) { const d = this._load()[t] || []; return t === 'filhos' ? d.sort((a, b) => a.ordem - b.ordem) : d; }
   async salvar(t, row) {
     const db = this._load(); db[t] = db[t] || [];
@@ -110,6 +118,8 @@ class SupaStore {
     let q = this.sb.from('mok_' + t).select('*');
     if (t === 'mensagens') q = q.order('criado_em', { ascending: false }).limit(500);
     if (t === 'filhos') q = q.order('ordem');
+    if (t === 'cientes') q = q.order('criado_em', { ascending: false }).limit(2000);
+    if (t === 'uso') q = q.order('dia', { ascending: false }).limit(400);
     const { data, error } = await q;
     if (error) throw error;
     return t === 'mensagens' ? data.reverse() : data;
@@ -205,7 +215,8 @@ function tarefasDoDia(dia, cats, soDiarias = false, filhoId = fid()) {
 }
 
 function statusDia(dia = hojeISO(), soDiarias = false, filhoId = fid()) {
-  const obr = tarefasDoDia(dia, null, soDiarias, filhoId).filter(t => t.obrigatoria);
+  const fx = S.dados.filhos.find(x => x.id === filhoId) || {};
+  const obr = tarefasDoDia(dia, null, soDiarias, filhoId).filter(t => t.obrigatoria || fx.exigir_todas !== false);
   const feitas = obr.filter(t => ehConcluida(regDe(t, dia))).length;
   return { total: obr.length, feitas, liberado: obr.length > 0 && feitas === obr.length };
 }
@@ -393,7 +404,9 @@ async function abrirApp() {
   detectarNovidades();
   DB.assinar(aoMudarBanco);
   DB.presenca(S.eu, chaves => { S.online = new Set(chaves); render(); });
-  DB.ping(); setInterval(() => DB.ping(), 60000);
+  DB.ping(); setInterval(() => { if (document.visibilityState === 'visible') DB.ping(); }, 60000);
+  if (S.papel === 'pai' && S.modo === 'online') setInterval(recarregarUso, 60000);
+  setInterval(checarProvas, 30000); setTimeout(checarProvas, 3000);
   setInterval(checarLembretes, 30000); setTimeout(checarLembretes, 2500);
   setInterval(() => { if (S.diaVer !== hojeISO() && S.tela !== 'painel') S.diaVer = hojeISO(); render(); }, 60000);
   render();
@@ -407,6 +420,9 @@ async function carregarTudo() {
   S.config = S.dados.config.find(c => c.id == 1) || {};
 }
 
+async function recarregarUso() {
+  try { const [p, u] = await Promise.all([DB.listar('perfis'), DB.listar('uso')]); S.dados.perfis = p; S.dados.uso = u; if (S.tela === 'painel' || S.tela === 'estudo') render(); } catch { }
+}
 let timerRecarga = null;
 function aoMudarBanco() {
   clearTimeout(timerRecarga);
@@ -416,7 +432,7 @@ function aoMudarBanco() {
 /* notificações a partir das mudanças (chat, pedidos, tarefas novas, aprovações) */
 function detectarNovidades() {
   const V = S.vistos, D = S.dados, primeira = !V.ok;
-  V.msgs = V.msgs || new Set(); V.tars = V.tars || new Set(); V.ped = V.ped || {}; V.reg = V.reg || {};
+  V.msgs = V.msgs || new Set(); V.tars = V.tars || new Set(); V.sig = V.sig || {}; V.prv = V.prv || {}; V.mis = V.mis || new Set(); V.ped = V.ped || {}; V.reg = V.reg || {};
   const avisar = (t, c, tag) => { if (!primeira) notificar(t, c, tag); };
   for (const m of D.mensagens) {
     if (V.msgs.has(m.id)) continue; V.msgs.add(m.id);
@@ -440,6 +456,19 @@ function detectarNovidades() {
     if (V.tars.has(t.id)) continue; V.tars.add(t.id);
     if (S.papel === 'filho' && t.filho_id === S.eu) avisar(`📋 Nova tarefa: ${t.titulo}`, t.horario ? `Horário: ${t.horario}` : (t.valor > 0 ? `Vale ${brl(t.valor)}` : 'Veja no app'), 'tar');
   }
+  const idsTar = new Set(D.tarefas.map(t => t.id));
+  for (const t of D.tarefas) {
+    const sig = JSON.stringify([t.titulo, t.horario, t.dias, t.descricao, t.ativa, t.itens, t.valor, t.recorrencia, t.data_unica, t.obrigatoria]);
+    if (V.sig[t.id] && V.sig[t.id] !== sig && S.papel === 'filho' && t.filho_id === S.eu) avisar(`✏️ Tarefa alterada: ${t.titulo}`, t.horario ? `Horário: ${t.horario}` : 'Veja no app', 'tar');
+    V.sig[t.id] = sig;
+  }
+  for (const id of Object.keys(V.sig)) if (!idsTar.has(id)) { delete V.sig[id]; if (S.papel === 'filho') avisar('🗑️ Uma tarefa foi removida', 'Abra a aba Tarefas', 'tar'); }
+  for (const m of D.missoes) { if (V.mis.has(m.id)) continue; V.mis.add(m.id); if (S.papel === 'filho' && m.filho_id === S.eu) avisar(`🎯 Nova missão: ${m.titulo}`, m.premio || 'Veja no app', 'mis'); }
+  for (const p of D.provas) {
+    const sig = p.materia + p.data + p.horario; const ant = V.prv[p.id]; V.prv[p.id] = sig;
+    if (!ant && p.criado_por && p.criado_por !== (S.papel === 'pai' ? 'pai' : S.eu)) avisar(S.papel === 'pai' ? `📚 ${nomeFilho(p.filho_id)} marcou prova` : `📚 Nova prova: ${p.materia}`, `${p.materia} · ${quandoProva(p)}`, 'prova');
+    else if (ant && ant !== sig) avisar(`✏️ Prova alterada: ${p.materia}`, quandoProva(p), 'prova');
+  }
   V.ok = true;
 }
 
@@ -453,8 +482,8 @@ function render() {
   const msgsEl = $('#msgs'); const rolagem = msgsEl ? msgsEl.scrollHeight - msgsEl.scrollTop - msgsEl.clientHeight : 0;
 
   const telas = S.papel === 'pai'
-    ? { painel: telaPainel, tarefas: telaTarefasPai, work: telaWorkPai, missoes: telaMissoes, chat: telaChat, mais: telaMaisPai }
-    : { hoje: telaHoje, work: telaWorkFilho, missoes: telaMissoes, premios: telaPremios, chat: telaChat, mais: telaMaisFilho };
+    ? { painel: telaPainel, tarefas: telaTarefasPai, work: telaWorkPai, estudo: telaEstudo, missoes: telaMissoes, chat: telaChat, mais: telaMaisPai }
+    : { hoje: telaHoje, work: telaWorkFilho, estudo: telaEstudo, missoes: telaMissoes, premios: telaPremios, chat: telaChat, mais: telaMaisFilho };
   const fn = telas[S.tela] || Object.values(telas)[0];
   $('#app').innerHTML = topo() + (S.papel === 'pai' ? barraFilhos() : '') + `<main>${fn()}</main>` + nav();
 
@@ -486,12 +515,13 @@ function barraFilhos() {
 
 function nav() {
   const itens = S.papel === 'pai'
-    ? [['painel', '📊', 'Painel'], ['tarefas', '✅', 'Tarefas'], ['work', '💼', 'Work'], ['missoes', '🎯', 'Missões'], ['chat', '💬', 'Chat'], ['mais', '☰', 'Mais']]
-    : [['hoje', '✅', 'Tarefas'], ['work', '💼', 'Work'], ['missoes', '🎯', 'Missões'], ['premios', '🏆', 'Prêmios'], ['chat', '💬', 'Chat'], ['mais', '☰', 'Mais']];
+    ? [['painel', '📊', 'Painel'], ['tarefas', '✅', 'Tarefas'], ['work', '💼', 'Work'], ['estudo', '📚', 'Estudo'], ['missoes', '🎯', 'Missões'], ['chat', '💬', 'Chat'], ['mais', '☰', 'Mais']]
+    : [['hoje', '✅', 'Tarefas'], ['work', '💼', 'Work'], ['estudo', '📚', 'Estudo'], ['missoes', '🎯', 'Missões'], ['premios', '🏆', 'Prêmios'], ['chat', '💬', 'Chat'], ['mais', '☰', 'Mais']];
   const badge = id => {
     let n = 0;
     if (id === 'chat') n = S.papel === 'pai' ? naoLidas() : naoLidas(S.eu);
     if (id === 'mais' && S.papel === 'pai') n = pedidosPendentes().length;
+    if (id === 'estudo') n = provasFuturas().filter(p => corProva(p) === 'vermelho').length;
     if (id === 'missoes') n = deFilho('missoes').filter(m => m.ativa !== false && !resgatada(m) && progressoMissao(m) >= m.meta).length;
     return n ? `<span class="badge">${n}</span>` : '';
   };
@@ -518,8 +548,8 @@ function cardPremio(dia = hojeISO(), filhoId = fid()) {
   if (!st.total) return `<div class="premio"><div class="cad">🎮</div><h2>Sem tarefas obrigatórias hoje</h2><p class="mut">Aproveite! Computador e celular conforme o combinado.</p></div>`;
   return `<div class="premio ${st.liberado ? 'liberado' : ''}">
     <div class="cad">${st.liberado ? '🔓' : '🔒'}</div>
-    <h2>${st.liberado ? 'LIBERADO! Missão cumprida' : 'Computador e celular BLOQUEADOS'}</h2>
-    <p style="margin:0;opacity:.85">${st.liberado ? 'Todas as tarefas feitas. Pode usar:' : `Faltam ${st.total - st.feitas} de ${st.total} tarefas para liberar`}</p>
+    <h2>${st.liberado ? '🎮 LIBERADO PARA JOGAR!' : '🎮 Jogo, computador e celular BLOQUEADOS'}</h2>
+    <p style="margin:0;opacity:.85">${st.liberado ? 'Todas as tarefas feitas. Pode usar:' : `Só pode jogar depois de concluir TODAS. Faltam ${st.total - st.feitas} de ${st.total}`}</p>
     ${st.liberado ? '' : `<div class="barra" style="margin:10px 0 0"><i style="width:${pct}%"></i></div>`}
     <div class="horas"><div>💻<b>${horasTxt(f.horas_pc)}</b><span class="peq">computador</span></div><div>📱<b>${horasTxt(f.horas_cel)}</b><span class="peq">celular</span></div></div>
     ${f.premio_extra ? `<p style="margin:12px 0 0">🎁 ${esc(f.premio_extra)}</p>` : ''}
@@ -602,7 +632,7 @@ function telaHoje() {
   const st = statusDia(dia);
   const casa = tars.filter(t => t.categoria === 'casa');
   const pct = st.total ? Math.round(st.feitas / st.total * 100) : 0;
-  return `${avisoNotificacao()}${bannerPermissoes()}
+  return `${avisoNotificacao()}${bannerPermissoes()}${bannerProvas()}
     <div class="card"><div class="linha"><div class="esp"><b>Missões de hoje</b><br><span class="mut peq">${new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</span></div><b style="font-size:1.4rem">${st.feitas}/${st.total}</b></div>
     <div class="barra" style="margin-top:10px"><i style="width:${pct}%"></i></div></div>
     ${!tars.length ? `<div class="vazio"><span class="e">🎉</span>Nenhuma tarefa de casa hoje.</div>` : ''}
@@ -636,6 +666,7 @@ function telaMaisFilho() {
     <div class="card"><h3>✋ Pedir permissão ao pai</h3><p class="mut peq">Para mudar algo no app você precisa da autorização do pai.</p>
     <button class="btn pri" data-act="pedir">Fazer um pedido</button></div>
     ${meus.length ? `<div class="card"><h3>Meus pedidos</h3>${meus.map(p => `<div class="lista-item"><div class="tt">${esc(AREAS[p.area] || p.area)}<small>${esc(p.mensagem || '')} · ${dataHoraBR(p.criado_em)}</small></div>${tagPedido(p)}</div>`).join('')}</div>` : ''}
+    ${S.modo === 'online' ? cardUso(S.eu) : ''}
     ${pode('perfil') ? `<div class="card"><h3>Meu perfil</h3><button class="btn ghost" data-act="editarPerfil">✏️ Mudar meu nome</button></div>` : ''}
     <div class="card"><h3>⚙️ Aparelho</h3>
       <button class="btn ghost" data-act="ativarNotif">🔔 Ativar / testar notificações</button><div style="height:8px"></div>
@@ -663,6 +694,7 @@ function telaPainel() {
     ${pend.map(p => `<div class="aviso warn linha"><div class="esp">🔐 <b>${esc(f.nome)}</b> pediu para ajustar <b>${esc(AREAS[p.area] || p.area)}</b>${p.mensagem ? `: "${esc(p.mensagem)}"` : ''}</div><button class="btn sm pri" data-act="abrirPedido" data-id="${esc(p.id)}">Ver</button></div>`).join('')}
     <div class="card"><div class="linha">${S.modo === 'online' ? `<span class="dot ${on ? 'on' : ''}"></span>` : ''}<div class="esp"><b>${esc(f.nome)}</b> <span class="mut peq">${S.modo === 'online' ? (on ? 'online agora' : (perfil && perfil.visto_em ? 'visto ' + dataHoraBR(perfil.visto_em) : (perfil ? 'offline' : 'acesso ainda não criado'))) : ''}</span></div>
       <input type="date" class="inp" style="width:auto;padding:7px 9px" value="${dia}" data-change="diaVer"></div></div>
+    ${S.modo === 'online' ? cardUso(f.id) : ''}${bannerProvas()}
     ${tars.length ? cardPremio(dia) : ''}
     ${aguard ? `<div class="aviso info" style="margin-top:12px">⭐ ${aguard} tarefa(s) esperando sua aprovação.</div>` : ''}
     <div class="secao">Tarefas de ${dia === hojeISO() ? 'hoje' : dataBR(dia)}</div>
@@ -750,6 +782,135 @@ function telaMaisPai() {
     <p class="rodape">TáFeito v${VERSAO} · Desenvolvido por Andrade</p>`;
 }
 
+/* ---------- ÁREA DE ESTUDO (provas) ---------- */
+const dhProva = p => new Date(`${p.data}T${p.horario || '08:00'}:00`);
+const quandoProva = p => `${DSEM[dow(p.data)]} ${dataBR(p.data)} às ${p.horario || '08:00'}`;
+const provasDe = (id = fid()) => S.dados.provas.filter(p => p.filho_id === id).sort((a, b) => dhProva(a) - dhProva(b));
+const provasFuturas = (id = fid()) => provasDe(id).filter(p => dhProva(p) > new Date());
+const cientesDe = (id = fid()) => S.dados.cientes.filter(c => c.filho_id === id);
+function corProva(p) {
+  const ms = dhProva(p) - new Date();
+  if (ms <= 0) return 'passou';
+  if (ms <= 7 * 864e5) return 'vermelho';
+  if (ms <= 30 * 864e5) return 'amarelo';
+  return 'verde';
+}
+function faltaTxt(p) {
+  const ms = dhProva(p) - new Date(); if (ms <= 0) return 'já passou';
+  const h = Math.floor(ms / 36e5), d = Math.floor(h / 24);
+  if (h < 1) return `em ${Math.max(1, Math.round(ms / 6e4))} min`;
+  if (h < 24) return `em ${h}h`;
+  if (d === 1) return 'amanhã';
+  return `em ${d} dias`;
+}
+const ROT_COR = { vermelho: '🔴 ALERTA · esta semana', amarelo: '🟡 em menos de 1 mês', verde: '🟢 mais de 1 mês', passou: '⚪ já passou' };
+function etapaAtual(p) {
+  const h = (dhProva(p) - new Date()) / 36e5; if (h <= 0) return null;
+  if (h <= 2) return '2h'; if (h <= 24) return '1d'; if (h <= 48) return '2d'; return null;
+}
+const jaCiente = (p, etapa) => S.dados.cientes.some(c => c.prova_id === p.id && c.etapa === etapa && new Date(c.criado_em) >= new Date(dhProva(p) - ETAPAS[etapa].h * 36e5 - 6e4));
+
+function bannerProvas() {
+  const l = provasFuturas().filter(p => corProva(p) === 'vermelho');
+  if (!l.length) return '';
+  return l.map(p => `<button class="aviso bad linha prova-alerta" data-act="verProva" data-id="${esc(p.id)}"><span style="font-size:1.4rem">🚨</span><div class="esp" style="text-align:left"><b>Prova de ${esc(p.materia)} ${faltaTxt(p)}</b><br><span class="peq">${quandoProva(p)}</span></div><span class="peq">ver ›</span></button>`).join('');
+}
+
+function cardUso(id) {
+  const perfil = S.dados.perfis.find(p => p.filho_id === id); if (!perfil) return '';
+  const hoje = S.dados.uso.filter(u => u.filho_id === id && u.dia === hojeISO()).reduce((s, u) => s + num(u.segundos), 0);
+  const semana = S.dados.uso.filter(u => u.filho_id === id && u.dia > addDias(hojeISO(), -7)).reduce((s, u) => s + num(u.segundos), 0);
+  const t = sg => { const m = Math.round(sg / 60); return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}`; };
+  const on = S.online.has(id);
+  return `<div class="card"><h3 style="margin:0 0 8px">⏱️ Tempo no app ${S.papel === 'filho' ? '<span class="mut peq">(registrado pelo servidor)</span>' : ''}</h3>
+    <div class="grid3"><div class="stat"><b>${t(hoje)}</b><span>hoje</span></div><div class="stat"><b>${t(semana)}</b><span>7 dias</span></div><div class="stat"><b>${t(num(perfil.tempo_total))}</b><span>total</span></div></div>
+    <p class="mut peq" style="margin:8px 0 0">🚪 Última vez que entrou: <b>${perfil.entrou_em ? dataHoraBR(perfil.entrou_em) : '—'}</b> · ${on ? '<span style="color:var(--ok)">online agora</span>' : 'visto ' + (perfil.visto_em ? dataHoraBR(perfil.visto_em) : '—')}</p></div>`;
+}
+
+function calendario() {
+  const [y, m] = S.calMes.split('-').map(Number);
+  const ini = new Date(y, m - 1, 1), dias = new Date(y, m, 0).getDate(), pad = ini.getDay(), hoje = hojeISO();
+  const porDia = {}; provasDe().forEach(p => { if (p.data.startsWith(S.calMes)) (porDia[p.data] = porDia[p.data] || []).push(p); });
+  let cel = DSEM.map(d => `<div class="cal-sem">${d[0]}</div>`).join('') + '<div></div>'.repeat(pad);
+  for (let d = 1; d <= dias; d++) {
+    const iso = `${S.calMes}-${String(d).padStart(2, '0')}`; const l = porDia[iso] || [];
+    const cor = l.length ? corProva(l[0]) : '';
+    cel += `<button class="cal-dia ${iso === hoje ? 'hoje' : ''} ${cor ? 'tem ' + cor : ''} ${iso < hoje ? 'passado' : ''}" data-act="calDia" data-dia="${iso}">${d}${l.length ? `<i>${l.length > 1 ? l.length : '●'}</i>` : ''}</button>`;
+  }
+  return `<div class="card"><div class="linha"><button class="icone-btn" data-act="calMes" data-n="-1">‹</button><div class="esp centro"><b>${MESES[m - 1]} ${y}</b><br><button class="link peq" data-act="calHoje">hoje</button></div><button class="icone-btn" data-act="calMes" data-n="1">›</button></div>
+    <div class="cal">${cel}</div><p class="mut peq centro" style="margin:8px 0 0">Toque num dia para marcar a prova</p></div>`;
+}
+
+function itemProva(p) {
+  const cor = corProva(p); const n = S.dados.cientes.filter(c => c.prova_id === p.id).length;
+  return `<button class="prova ${cor}" data-act="verProva" data-id="${esc(p.id)}"><div class="pdata"><b>${p.data.slice(8, 10)}</b><span>${MESES[Number(p.data.slice(5, 7)) - 1].slice(0, 3)}</span></div>
+    <div class="esp" style="text-align:left"><b>${esc(p.materia)}</b><br><span class="peq">${DSEM[dow(p.data)]} às ${esc(p.horario)} · ${faltaTxt(p)}</span><br><span class="peq">${ROT_COR[cor]}${n ? ` · 👍 ${n}` : ''}</span></div><span>›</span></button>`;
+}
+
+function telaEstudo() {
+  const fut = provasFuturas(); const pass = provasDe().filter(p => dhProva(p) <= new Date()).reverse().slice(0, 15);
+  const tot = cientesDe().length; const nome = filhoAtual().nome;
+  return `${S.papel === 'filho' ? bannerPermissoes() : ''}
+    <div class="linha" style="margin-bottom:10px"><div class="esp"><h2 style="margin:0">📚 Área de estudo</h2><span class="mut peq">${S.papel === 'pai' ? 'Provas de ' + esc(nome) : 'Marque as datas das suas provas do ano todo'}</span></div>
+    <button class="btn pri sm" style="width:auto" data-act="novaProva">＋ Prova</button></div>
+    <div class="card destaque"><div class="grid3"><div class="stat"><b>${fut.length}</b><span>provas marcadas</span></div><div class="stat"><b style="color:#ff9a9a">${fut.filter(p => corProva(p) === 'vermelho').length}</b><span>esta semana</span></div><div class="stat"><b>👍 ${tot}</b><span>vezes ciente</span></div></div>
+    <p class="mut peq" style="margin:8px 0 0">🔒 O número de "Ciente" fica gravado no banco e não pode ser alterado.</p></div>
+    ${calendario()}
+    <div class="secao">Próximas provas</div>
+    ${fut.length ? fut.map(itemProva).join('') : `<div class="vazio"><span class="e">📅</span>Nenhuma prova marcada.<br>Toque num dia do calendário ou em <b>＋ Prova</b>.</div>`}
+    <div class="legenda peq"><span>🔴 até 1 semana</span><span>🟡 até 1 mês</span><span>🟢 mais de 1 mês</span></div>
+    <div class="aviso info">🔔 Lembrete automático no celular: <b>2 dias antes</b>, <b>1 dia antes</b> e <b>2 horas antes</b> de cada prova. Em cada aviso, toque em <b>Ciente</b>.</div>
+    ${pass.length ? `<div class="secao">Já passaram</div>${pass.map(itemProva).join('')}` : ''}`;
+}
+
+function formProva(p, dia) {
+  const novo = !p; p = p || { materia: '', conteudo: '', data: dia || hojeISO(), horario: '08:00' };
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>${novo ? '📅 Marcar prova' : '✏️ Editar prova'}</h2>
+  <form data-form="prova" data-id="${esc(p.id || '')}">
+    <label class="campo"><span>Matéria</span><input name="materia" value="${esc(p.materia)}" required maxlength="80" placeholder="Ex.: Matemática"></label>
+    <div class="grid2"><label class="campo"><span>Data</span><input type="date" name="data" value="${esc(p.data)}" required></label>
+    <label class="campo"><span>Horário</span><input type="time" name="horario" value="${esc(p.horario)}" required></label></div>
+    <label class="campo"><span>O que vai cair (opcional)</span><textarea name="conteudo" rows="3" placeholder="Ex.: capítulos 3 e 4, frações">${esc(p.conteudo)}</textarea></label>
+    <button class="btn pri">Salvar prova</button>
+    ${!novo ? `<button type="button" class="btn bad" style="margin-top:8px" data-act="apagarProva" data-id="${esc(p.id)}">🗑️ Excluir prova</button>` : ''}
+  </form>`);
+}
+
+function modalProva(p) {
+  const cor = corProva(p); const cs = S.dados.cientes.filter(c => c.prova_id === p.id);
+  const et = etapaAtual(p);
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><div class="grande">📚</div><h2>${esc(p.materia)}</h2>
+    <p style="margin:0"><b>${quandoProva(p)}</b> · ${faltaTxt(p)}</p><p><span class="tag ${cor === 'vermelho' ? 'bad' : cor === 'amarelo' ? 'warn' : cor === 'verde' ? 'ok' : ''}">${ROT_COR[cor]}</span></p>
+    ${p.conteudo ? `<div class="aviso info">📖 ${esc(p.conteudo)}</div>` : ''}
+    <p class="mut peq">Ciente nesta prova: <b>${cs.length}</b>${cs.length ? ' · último ' + dataHoraBR(cs[0].criado_em) : ''}</p>
+    ${S.papel === 'filho' && cor !== 'passou' ? `<button class="btn ok" data-act="ciente" data-id="${esc(p.id)}" data-etapa="${et && !jaCiente(p, et) ? et : 'lista'}">👍 Ciente</button><div style="height:8px"></div>` : ''}
+    <div class="grid2"><button class="btn ghost" data-act="editarProva" data-id="${esc(p.id)}">✏️ Editar</button><button class="btn bad" data-act="apagarProva" data-id="${esc(p.id)}">🗑️ Excluir</button></div>`);
+}
+
+function modalDiaProvas(dia, l) {
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>📅 ${DSEM[dow(dia)]} ${dataBR(dia)}</h2>
+    ${l.map(itemProva).join('')}<button class="btn pri" style="margin-top:8px" data-act="novaProva" data-dia="${dia}">＋ Outra prova neste dia</button>`);
+}
+
+/* alerta na tela com botão Ciente: 2 dias, 1 dia e 2 horas antes (fica até ele tocar em Ciente) */
+let alertaAberto = null;
+function checarProvas() {
+  if (S.papel !== 'filho') return;
+  if (alertaAberto && alertaAberto.isConnected) return;
+  for (const p of provasFuturas(S.eu)) {
+    const et = etapaAtual(p); if (!et || jaCiente(p, et)) continue;
+    const k = 'mok_prova_av_' + p.id + et + p.data + p.horario;
+    if (!lsGet(k)) { lsSet(k, 1); notificar(`${ETAPAS[et].tit}: ${p.materia}`, quandoProva(p), 'prova'); }
+    beep(); if (navigator.vibrate) navigator.vibrate([400, 150, 400, 150, 400]);
+    alertaAberto = modal(`<div class="grande">${et === '2h' ? '🚨' : et === '1d' ? '⚠️' : '📚'}</div><h2 style="color:#ff9a9a">${ETAPAS[et].tit}</h2>
+      <p style="font-size:1.2rem;margin:4px 0"><b>${esc(p.materia)}</b></p><p>${quandoProva(p)}</p>
+      ${p.conteudo ? `<div class="aviso info">📖 ${esc(p.conteudo)}</div>` : ''}
+      <button class="btn ok" data-act="ciente" data-alerta="1" data-id="${esc(p.id)}" data-etapa="${et}">👍 Ciente</button>
+      <p class="mut peq" style="margin:8px 0 0">Seu "Ciente" fica registrado e o pai é avisado.</p>`, 'alerta prova-modal');
+    return;
+  }
+}
+
 /* ===================================================================
    MODAIS
    =================================================================== */
@@ -834,6 +995,7 @@ function formFilho(f) {
     <div class="grid2"><label class="campo"><span>💻 Horas de computador</span><input type="number" name="horas_pc" min="0" step="0.5" value="${num(f.horas_pc)}"></label>
     <label class="campo"><span>📱 Horas de celular</span><input type="number" name="horas_cel" min="0" step="0.5" value="${num(f.horas_cel)}"></label></div>
     <label class="campo"><span>Prêmio extra do dia (opcional)</span><input name="premio_extra" value="${esc(f.premio_extra)}" placeholder="Ex.: sobremesa liberada"></label>
+    <label class="check"><input type="checkbox" name="exigir_todas" ${f.exigir_todas !== false ? 'checked' : ''}> 🎮 Só jogar depois de concluir TODAS as tarefas do dia (inclusive opcionais e trabalhos)</label>
     <label class="check"><input type="checkbox" name="exigir_aprovacao" ${f.exigir_aprovacao ? 'checked' : ''}> Só liberar depois que eu aprovar as fotos</label>
     <button class="btn pri" style="margin-top:6px">Salvar</button>
   </form>
@@ -1016,6 +1178,25 @@ const acoes = {
       <p class="mut peq">Se já estiver instalado, é só abrir pelo ícone.</p><button class="btn pri" data-act="fechar">Entendi</button>`);
   },
   agenda: () => modalAgenda(),
+  calMes: d => { const [y, m] = S.calMes.split('-').map(Number); const n = new Date(y, m - 1 + Number(d.n), 1); S.calMes = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`; render(); },
+  calHoje: () => { S.calMes = hojeISO().slice(0, 7); render(); },
+  calDia: d => { const l = S.dados.provas.filter(p => p.filho_id === fid() && p.data === d.dia); if (l.length) modalDiaProvas(d.dia, l); else formProva(null, d.dia); },
+  novaProva: d => formProva(null, d.dia),
+  verProva: d => { const p = S.dados.provas.find(x => x.id === d.id); if (p) modalProva(p); },
+  editarProva: d => { fecharModais(); formProva(S.dados.provas.find(x => x.id === d.id)); },
+  apagarProva: async d => {
+    if (!confirm('Excluir esta prova do calendário?')) return;
+    try { await DB.remover('provas', d.id); S.dados.provas = S.dados.provas.filter(p => p.id !== d.id); fecharModais(); render(); toast('Prova excluída'); } catch (e) { toast(msgErro(e), 'bad'); }
+  },
+  ciente: async (d, b) => {
+    if (b) b.disabled = true;
+    try {
+      const n = await DB.rpc('mok_ciente', { p_prova: d.id, p_etapa: d.etapa || 'lista' });
+      S.dados.cientes = await DB.listar('cientes');
+      if (d.alerta) { fecharTopo(); alertaAberto = null; }
+      render(); toast(`👍 Ciente registrado (${n} no total)`, 'ok'); setTimeout(checarProvas, 400);
+    } catch (e) { if (b) b.disabled = false; toast(msgErro(e), 'bad'); }
+  },
   agendaTarefa: d => { const t = tarefaPorId(d.id); window.open(linkGoogle(t), '_blank'); },
   baixarIcs: () => baixarIcs(),
   compartilhar: () => {
@@ -1106,7 +1287,7 @@ const forms = {
     const id = f.dataset.id; const ant = id ? S.dados.filhos.find(x => x.id === id) : null;
     let novoId = id;
     if (!ant) { novoId = f.nome.value.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '') || 'filho'; if (S.dados.filhos.some(x => x.id === novoId)) novoId += Math.floor(Math.random() * 90 + 10); }
-    const x = { ...(ant || { id: novoId, ordem: S.dados.filhos.length + 1, criado_em: agoraISO() }), nome: f.nome.value.trim(), horas_pc: num(f.horas_pc.value), horas_cel: num(f.horas_cel.value), premio_extra: f.premio_extra.value.trim(), exigir_aprovacao: f.exigir_aprovacao.checked };
+    const x = { ...(ant || { id: novoId, ordem: S.dados.filhos.length + 1, criado_em: agoraISO() }), nome: f.nome.value.trim(), horas_pc: num(f.horas_pc.value), horas_cel: num(f.horas_cel.value), premio_extra: f.premio_extra.value.trim(), exigir_aprovacao: f.exigir_aprovacao.checked, exigir_todas: f.exigir_todas.checked };
     try { const s = await DB.salvar('filhos', x); const i = S.dados.filhos.findIndex(y => y.id === x.id); if (i >= 0) S.dados.filhos[i] = s || x; else S.dados.filhos.push(s || x); if (!S.filhoSel) S.filhoSel = x.id; fecharModais(); render(); toast('Salvo ✅', 'ok'); }
     catch (e) { toast(msgErro(e), 'bad'); }
   },
@@ -1135,6 +1316,17 @@ const forms = {
   pedido: async f => {
     const p = { id: uid(), filho_id: S.eu, area: f.area.value, mensagem: f.mensagem.value.trim(), status: 'pendente', criado_em: agoraISO(), respondido_em: null, expira_em: null };
     try { await DB.inserir('pedidos', p); S.dados.pedidos.push(p); S.vistos.ped[p.id] = 'pendente'; fecharModais(); render(); toast('Pedido enviado ao pai ✅', 'ok'); } catch (e) { toast(msgErro(e), 'bad'); }
+  },
+  prova: async f => {
+    const id = f.dataset.id; const ant = id ? S.dados.provas.find(p => p.id === id) : null;
+    const p = { ...(ant || { id: uid(), filho_id: fid(), criado_por: S.papel === 'pai' ? 'pai' : S.eu, criado_em: agoraISO() }), materia: f.materia.value.trim(), conteudo: f.conteudo.value.trim(), data: f.data.value, horario: f.horario.value || '08:00' };
+    if (!p.data) return toast('Escolha a data da prova.', 'bad');
+    try {
+      const s = await DB.salvar('provas', p); const i = S.dados.provas.findIndex(x => x.id === p.id);
+      if (i >= 0) S.dados.provas[i] = s || p; else S.dados.provas.push(s || p);
+      S.vistos.prv && (S.vistos.prv[p.id] = p.materia + p.data + p.horario);
+      S.calMes = p.data.slice(0, 7); fecharModais(); render(); toast(ant ? 'Prova atualizada ✅' : '📅 Prova marcada! Vou te lembrar 2 dias, 1 dia e 2 horas antes.', 'ok');
+    } catch (e) { toast(msgErro(e), 'bad'); }
   },
   pagar: async f => {
     const p = { id: uid(), filho_id: fid(), valor: num(f.valor.value), obs: f.obs.value.trim(), criado_em: agoraISO() };
@@ -1300,7 +1492,7 @@ async function notificar(titulo, corpo, tag) {
   beep(); if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
   if (document.visibilityState === 'visible') { const c = corpo || ''; toast(`${titulo}${c ? ' — ' + (c.length > 70 ? c.slice(0, 70) + '…' : c) : ''}`); }
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  if (lsGet('mok_push_ok') && ['msg', 'ped', 'reg', 'tar', 'lembrete'].includes(tag)) return; // o push do servidor já mostra
+  if (lsGet('mok_push_ok') && ['msg', 'ped', 'reg', 'tar', 'lembrete', 'mis', 'pag', 'prova', 'ciente'].includes(tag)) return; // o push do servidor já mostra
   const op = { body: corpo || '', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: tag ? tag + '-' + Date.now() : undefined, vibrate: [200, 100, 200], requireInteraction: true };
   try { const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (reg) await reg.showNotification(titulo, op); else new Notification(titulo, op); }
   catch { try { new Notification(titulo, op); } catch { } }
@@ -1376,6 +1568,6 @@ function linkConvite() { const base = location.origin + location.pathname.replac
 function registrarSW() { if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(e => console.warn('sw', e)); }
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); promptInstalar = e; render(); });
 window.addEventListener('appinstalled', () => { promptInstalar = null; toast('App instalado ✅', 'ok'); });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.papel) { aoMudarBanco(); checarLembretes(); } });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.papel) { DB.ping(); aoMudarBanco(); checarLembretes(); checarProvas(); } });
 
 iniciar().catch(e => { console.error(e); telaErro('Algo deu errado', msgErro(e)); });

@@ -196,3 +196,31 @@ code{background:var(--bg2);padding:2px 6px;border-radius:6px;font-size:.85em;wor
 .cam video{width:100%;max-height:60vh;display:block;object-fit:contain}
 .cam-msg{padding:10px;text-align:center;margin:0}
 .cam-msg:empty{display:none}
+
+/* v1.3 área de estudo */
+.nav button{font-size:.62rem}
+.nav button span.i{font-size:1.25rem}
+.link{background:none;border:0;color:var(--pri);cursor:pointer;padding:0;font-weight:700}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:10px}
+.cal-sem{text-align:center;font-size:.72rem;color:var(--mut);font-weight:700;padding:2px 0}
+.cal-dia{position:relative;aspect-ratio:1;border-radius:10px;border:1px solid var(--linha);background:var(--bg2);color:var(--txt);font-weight:700;font-size:.9rem;cursor:pointer;padding:0}
+.cal-dia.passado{opacity:.45}
+.cal-dia.hoje{border-color:var(--pri);box-shadow:0 0 0 2px rgba(79,124,255,.4)}
+.cal-dia i{position:absolute;bottom:2px;left:0;right:0;font-style:normal;font-size:.6rem;line-height:1}
+.cal-dia.tem.vermelho{background:rgba(239,68,68,.35);border-color:var(--bad)}
+.cal-dia.tem.amarelo{background:rgba(245,165,36,.3);border-color:var(--warn)}
+.cal-dia.tem.verde{background:rgba(34,197,94,.28);border-color:var(--ok)}
+.cal-dia.tem.passou{background:var(--card2)}
+.prova{display:flex;align-items:center;gap:12px;width:100%;background:var(--card);border:1px solid var(--linha);border-left:6px solid var(--linha);border-radius:14px;padding:10px 12px;margin-bottom:8px;color:var(--txt);cursor:pointer}
+.prova .pdata{width:46px;text-align:center;flex:none}
+.prova .pdata b{display:block;font-size:1.35rem;line-height:1}
+.prova .pdata span{font-size:.7rem;color:var(--mut);text-transform:uppercase}
+.prova.vermelho{border-left-color:var(--bad);background:linear-gradient(90deg,rgba(239,68,68,.2),var(--card));animation:pulsa 1.6s ease-in-out infinite}
+.prova.amarelo{border-left-color:var(--warn);background:linear-gradient(90deg,rgba(245,165,36,.16),var(--card))}
+.prova.verde{border-left-color:var(--ok);background:linear-gradient(90deg,rgba(34,197,94,.14),var(--card))}
+.prova.passou{opacity:.55}
+@keyframes pulsa{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}50%{box-shadow:0 0 0 4px rgba(239,68,68,.25)}}
+.prova-alerta{width:100%;border:1px solid rgba(239,68,68,.5);cursor:pointer;font:inherit;animation:pulsa 1.6s ease-in-out infinite}
+.legenda{display:flex;gap:12px;justify-content:center;color:var(--mut);margin:6px 0 4px;flex-wrap:wrap}
+.prova-modal{border:2px solid var(--bad)}
+.prova .esp{flex:1;min-width:0}
