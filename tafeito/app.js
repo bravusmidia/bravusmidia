@@ -425,7 +425,7 @@ async function abrirApp() {
   render();
   verificarPedidosPai();
   inscreverPush(false);
-  checarBanco();
+  checarBanco(); cumprimentoDoDia();
 }
 
 async function carregarTudo() {
@@ -1109,98 +1109,170 @@ function ajustarFoto(id, arq) {
   img.src = url;
 }
 
-/* ---------- MASCOTE personalizado (desenho original do TáFeito) ---------- */
+/* ---------- MASCOTE personalizado (personagem original do TáFeito) ---------- */
 const MASC_OPC = {
-  pele: ['#ffdcc2', '#f1bc94', '#d39467', '#a8693f', '#6e4428'],
-  cabelo: ['curto', 'espetado', 'cacheado', 'topete', 'raspado'],
-  corCabelo: ['#2a1b12', '#5b3a26', '#b7792f', '#f0cf6a', '#e2483d', '#3c6df0', '#9b5cff'],
-  roupa: ['camiseta', 'moletom', 'jaqueta', 'uniforme'],
-  corRoupa: ['#4f7cff', '#22c55e', '#ef4444', '#f5a524', '#111827', '#e649a6', '#14b8a6'],
-  estampa: ['nenhuma', 'raio', 'estrela', 'numero'],
-  chapeu: ['nenhum', 'bone', 'fone', 'coroa', 'gorro'],
-  oculos: ['nenhum', 'redondo', 'escuro'],
-  extra: ['nenhum', 'mochila', 'capa', 'medalha'],
-  rosto: ['feliz', 'legal', 'animado']
+  pele: ['#ffe0c7', '#f6c7a0', '#e3a77a', '#c4875a', '#9a6440', '#6b4128'],
+  cabelo: ['espetado', 'topete', 'cacheado', 'liso', 'moicano', 'tranças', 'raspado'],
+  corCabelo: ['#1e140e', '#4a2e1d', '#8a5a2b', '#d9a441', '#f3dc8a', '#d7462f', '#2f6df0', '#8b5cf6', '#ffffff'],
+  olhos: ['#4a2e1d', '#1f6feb', '#16a34a', '#6b7280', '#111111'],
+  sobrancelha: ['confiante', 'alegre', 'brava', 'surpresa'],
+  roupa: ['jaqueta', 'moletom', 'camiseta', 'regata', 'colete', 'uniforme'],
+  corRoupa: ['#2f6df0', '#7b5cff', '#16a34a', '#e11d48', '#f59e0b', '#111827', '#0ea5e9', '#f97316'],
+  corDetalhe: ['#ffffff', '#fbbf24', '#111827', '#ef4444', '#22c55e', '#38bdf8'],
+  estampa: ['nenhuma', 'raio', 'estrela', 'numero', 'listras'],
+  calca: ['#1e293b', '#334155', '#1d4ed8', '#6b7280', '#3f2d20', '#111827'],
+  tenis: ['#ffffff', '#ef4444', '#111827', '#22c55e', '#f59e0b', '#7b5cff'],
+  chapeu: ['nenhum', 'bone', 'bonetras', 'fone', 'gorro', 'bandana', 'coroa'],
+  oculos: ['nenhum', 'redondo', 'escuro', 'gamer'],
+  extra: ['nenhum', 'mochila', 'capa', 'medalha', 'relogio', 'skate'],
+  boca: ['sorriso', 'sorrisao', 'debochado', 'lingua'],
+  movimento: ['flutuar', 'acenar', 'pular', 'dancar', 'joinha']
 };
-const MASC_ROT = { pele: 'Pele', cabelo: 'Cabelo', corCabelo: 'Cor do cabelo', roupa: 'Roupa', corRoupa: 'Cor da roupa', estampa: 'Estampa', chapeu: 'Cabeça', oculos: 'Óculos', extra: 'Acessório', rosto: 'Rosto' };
-const MASC_NOMES = { curto: 'Curto', espetado: 'Espetado', cacheado: 'Cacheado', topete: 'Topete', raspado: 'Raspado', camiseta: 'Camiseta', moletom: 'Moletom', jaqueta: 'Jaqueta', uniforme: 'Uniforme', nenhuma: 'Nenhuma', raio: '⚡ Raio', estrela: '⭐ Estrela', numero: 'Nº 10', nenhum: 'Nenhum', bone: '🧢 Boné', fone: '🎧 Fone', coroa: '👑 Coroa', gorro: 'Gorro', redondo: '👓 Redondo', escuro: '🕶️ Escuro', mochila: '🎒 Mochila', capa: '🦸 Capa', medalha: '🏅 Medalha', feliz: '😀 Feliz', legal: '😎 Legal', animado: '🤩 Animado' };
-const MASC_PADRAO = { nome: 'Bolt', pele: '#f1bc94', cabelo: 'espetado', corCabelo: '#2a1b12', roupa: 'moletom', corRoupa: '#4f7cff', estampa: 'raio', chapeu: 'nenhum', oculos: 'nenhum', extra: 'nenhum', rosto: 'feliz' };
-const mascoteDe = id => ({ ...MASC_PADRAO, ...(((S.dados.filhos.find(f => f.id === id) || {}).mascote) || {}) });
-function escurece(h, f = .75) { const n = parseInt(h.slice(1), 16); const c = x => Math.round(x * f).toString(16).padStart(2, '0'); return '#' + c(n >> 16 & 255) + c(n >> 8 & 255) + c(n & 255); }
-function mascoteSVG(m, tam = 80) {
+const MASC_ROT = { pele: 'Pele', cabelo: 'Cabelo', corCabelo: 'Cor do cabelo', olhos: 'Cor dos olhos', sobrancelha: 'Expressão', roupa: 'Roupa', corRoupa: 'Cor da roupa', corDetalhe: 'Cor dos detalhes', estampa: 'Estampa', calca: 'Calça', tenis: 'Tênis', chapeu: 'Cabeça', oculos: 'Óculos', extra: 'Acessório', boca: 'Boca', movimento: 'Movimento' };
+const MASC_NOMES = { espetado: 'Espetado', topete: 'Topete', cacheado: 'Cacheado', liso: 'Liso', moicano: 'Moicano', 'tranças': 'Tranças', raspado: 'Raspado', confiante: '😏 Confiante', alegre: '😄 Alegre', brava: '😠 Brava', surpresa: '😮 Surpresa', jaqueta: 'Jaqueta', moletom: 'Moletom', camiseta: 'Camiseta', regata: 'Regata', colete: 'Colete', uniforme: 'Uniforme', nenhuma: 'Nenhuma', raio: '⚡ Raio', estrela: '⭐ Estrela', numero: 'Nº 10', listras: 'Listras', nenhum: 'Nenhum', bone: '🧢 Boné', bonetras: '🧢 Boné pra trás', fone: '🎧 Fone', gorro: 'Gorro', bandana: 'Bandana', coroa: '👑 Coroa', redondo: '👓 Redondo', escuro: '🕶️ Escuro', gamer: '🥽 Gamer', mochila: '🎒 Mochila', capa: '🦸 Capa', medalha: '🏅 Medalha', relogio: '⌚ Relógio', skate: '🛹 Skate', sorriso: '🙂 Sorriso', sorrisao: '😁 Sorrisão', debochado: '😏 Debochado', lingua: '😛 Língua', flutuar: '🎈 Flutuar', acenar: '👋 Acenar', pular: '🦘 Pular', dancar: '🕺 Dançar', joinha: '👍 Joinha' };
+const MASC_CORES = ['pele', 'corCabelo', 'olhos', 'corRoupa', 'corDetalhe', 'calca', 'tenis'];
+const MASC_PADRAO = { nome: 'Bolt', voz: true, pele: '#e3a77a', cabelo: 'espetado', corCabelo: '#1e140e', olhos: '#4a2e1d', sobrancelha: 'confiante', roupa: 'jaqueta', corRoupa: '#2f6df0', corDetalhe: '#fbbf24', estampa: 'raio', calca: '#1e293b', tenis: '#ffffff', chapeu: 'nenhum', oculos: 'nenhum', extra: 'nenhum', boca: 'sorriso', movimento: 'acenar' };
+const mascoteDe = id => { const m = { ...MASC_PADRAO, ...(((S.dados.filhos.find(f => f.id === id) || {}).mascote) || {}) }; if (m.rosto && !m.boca) m.boca = 'sorriso'; return m; };
+function tom(h, f) { const n = parseInt(String(h).replace('#', '').padEnd(6, '0').slice(0, 6), 16); const c = x => Math.max(0, Math.min(255, Math.round(f >= 1 ? x + (255 - x) * (f - 1) : x * f))).toString(16).padStart(2, '0'); return '#' + c(n >> 16 & 255) + c(n >> 8 & 255) + c(n & 255); }
+const escurece = (h, f = .75) => tom(h, f);
+function mascoteSVG(m, tam = 80, animar = true) {
   m = { ...MASC_PADRAO, ...m }; const u = 'm' + Math.random().toString(36).slice(2, 7);
-  const pele = m.pele, pe2 = escurece(pele, .82), cab = m.corCabelo, cab2 = escurece(cab, .7), rp = m.corRoupa, rp2 = escurece(rp, .7);
-  const cabelos = {
-    curto: `<path d="M40 58 Q40 22 80 20 Q120 22 120 58 Q112 40 80 38 Q48 40 40 58Z" fill="url(#${u}c)"/>`,
-    espetado: `<path d="M38 60 L42 30 L54 40 L58 16 L72 32 L80 10 L90 32 L104 16 L106 40 L118 30 L122 60 Q110 40 80 38 Q50 40 38 60Z" fill="url(#${u}c)"/>`,
-    cacheado: `<g fill="url(#${u}c)">${[[48, 40], [60, 28], [76, 22], [92, 24], [106, 32], [116, 46], [42, 54], [118, 60]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="15"/>`).join('')}</g>`,
-    topete: `<path d="M40 60 Q36 26 70 22 Q96 4 122 30 Q112 30 106 36 Q120 46 120 60 Q104 42 80 40 Q52 42 40 60Z" fill="url(#${u}c)"/>`,
-    raspado: `<path d="M42 56 Q44 26 80 24 Q116 26 118 56 Q100 42 80 41 Q60 42 42 56Z" fill="${cab}" opacity=".55"/>`
-  };
-  const olhos = m.rosto === 'legal' ? `<path d="M60 72 q6 -6 12 0" stroke="#1b1b1b" stroke-width="4" fill="none" stroke-linecap="round"/><circle cx="98" cy="72" r="6" fill="#1b1b1b"/><circle cx="100" cy="70" r="2" fill="#fff"/>`
-    : m.rosto === 'animado' ? `<g fill="#1b1b1b"><path d="M66 64 l2.5 6 6 .5 -4.6 4 1.5 6 -5.4 -3.3 -5.4 3.3 1.5 -6 -4.6 -4 6 -.5Z" fill="#f5a524"/><path d="M98 64 l2.5 6 6 .5 -4.6 4 1.5 6 -5.4 -3.3 -5.4 3.3 1.5 -6 -4.6 -4 6 -.5Z" fill="#f5a524"/></g>`
-    : `<circle cx="66" cy="72" r="6.5" fill="#1b1b1b"/><circle cx="94" cy="72" r="6.5" fill="#1b1b1b"/><circle cx="68" cy="70" r="2.2" fill="#fff"/><circle cx="96" cy="70" r="2.2" fill="#fff"/>`;
-  const boca = m.rosto === 'animado' ? `<path d="M68 88 Q80 102 92 88 Z" fill="#7a1f2b"/>` : `<path d="M68 88 Q80 98 92 88" stroke="#7a1f2b" stroke-width="4" fill="none" stroke-linecap="round"/>`;
-  const oculos = m.oculos === 'redondo' ? `<g fill="rgba(180,220,255,.25)" stroke="#222" stroke-width="3"><circle cx="66" cy="72" r="11"/><circle cx="94" cy="72" r="11"/><path d="M77 72 h6"/></g>`
-    : m.oculos === 'escuro' ? `<g><rect x="52" y="63" width="26" height="17" rx="7" fill="#111"/><rect x="82" y="63" width="26" height="17" rx="7" fill="#111"/><path d="M78 69 h4" stroke="#111" stroke-width="3"/><path d="M57 67 l7 0" stroke="#fff" stroke-width="2" opacity=".5"/></g>` : '';
-  const chapeu = {
-    nenhum: '', bone: `<path d="M40 52 Q42 22 80 20 Q118 22 120 52Z" fill="${rp}"/><path d="M40 52 Q80 44 120 52 L138 56 Q100 50 40 56Z" fill="${rp2}"/><circle cx="80" cy="22" r="4" fill="${rp2}"/>`,
-    fone: `<path d="M38 66 Q38 18 80 18 Q122 18 122 66" stroke="#222" stroke-width="7" fill="none"/><rect x="28" y="58" width="16" height="26" rx="7" fill="#e2483d"/><rect x="116" y="58" width="16" height="26" rx="7" fill="#e2483d"/>`,
-    coroa: `<path d="M50 30 L56 6 L68 22 L80 2 L92 22 L104 6 L110 30Z" fill="#fbbf24" stroke="#b7791f" stroke-width="2"/><circle cx="80" cy="18" r="4" fill="#ef4444"/>`,
-    gorro: `<path d="M40 54 Q40 14 80 14 Q120 14 120 54Z" fill="${rp}"/><rect x="38" y="46" width="84" height="12" rx="6" fill="${rp2}"/><circle cx="80" cy="12" r="8" fill="#fff"/>`
-  }[m.chapeu] || '';
-  const estampa = m.estampa === 'raio' ? `<path d="M84 122 L72 142 L82 142 L76 160 L92 136 L82 136 L88 122Z" fill="#fbbf24"/>`
-    : m.estampa === 'estrela' ? `<path d="M80 124 l4.7 9.5 10.5 1.5 -7.6 7.4 1.8 10.4 -9.4 -5 -9.4 5 1.8 -10.4 -7.6 -7.4 10.5 -1.5Z" fill="#fff"/>`
-    : m.estampa === 'numero' ? `<text x="80" y="152" font-family="Arial Black,Arial" font-weight="900" font-size="24" fill="#fff" text-anchor="middle">10</text>` : '';
-  const roupaExtra = m.roupa === 'jaqueta' ? `<path d="M80 114 L80 172" stroke="${rp2}" stroke-width="4"/><path d="M62 112 L80 128 L98 112" fill="none" stroke="#fff" stroke-width="3" opacity=".6"/>`
-    : m.roupa === 'moletom' ? `<path d="M60 112 Q80 126 100 112" fill="none" stroke="${rp2}" stroke-width="5"/><path d="M72 120 v14 M88 120 v14" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>`
-    : m.roupa === 'uniforme' ? `<path d="M66 110 L80 124 L94 110" fill="#fff"/><rect x="58" y="160" width="44" height="8" fill="#fff" opacity=".85"/>` : '';
-  const capa = m.extra === 'capa' ? `<path d="M52 112 Q30 160 40 196 L120 196 Q130 160 108 112Z" fill="#ef4444"/>` : '';
-  const mochila = m.extra === 'mochila' ? `<rect x="34" y="118" width="18" height="40" rx="7" fill="#f5a524"/><rect x="108" y="118" width="18" height="40" rx="7" fill="#f5a524"/>` : '';
-  const medalha = m.extra === 'medalha' ? `<path d="M72 112 L80 134 L88 112" stroke="#ef4444" stroke-width="4" fill="none"/><circle cx="80" cy="140" r="9" fill="#fbbf24" stroke="#b7791f" stroke-width="2"/>` : '';
-  return `<svg class="sem3d" viewBox="0 0 160 200" width="${tam}" height="${tam * 1.25}" xmlns="http://www.w3.org/2000/svg">
-    <defs><radialGradient id="${u}p" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".5" stop-color="${pele}"/><stop offset="1" stop-color="${pe2}"/></radialGradient>
-    <linearGradient id="${u}c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${escurece(cab, 1.25 > 1 ? 1 : 1)}"/><stop offset="1" stop-color="${cab2}"/></linearGradient>
-    <linearGradient id="${u}r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${rp}"/><stop offset="1" stop-color="${rp2}"/></linearGradient></defs>
-    <ellipse cx="80" cy="194" rx="36" ry="5" fill="#000" opacity=".25"/>
-    ${capa}${mochila}
-    <rect x="60" y="164" width="16" height="26" rx="7" fill="#24304f"/><rect x="84" y="164" width="16" height="26" rx="7" fill="#24304f"/>
-    <path d="M52 124 Q52 108 80 108 Q108 108 108 124 L108 170 Q80 176 52 170Z" fill="url(#${u}r)"/>
-    <path d="M52 122 Q36 132 38 150" stroke="url(#${u}r)" stroke-width="15" stroke-linecap="round" fill="none"/><circle cx="38" cy="152" r="8" fill="url(#${u}p)"/>
-    <path d="M108 122 Q126 116 128 98" stroke="url(#${u}r)" stroke-width="15" stroke-linecap="round" fill="none"/>
-    <g transform="translate(128 88)"><rect x="-9" y="-2" width="18" height="16" rx="6" fill="url(#${u}p)"/><rect x="-4" y="-16" width="8" height="18" rx="4" fill="url(#${u}p)"/></g>
-    ${roupaExtra}${estampa}${medalha}
-    <circle cx="40" cy="74" r="9" fill="${pe2}"/><circle cx="120" cy="74" r="9" fill="${pe2}"/>
-    <circle cx="80" cy="68" r="42" fill="url(#${u}p)"/>
-    <ellipse cx="60" cy="84" rx="7" ry="4" fill="#ff7a7a" opacity=".35"/><ellipse cx="100" cy="84" rx="7" ry="4" fill="#ff7a7a" opacity=".35"/>
-    ${cabelos[m.cabelo] || ''}${olhos}${boca}${oculos}${chapeu}
+  const P = m.pele, R = m.corRoupa, D = m.corDetalhe, C = m.corCabelo;
+  const G = (id, c, a = 1.35, b = .62, cx = '38%', cy = '30%') => `<radialGradient id="${u}${id}" cx="${cx}" cy="${cy}" r="75%"><stop offset="0" stop-color="${tom(c, a)}"/><stop offset=".55" stop-color="${c}"/><stop offset="1" stop-color="${tom(c, b)}"/></radialGradient>`;
+  const L = (id, c) => `<linearGradient id="${u}${id}" x1="0" y1="0" x2=".3" y2="1"><stop offset="0" stop-color="${tom(c, 1.3)}"/><stop offset=".5" stop-color="${c}"/><stop offset="1" stop-color="${tom(c, .55)}"/></linearGradient>`;
+  const brilho = (d, op = .35) => `<path d="${d}" fill="#fff" opacity="${op}"/>`;
+  // cabelo
+  const cab = {
+    espetado: `<path d="M52 92 L46 56 L64 66 L62 34 L82 52 L92 22 L104 48 L122 26 L124 56 L144 42 L140 74 L156 70 L148 96 Q130 70 100 68 Q70 70 52 92Z" fill="url(#${u}c)"/>${brilho('M78 50 L92 30 L96 50Z', .25)}`,
+    topete: `<path d="M50 96 Q42 50 82 40 Q96 6 140 20 Q156 30 150 52 Q160 70 152 96 Q134 68 100 66 Q68 68 50 96Z" fill="url(#${u}c)"/>${brilho('M96 22 Q122 14 140 26 Q118 24 100 34Z', .3)}`,
+    cacheado: `<g fill="url(#${u}c)">${[[56, 70], [66, 50], [84, 38], [104, 34], [124, 40], [140, 54], [148, 74], [50, 90], [152, 94], [96, 48], [116, 56], [76, 60]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="17"/>`).join('')}</g>`,
+    liso: `<path d="M48 110 Q40 46 100 38 Q160 46 152 110 L146 112 Q140 74 112 66 Q90 84 58 82 Q54 96 54 112Z" fill="url(#${u}c)"/>${brilho('M70 50 Q100 40 130 50 Q100 48 72 58Z', .3)}`,
+    moicano: `<path d="M50 96 Q52 70 70 66 Q100 62 130 66 Q148 70 150 96 Q130 76 100 74 Q70 76 50 96Z" fill="${tom(C, .7)}" opacity=".8"/><path d="M84 70 L80 30 L94 40 L100 14 L108 40 L122 30 L116 70Z" fill="url(#${u}c)"/>`,
+    'tranças': `<path d="M50 96 Q44 48 100 40 Q156 48 150 96 Q130 70 100 68 Q70 70 50 96Z" fill="url(#${u}c)"/><g stroke="${tom(C, .55)}" stroke-width="2" opacity=".7">${[68, 84, 100, 116, 132].map(x => `<path d="M${x} 46 Q${x - 4} 58 ${x} 70"/>`).join('')}</g>`,
+    raspado: `<path d="M54 92 Q56 52 100 48 Q144 52 146 92 Q128 72 100 70 Q72 72 54 92Z" fill="${C}" opacity=".45"/>`
+  }[m.cabelo] || '';
+  const sob = { confiante: ['M66 96 L90 100', 'M110 100 L134 92'], alegre: ['M66 96 Q78 88 90 96', 'M110 96 Q122 88 134 96'], brava: ['M66 92 L92 102', 'M108 102 L134 92'], surpresa: ['M66 88 Q78 80 90 88', 'M110 88 Q122 80 134 88'] }[m.sobrancelha];
+  const olho = (cx, pis) => `<ellipse cx="${cx}" cy="114" rx="13" ry="${m.sobrancelha === 'surpresa' ? 16 : 14}" fill="#fff"/><ellipse cx="${cx}" cy="114" rx="13" ry="14" fill="url(#${u}sh)" opacity=".25"/>
+    <circle cx="${cx + pis}" cy="116" r="8" fill="url(#${u}o)"/><circle cx="${cx + pis}" cy="116" r="4" fill="#0b0b0b"/><circle cx="${cx + pis + 3}" cy="112" r="2.6" fill="#fff"/><circle cx="${cx + pis - 2}" cy="120" r="1.2" fill="#fff" opacity=".8"/>`;
+  const bocas = {
+    sorriso: `<path d="M86 142 Q100 154 116 140" stroke="#5b1c1c" stroke-width="4.5" fill="none" stroke-linecap="round"/>`,
+    sorrisao: `<path d="M82 138 Q100 162 120 138 Q100 146 82 138Z" fill="#5b1c1c"/><path d="M86 140 Q100 146 116 140 L114 144 Q100 148 88 144Z" fill="#fff"/>`,
+    debochado: `<path d="M88 144 Q104 148 118 136" stroke="#5b1c1c" stroke-width="4.5" fill="none" stroke-linecap="round"/>`,
+    lingua: `<path d="M84 140 Q100 156 118 140Z" fill="#5b1c1c"/><path d="M96 146 Q104 160 112 146Z" fill="#f472b6"/>`
+  }[m.boca] || '';
+  const oc = { nenhum: '', redondo: `<g fill="rgba(190,225,255,.18)" stroke="#1f2937" stroke-width="3.5"><circle cx="78" cy="114" r="17"/><circle cx="122" cy="114" r="17"/><path d="M95 112 h10"/></g>`,
+    escuro: `<g><path d="M58 104 H96 L92 124 Q78 130 62 124Z" fill="#0b0f1a"/><path d="M104 104 H142 L138 124 Q124 130 108 124Z" fill="#0b0f1a"/><path d="M96 106 h8" stroke="#0b0f1a" stroke-width="4"/><path d="M64 108 l12 0" stroke="#fff" stroke-width="2.5" opacity=".45"/><path d="M110 108 l12 0" stroke="#fff" stroke-width="2.5" opacity=".45"/></g>`,
+    gamer: `<g><rect x="56" y="102" width="88" height="26" rx="12" fill="${D}"/><rect x="60" y="105" width="80" height="20" rx="9" fill="#0b0f1a" opacity=".85"/><path d="M66 110 h30" stroke="#38bdf8" stroke-width="3" opacity=".8"/></g>` }[m.oculos] || '';
+  const chap = { nenhum: '',
+    bone: `<path d="M50 88 Q50 40 100 38 Q150 40 150 88 Q100 76 50 88Z" fill="url(#${u}r)"/><path d="M50 88 Q100 78 150 88 L176 96 Q130 86 50 94Z" fill="${tom(R, .6)}"/><circle cx="100" cy="40" r="5" fill="${D}"/><path d="M76 70 Q100 62 124 70" stroke="${D}" stroke-width="5" fill="none"/>`,
+    bonetras: `<path d="M50 88 Q50 40 100 38 Q150 40 150 88 Q100 76 50 88Z" fill="url(#${u}r)"/><path d="M40 84 Q24 82 22 92 Q40 92 52 90Z" fill="${tom(R, .6)}"/><circle cx="100" cy="40" r="5" fill="${D}"/>`,
+    fone: `<path d="M44 112 Q44 30 100 30 Q156 30 156 112" stroke="#111827" stroke-width="9" fill="none"/><rect x="30" y="100" width="22" height="34" rx="10" fill="url(#${u}d)"/><rect x="148" y="100" width="22" height="34" rx="10" fill="url(#${u}d)"/>`,
+    gorro: `<path d="M48 92 Q48 30 100 28 Q152 30 152 92Z" fill="url(#${u}r)"/><rect x="44" y="80" width="112" height="18" rx="9" fill="${tom(R, .65)}"/><circle cx="100" cy="26" r="11" fill="${D}"/>`,
+    bandana: `<path d="M50 84 Q100 66 150 84 L150 96 Q100 80 50 96Z" fill="url(#${u}d)"/><path d="M150 88 L168 80 L164 100Z" fill="${tom(D, .8)}"/>`,
+    coroa: `<path d="M66 60 L72 26 L88 46 L100 20 L112 46 L128 26 L134 60Z" fill="#fbbf24" stroke="#b45309" stroke-width="2.5"/><circle cx="100" cy="42" r="5" fill="#ef4444"/>` }[m.chapeu] || '';
+  const estampa = { nenhuma: '', raio: `<path d="M106 182 L92 206 L104 206 L96 228 L116 198 L104 198 L112 182Z" fill="${D}" stroke="${tom(D, .6)}" stroke-width="1.5"/>`,
+    estrela: `<path d="M100 184 l6 12 13 2 -9.5 9 2.3 13 -11.8 -6.2 -11.8 6.2 2.3 -13 -9.5 -9 13 -2Z" fill="${D}"/>`,
+    numero: `<text x="100" y="220" font-family="Arial Black,Arial" font-weight="900" font-size="30" fill="${D}" text-anchor="middle" stroke="${tom(D, .5)}" stroke-width="1">10</text>`,
+    listras: `<g fill="${D}" opacity=".85"><rect x="70" y="190" width="60" height="6"/><rect x="68" y="204" width="64" height="6"/><rect x="68" y="218" width="64" height="6"/></g>` }[m.estampa] || '';
+  const roupaX = { jaqueta: `<path d="M100 166 L100 240" stroke="${tom(R, .55)}" stroke-width="4"/><path d="M78 164 L100 184 L122 164" fill="${D}" opacity=".9"/><path d="M64 172 L74 236 M136 172 L126 236" stroke="${tom(R, 1.3)}" stroke-width="3" opacity=".5"/>`,
+    moletom: `<path d="M74 166 Q100 186 126 166" fill="none" stroke="${tom(R, .6)}" stroke-width="7"/><path d="M90 176 v20 M110 176 v20" stroke="${D}" stroke-width="3" stroke-linecap="round"/><path d="M76 222 h48 v14 h-48Z" fill="${tom(R, .75)}"/>`,
+    camiseta: `<path d="M84 162 Q100 174 116 162" fill="none" stroke="${tom(R, .6)}" stroke-width="5"/>`,
+    regata: `<path d="M80 162 Q100 186 120 162" fill="url(#${u}p)"/>`,
+    colete: `<path d="M64 170 L80 166 L100 200 L120 166 L136 170 L134 240 L66 240Z" fill="${tom(R, .55)}" opacity=".95"/><circle cx="92" cy="214" r="3" fill="${D}"/><circle cx="108" cy="214" r="3" fill="${D}"/>`,
+    uniforme: `<path d="M82 164 L100 180 L118 164" fill="#fff"/><rect x="64" y="226" width="72" height="8" fill="${D}"/>` }[m.roupa] || '';
+  const braco = m.roupa === 'regata' ? `url(#${u}p)` : `url(#${u}r)`;
+  const ex = { capa: `<path d="M66 168 Q30 230 46 262 L154 262 Q170 230 134 168Z" fill="url(#${u}d)"/>`, mochila: `<rect x="44" y="178" width="22" height="50" rx="9" fill="url(#${u}d)"/><rect x="134" y="178" width="22" height="50" rx="9" fill="url(#${u}d)"/>` }[m.extra] || '';
+  const exFrente = { medalha: `<path d="M88 164 L100 192 L112 164" stroke="#ef4444" stroke-width="5" fill="none"/><circle cx="100" cy="200" r="11" fill="#fbbf24" stroke="#b45309" stroke-width="2.5"/><path d="M100 194 l2 4 4 .5 -3 3 1 4 -4 -2 -4 2 1 -4 -3 -3 4 -.5Z" fill="#fff" opacity=".8"/>`, relogio: '', skate: `<g transform="translate(100 270)"><rect x="-46" y="-8" width="92" height="9" rx="4.5" fill="${D}"/><circle cx="-30" cy="5" r="5" fill="#111"/><circle cx="30" cy="5" r="5" fill="#111"/></g>` }[m.extra] || '';
+  const relogio = m.extra === 'relogio' ? `<rect x="-8" y="10" width="16" height="9" rx="3" fill="#111827"/><rect x="-5" y="11.5" width="10" height="6" rx="2" fill="#38bdf8"/>` : '';
+  const mao = `<circle cx="0" cy="30" r="11" fill="url(#${u}p)"/>`;
+  const joinha = `<g transform="translate(0 30)"><rect x="-11" y="-8" width="22" height="20" rx="8" fill="url(#${u}p)"/><rect x="-5" y="-24" width="10" height="20" rx="5" fill="url(#${u}p)"/></g>`;
+  return `<svg class="sem3d masc anim-${animar ? m.movimento : 'nada'}" viewBox="0 0 200 ${m.extra === 'skate' ? 290 : 270}" width="${tam}" height="${tam * (m.extra === 'skate' ? 1.45 : 1.35)}" xmlns="http://www.w3.org/2000/svg">
+    <defs>${G('p', P)}${G('c', C, 1.6, .5, '35%', '20%')}${L('r', R)}${L('d', D)}${L('k', m.calca)}${L('t', m.tenis)}
+      <radialGradient id="${u}o" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="${tom(m.olhos, 1.6)}"/><stop offset="1" stop-color="${m.olhos}"/></radialGradient>
+      <radialGradient id="${u}sh" cx="50%" cy="0%" r="90%"><stop offset="0" stop-color="#000"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient></defs>
+    <ellipse class="sombra" cx="100" cy="${m.extra === 'skate' ? 282 : 262}" rx="50" ry="7" fill="#000" opacity=".28"/>
+    <g class="corpo">
+    ${ex}
+    <g class="pernas"><rect x="74" y="230" width="22" height="26" rx="8" fill="url(#${u}k)"/><rect x="104" y="230" width="22" height="26" rx="8" fill="url(#${u}k)"/>
+      <path d="M68 252 h32 q4 0 4 6 v4 h-38 v-4 q0 -6 2 -6Z" fill="url(#${u}t)"/><path d="M100 252 h32 q4 0 4 6 v4 h-38 v-4 q0 -6 2 -6Z" fill="url(#${u}t)"/><rect x="66" y="259" width="70" height="4" rx="2" fill="#e5e7eb" opacity=".85"/></g>
+    <path d="M62 180 Q62 160 100 158 Q138 160 138 180 L136 240 Q100 248 64 240Z" fill="url(#${u}r)"/>
+    ${roupaX}${estampa}
+    <path d="M64 178 Q66 168 76 164" stroke="#fff" stroke-width="3" opacity=".25" fill="none"/>
+    <g class="braco-e" style="transform-origin:68px 172px"><g transform="translate(58 172) rotate(18)"><rect x="-10" y="-4" width="20" height="36" rx="10" fill="${braco}"/>${mao}${relogio}</g></g>
+    <g class="braco-d" style="transform-origin:132px 172px"><g transform="translate(142 172) rotate(${m.movimento === 'joinha' || m.movimento === 'acenar' ? -150 : -18})"><rect x="-10" y="-4" width="20" height="36" rx="10" fill="${braco}"/>${m.movimento === 'joinha' ? `<g transform="rotate(180 0 30)">${joinha}</g>` : mao}</g></g>
+    ${exFrente}
+    <rect x="88" y="146" width="24" height="18" rx="8" fill="${tom(P, .8)}"/>
+    <g class="cabeca">
+      <ellipse cx="50" cy="118" rx="11" ry="14" fill="url(#${u}p)"/><ellipse cx="150" cy="118" rx="11" ry="14" fill="url(#${u}p)"/>
+      <path d="M52 100 Q50 62 100 58 Q150 62 148 100 L146 130 Q140 160 100 162 Q60 160 54 130Z" fill="url(#${u}p)"/>
+      <path d="M60 136 Q66 156 100 160 Q134 156 140 136 Q130 152 100 154 Q70 152 60 136Z" fill="${tom(P, .82)}" opacity=".6"/>
+      ${brilho('M70 76 Q100 64 128 74 Q100 70 74 84Z', .22)}
+      <ellipse cx="70" cy="136" rx="9" ry="5" fill="#ff6b6b" opacity=".28"/><ellipse cx="130" cy="136" rx="9" ry="5" fill="#ff6b6b" opacity=".28"/>
+      ${olho(78, m.sobrancelha === 'confiante' ? 2 : 0)}${olho(122, m.sobrancelha === 'confiante' ? 2 : 0)}
+      <path d="${sob[0]}" stroke="${tom(C, .8)}" stroke-width="7" stroke-linecap="round" fill="none"/><path d="${sob[1]}" stroke="${tom(C, .8)}" stroke-width="7" stroke-linecap="round" fill="none"/>
+      <path d="M98 122 Q94 132 100 134 Q104 134 104 130" stroke="${tom(P, .7)}" stroke-width="3" fill="none" stroke-linecap="round"/>
+      ${bocas}${cab}${oc}${chap}
+    </g></g>
   </svg>`;
+}
+/* fala do mascote (voz do próprio celular) */
+function falar(txt) {
+  try {
+    if (!('speechSynthesis' in window)) return false; speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(txt.replace(/[\u{1F000}-\u{1FAFF}☀-➿]/gu, '')); u.lang = 'pt-BR'; u.rate = 1.05; u.pitch = 1.15;
+    const v = speechSynthesis.getVoices().find(x => /pt[-_]BR/i.test(x.lang)); if (v) u.voice = v;
+    speechSynthesis.speak(u); return true;
+  } catch { return false; }
+}
+function saudacao() { const h = new Date().getHours(); return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; }
+function textoMascote(curto = false) {
+  const f = filhoAtual(); const dia = hojeISO(); const st = statusDia();
+  const pend = tarefasDoDia(dia, ['casa', 'trabalho']).filter(t => !ehFeita(regDe(t, dia)));
+  let t = `${saudacao()}, ${f.nome}! `;
+  if (!pend.length) t += st.total ? 'Você já fez tudo hoje. Jogo liberado! Mandou muito bem. ' : 'Hoje não tem tarefa obrigatória. Aproveite! ';
+  else {
+    t += `Hoje faltam ${pend.length} ${pend.length === 1 ? 'tarefa' : 'tarefas'}: `;
+    t += pend.slice(0, curto ? 2 : 6).map(x => x.titulo + (x.horario ? ` às ${x.horario.replace(':00', ' horas').replace(':', ' e ')}` : '')).join(', ') + (pend.length > (curto ? 2 : 6) ? ' e mais algumas' : '') + '. ';
+    t += 'Termina tudo para liberar o jogo! ';
+  }
+  const p = provasFuturas()[0]; if (p && corProva(p) === 'vermelho') t += `E atenção: prova de ${p.materia} ${faltaTxt(p)}. `;
+  return t.trim();
+}
+function cumprimentoDoDia() {
+  if (S.papel !== 'filho') return; const m = mascoteDe(S.eu); if (!m.voz) return;
+  const k = 'mok_ola_' + hojeISO(); if (lsGet(k)) return;
+  const vai = () => { if (lsGet(k)) return; lsSet(k, 1); falar(textoMascote(true)); document.removeEventListener('pointerdown', vai); };
+  document.addEventListener('pointerdown', vai); // navegadores só liberam a voz depois do primeiro toque
 }
 let MASC_EDIT = {};
 function modalMascote(id) {
   if (!podeEditarPerfil(id)) return toast('Você só pode personalizar o seu mascote.', 'bad');
   MASC_EDIT = mascoteDe(id);
-  const cores = k => MASC_OPC[k].map(v => `<button type="button" class="cor-opc ${MASC_EDIT[k] === v ? 'on' : ''}" style="background:${v}" data-act="mascoteOpc" data-k="${k}" data-v="${v}"></button>`).join('');
+  const cores = k => MASC_OPC[k].map(v => `<button type="button" class="cor-opc ${MASC_EDIT[k] === v ? 'on' : ''}" style="background:${v}" data-act="mascoteOpc" data-k="${k}" data-v="${v}"></button>`).join('') + `<label class="cor-livre" title="Escolher qualquer cor"><input type="color" value="${esc(MASC_EDIT[k])}" data-change="mascoteCor" data-k="${k}">🎨</label>`;
   const opcs = k => MASC_OPC[k].map(v => `<button type="button" class="opc ${MASC_EDIT[k] === v ? 'on' : ''}" data-act="mascoteOpc" data-k="${k}" data-v="${v}">${MASC_NOMES[v] || v}</button>`).join('');
   modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>🎨 Meu mascote</h2>
     <div class="masc-preview">${mascoteSVG(MASC_EDIT, 150)}</div>
     <label class="campo"><span>Nome do mascote</span><input id="mascNome" value="${esc(MASC_EDIT.nome)}" maxlength="20" placeholder="Dê um nome"></label>
-    ${Object.keys(MASC_OPC).map(k => `<div class="masc-grupo"><span>${MASC_ROT[k]}</span><div class="masc-opcs">${/^(pele|corCabelo|corRoupa)$/.test(k) ? cores(k) : opcs(k)}</div></div>`).join('')}
+    <label class="check"><input type="checkbox" id="mascVoz" ${MASC_EDIT.voz !== false ? 'checked' : ''}> 🔊 Falar comigo (bom dia e tarefas)</label>
+    <button type="button" class="btn ghost sm" style="margin:6px 0 12px" data-act="mascoteTestarVoz">▶️ Ouvir o mascote</button>
+    ${Object.keys(MASC_OPC).map(k => `<div class="masc-grupo"><span>${MASC_ROT[k]}</span><div class="masc-opcs">${MASC_CORES.includes(k) ? cores(k) : opcs(k)}</div></div>`).join('')}
     <button class="btn ok" style="margin-top:10px" data-act="mascoteSalvar" data-id="${esc(id)}">💾 Salvar mascote</button>`);
 }
 function dicaMascote() {
   if (S.papel !== 'filho') return '';
   const st = statusDia(); const p = provasFuturas()[0];
   if (p && corProva(p) === 'vermelho') return `Prova de ${p.materia} ${faltaTxt(p)}! 📚`;
+  if (!lsGet('mok_ola_' + hojeISO())) return `${saudacao()}, ${filhoAtual().nome}! Toque em mim 👋`;
   if (st.total && !st.liberado) return `Faltam ${st.total - st.feitas} tarefas para liberar o jogo 🎮`;
   if (st.liberado) return 'Tudo feito! Jogo liberado 🎮';
-  return 'Toque em mim! 👋';
+  return `${saudacao()}, ${filhoAtual().nome}! 👋`;
 }
 function modalAssistente() {
   const m = mascoteDe(S.eu); const st = statusDia(); const fut = provasFuturas(); const c = carteira();
   const pend = tarefasDoDia(hojeISO(), ['casa']).filter(t => !ehFeita(regDe(t, hojeISO())));
-  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><div class="centro">${mascoteSVG(m, 110)}</div>
-    <h2 class="centro" style="margin-top:4px">Oi, ${esc(filhoAtual().nome)}! Eu sou o ${esc(m.nome)} 👋</h2>
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><div class="centro masc-palco">${mascoteSVG(m, 120)}</div>
+    <h2 class="centro" style="margin-top:4px">${saudacao()}, ${esc(filhoAtual().nome)}! Eu sou o ${esc(m.nome)} 👋</h2>
+    <div class="fala">${esc(textoMascote())}</div><button class="btn ghost sm" style="margin-top:6px" data-act="mascoteFalar">🔊 Ouvir de novo</button>
     <div class="assist">
       <div class="${st.liberado || !st.total ? 'ok' : 'bad'}">${st.total ? (st.liberado ? '🎮 Jogo liberado! Mandou bem.' : `🔒 Faltam <b>${st.total - st.feitas}</b> tarefas para liberar o jogo.`) : '🎮 Sem tarefas obrigatórias hoje.'}</div>
       ${pend.length ? `<div>✅ Próxima tarefa: <b>${esc(pend[0].titulo)}</b>${pend[0].horario ? ' às ' + pend[0].horario : ''}</div>` : ''}
@@ -1214,7 +1286,7 @@ function flutuantes() {
   const nl = S.papel === 'pai' ? naoLidas() : naoLidas(S.eu);
   const pos = k => { const p = lsGet('mok_pos_' + k); return p ? `style="left:${Math.min(p.x, innerWidth - 60)}px;top:${Math.min(p.y, innerHeight - 70)}px;right:auto;bottom:auto"` : ''; };
   let h = `<button class="flut-chat" data-arrastar="chat" ${pos('chat')} data-act="chatAbrir" title="Chat (arraste para mover)">💬${nl ? `<span class="badge">${nl}</span>` : ''}</button>`;
-  if (S.papel === 'filho') { const m = mascoteDe(S.eu); const d = dicaMascote(); h += `<button class="flut-masc" data-arrastar="masc" ${pos('masc')} data-act="mascote" title="${esc(m.nome)} (arraste para mover)"><span class="balao">${esc(d)}</span>${mascoteSVG(m, 62)}</button>`; }
+  if (S.papel === 'filho') { const m = mascoteDe(S.eu); const d = dicaMascote(); h += `<button class="flut-masc" data-arrastar="masc" ${pos('masc')} data-act="mascote" title="${esc(m.nome)} (arraste para mover)"><span class="balao">${esc(d)}</span>${mascoteSVG(m, 66)}</button>`; }
   if (S.chatAberto) h += `<div class="chat-flut-bg" data-act="chatFechar"></div><div class="chat-flut"><div class="linha" style="margin-bottom:6px"><b class="esp">💬 Chat</b><button class="btn zap sm" style="width:auto" data-act="whats">📲 WhatsApp</button><button class="icone-btn" data-act="chatFechar">✕</button></div>${telaChat()}</div>`;
   return h;
 }
@@ -1760,10 +1832,12 @@ const acoes = {
   mascoteEditar: d => modalMascote(d.id || S.eu),
   mascoteOpc: (d, b) => { MASC_EDIT[d.k] = d.v; const box = b.closest('.modal'); box.querySelector('.masc-preview').innerHTML = mascoteSVG(MASC_EDIT, 150); box.querySelectorAll(`[data-k="${d.k}"]`).forEach(x => x.classList.toggle('on', x.dataset.v === d.v)); },
   mascoteSalvar: async d => {
-    const nm = $('#mascNome'); MASC_EDIT.nome = (nm && nm.value.trim().slice(0, 20)) || 'Bolt';
+    const nm = $('#mascNome'); MASC_EDIT.nome = (nm && nm.value.trim().slice(0, 20)) || 'Bolt'; const vz = $('#mascVoz'); if (vz) MASC_EDIT.voz = vz.checked;
     try { await salvarPerfil(d.id, { mascote: { ...MASC_EDIT } }); fecharModais(); toast(`🎨 ${MASC_EDIT.nome} está pronto!`, 'ok'); } catch (e) { toast(msgErro(e), 'bad'); }
   },
-  mascote: () => modalAssistente(),
+  mascote: () => { modalAssistente(); const m = mascoteDe(S.eu); if (m.voz !== false) falar(textoMascote()); },
+  mascoteFalar: () => falar(textoMascote()),
+  mascoteTestarVoz: () => { const n = ($('#mascNome') || {}).value || MASC_EDIT.nome; falar(`${saudacao()}, ${filhoAtual().nome}! Eu sou o ${n}, seu assistente. Vamos fazer as tarefas?`); },
   chatAbrir: () => { S.chatAberto = true; render(); setTimeout(() => { const i = $('#chatTxt'); if (i && innerWidth > 700) i.focus(); }, 50); },
   chatFechar: () => { S.chatAberto = false; render(); },
   whats: () => modalWhats(),
@@ -1943,6 +2017,7 @@ const forms = {
 
 const mudancas = {
   diaVer: el => { S.diaVer = el.value || hojeISO(); render(); },
+  mascoteCor: el => { MASC_EDIT[el.dataset.k] = el.value; const box = el.closest('.modal'); box.querySelector('.masc-preview').innerHTML = mascoteSVG(MASC_EDIT, 150); },
   recorrencia: el => { const u = el.value === 'unica'; $('#boxDias').hidden = u; $('#boxData').hidden = !u; }
 };
 
