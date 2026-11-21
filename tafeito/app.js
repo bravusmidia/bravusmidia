@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '1.4.1';
+const VERSAO = '1.4.2';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -167,7 +167,7 @@ function sementes(filhoId) {
   const criado = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
   const T = (icone, titulo, categoria, horario, extra = {}) => ({
     id: uid(), filho_id: filhoId, icone, titulo, categoria, descricao: '', recorrencia: 'diaria', dias: [], data_unica: null,
-    horario, foto: true, obrigatoria: categoria !== 'trabalho', xp: 10, valor: 0, ativa: true, criado_em: criado, ...extra
+    horario, aviso_antes: 30, foto: true, obrigatoria: categoria !== 'trabalho', xp: 10, valor: 0, ativa: true, criado_em: criado, ...extra
   });
   const tarefas = [
     T('🛏️', 'Arrumar o quarto', 'casa', '08:00', { descricao: 'Cama feita, roupas no lugar e nada jogado no chão.' }),
@@ -575,7 +575,7 @@ function slotFoto(t, r, tipo, travado, souPai) {
 
 function infoTarefa(t) {
   const partes = [];
-  if (t.horario) partes.push(`⏰ ${t.horario}`);
+  if (t.horario) partes.push(`⏰ ${t.horario}${num(t.aviso_antes ?? 30) > 0 ? ` (🔔 ${num(t.aviso_antes ?? 30)} min antes)` : ''}`);
   if (t.recorrencia === 'unica') partes.push(t.data_unica ? `📅 ${dataBR(t.data_unica)}` : 'Única');
   else if ((t.dias || []).length && t.dias.length < 7) partes.push(t.dias.map(d => DSEM[d]).join(', '));
   else partes.push('Todo dia');
@@ -961,7 +961,7 @@ function carregando(on, txt = 'Enviando…') {
 
 function formTarefa(t, cat) {
   const novo = !t; const souPai = S.papel === 'pai';
-  t = t || { categoria: cat || 'casa', recorrencia: cat === 'trabalho' ? 'unica' : 'diaria', dias: [], data_unica: hojeISO(), horario: '', foto: true, obrigatoria: cat !== 'trabalho', xp: cat === 'trabalho' ? 20 : 10, valor: 0, ativa: true, icone: '', titulo: '', descricao: '' };
+  t = t || { categoria: cat || 'casa', recorrencia: cat === 'trabalho' ? 'unica' : 'diaria', dias: [], data_unica: hojeISO(), horario: '', aviso_antes: 30, foto: true, obrigatoria: cat !== 'trabalho', xp: cat === 'trabalho' ? 20 : 10, valor: 0, ativa: true, icone: '', titulo: '', descricao: '' };
   modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>${novo ? 'Nova tarefa' : 'Editar tarefa'}</h2>
   <form data-form="tarefa" data-id="${esc(t.id || '')}">
     <div class="grid2" style="grid-template-columns:70px 1fr"><label class="campo"><span>Ícone</span><input name="icone" value="${esc(t.icone)}" placeholder="🧹" maxlength="8" autocomplete="off" style="text-align:center"></label>
@@ -975,6 +975,7 @@ function formTarefa(t, cat) {
     <label class="campo" id="boxData" ${t.recorrencia === 'unica' ? '' : 'hidden'}><span>A partir de</span><input type="date" name="data_unica" value="${esc(t.data_unica || hojeISO())}"></label>
     <div class="grid2"><label class="campo"><span>Horário do lembrete</span><input type="time" name="horario" value="${esc(t.horario)}"></label>
     <label class="campo"><span>XP (pontos)</span><input type="number" name="xp" min="0" max="1000" value="${num(t.xp)}"></label></div>
+    <label class="campo"><span>🔔 Avisar antes do horário</span><select name="aviso_antes">${[[0, 'Não avisar antes'], [10, '10 minutos antes'], [15, '15 minutos antes'], [30, '30 minutos antes'], [60, '1 hora antes']].map(([v, n]) => `<option value="${v}" ${num(t.aviso_antes ?? 30) === v ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
     ${souPai || t.valor ? `<label class="campo"><span>Vale dinheiro? (R$)</span><input type="number" name="valor" min="0" step="0.5" value="${num(t.valor)}" ${souPai ? '' : 'readonly'}></label>` : ''}
     <label class="check"><input type="checkbox" name="foto" ${t.foto ? 'checked' : ''} ${souPai ? '' : 'disabled'}> Exigir foto ANTES e DEPOIS</label>
     <label class="check"><input type="checkbox" name="obrigatoria" ${t.obrigatoria ? 'checked' : ''} ${souPai ? '' : 'disabled'}> Obrigatória para liberar PC/celular</label>
@@ -1302,7 +1303,7 @@ const forms = {
       ...(ant || { id: uid(), filho_id: fid(), criado_em: agoraISO() }),
       icone: f.icone.value.trim(), titulo: f.titulo.value.trim(), categoria: f.categoria.value, descricao: f.descricao.value.trim(),
       recorrencia: f.recorrencia.value, dias: dias.length === 7 ? [] : dias, data_unica: f.recorrencia.value === 'unica' ? (f.data_unica.value || hojeISO()) : null,
-      horario: f.horario.value, xp: num(f.xp.value)
+      horario: f.horario.value, aviso_antes: num(f.aviso_antes.value), xp: num(f.xp.value)
     };
     if (S.papel === 'pai') { t.valor = f.valor ? num(f.valor.value) : 0; t.foto = f.foto.checked; t.obrigatoria = f.obrigatoria.checked; }
     else if (!ant) { t.valor = 0; t.foto = true; t.obrigatoria = true; }
@@ -1547,6 +1548,10 @@ function checarLembretes() {
   const enviados = lsGet('mok_avisos', {}); const atrasadas = [];
   for (const t of tarefasDoDia(dia)) {
     if (!t.horario || ehFeita(regDe(t, dia))) continue;
+    const av = num(t.aviso_antes ?? 30), ka = regId(t, dia) + '@antes@' + dia;
+    if (av > 0 && !enviados[ka] && minutos(t.horario) - minutos(hm) <= av && minutos(t.horario) - minutos(hm) > 0) {
+      enviados[ka] = 1; notificar(`⏳ Em ${minutos(t.horario) - minutos(hm)} min: ${t.titulo}`, `Às ${t.horario}. Já vai se preparando!`, 'lembrete');
+    }
     const k = regId(t, dia) + '@' + dia; if (enviados[k]) continue;
     if (t.horario <= hm) {
       enviados[k] = 1;

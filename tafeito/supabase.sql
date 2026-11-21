@@ -581,6 +581,8 @@ create trigger mok_push_tar after insert on public.mok_tarefas for each row exec
 -- Se 30 minutos depois ainda não estiver feita, manda "⚠️ Ainda falta..." para o filho e avisa o pai.
 create extension if not exists pg_cron;
 
+alter table public.mok_tarefas add column if not exists aviso_antes int not null default 30;
+
 create table if not exists public.mok_push_lembrete_log (
   chave text primary key,
   criado_em timestamptz not null default now()
@@ -608,6 +610,14 @@ begin
     rid := case when t.recorrencia = 'unica' then t.id || '_u' else t.id || '_' || to_char(dia, 'YYYY-MM-DD') end;
     if exists (select 1 from mok_registros where id = rid and status in ('feita', 'aprovada')) then continue; end if;
     hora := dia + t.horario::time;
+
+    -- aviso antes da hora (padrão 30 min)
+    if coalesce(t.aviso_antes, 0) > 0 and agora >= hora - make_interval(mins => t.aviso_antes) and agora < hora - make_interval(mins => t.aviso_antes) + interval '10 minutes' and agora < hora then
+      insert into mok_push_lembrete_log (chave) values (rid || '@' || dia || '@antes') on conflict do nothing;
+      if found then
+        perform mok_push_enviar(t.filho_id, '⏳ Em ' || t.aviso_antes || ' min: ' || t.titulo, 'Às ' || t.horario || '. Já vai se preparando!', 'lembrete');
+      end if;
+    end if;
 
     -- na hora (aceita até 10 min de atraso do relógio do servidor)
     if agora >= hora and agora < hora + interval '10 minutes' then
