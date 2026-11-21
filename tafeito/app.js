@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '2.6.0';
+const VERSAO = '2.6.1';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -1301,30 +1301,30 @@ function animalVisual(m, tam) {
     ${m.fundo ? '<span class="aura-fundo"></span>' : ''}${au ? `<span class="aura-orbita">${img3d(au)}</span>` : ''}
     <div class="corpo-animal"><img class="bicho" src="${imgMasc(a)}" onerror="this.onerror=null;this.src='${miniMasc(a)}'" alt="${esc(a[2])}" draggable="false">${img3d(ch, 'acc-chapeu')}${img3d(oc, 'acc-oculos')}</div><span class="sombra-animal"></span></div>`;
 }
-/* ---------- BICHINHO VIRTUAL: comer, beber, carinho e dormir ---------- */
+/* ---------- BICHINHO VIRTUAL: comer, beber, treinar e dormir ---------- */
 const H = 36e5, clamp = (v, a = 0, b = 100) => Math.max(a, Math.min(b, v));
 const petDe = id => { const p = id === 'pai' ? S.config.pet_pai : (S.dados.filhos.find(f => f.id === id) || {}).pet; return p && typeof p === 'object' ? { ...p } : {}; };
 function statusPet(p, agora = Date.now()) {
   const desde = k => p[k] ? (agora - p[k]) / H : 6;
-  const fome = clamp(100 - desde('comeu') * 12), sede = clamp(100 - desde('bebeu') * 16), carinho = clamp(100 - desde('carinho') * 10);
+  const fome = clamp(100 - desde('comeu') * 12), sede = clamp(100 - desde('bebeu') * 16), treino = clamp(100 - desde('treinou') * 8);
   let energia;
   if (p.dormindo) energia = clamp((p.energia ?? 60) + ((agora - (p.dormiu || agora)) / H) * 30);
   else energia = clamp((p.energia ?? 80) - ((agora - (p.acordou || agora)) / H) * 6);
-  const humor = Math.round((fome + sede + carinho + energia) / 4);
+  const humor = Math.round((fome + sede + treino + energia) / 4);
   const nivel = Math.floor((p.xp || 0) / 50) + 1;
-  return { fome: Math.round(fome), sede: Math.round(sede), carinho: Math.round(carinho), energia: Math.round(energia), humor, nivel, xp: p.xp || 0, dormindo: !!p.dormindo };
+  return { fome: Math.round(fome), sede: Math.round(sede), treino: Math.round(treino), energia: Math.round(energia), humor, nivel, xp: p.xp || 0, dormindo: !!p.dormindo };
 }
 function pedidoPet(st, nome) {
   if (st.dormindo) return `${nome} está dormindo 💤`;
   if (st.fome < 30) return `${nome} está com fome! 🍖`;
   if (st.sede < 30) return `${nome} está com sede! 💧`;
   if (st.energia < 25) return `${nome} está com sono 😴`;
-  if (st.carinho < 30) return `${nome} quer carinho 🤚`;
+  if (st.treino < 30) return `${nome} quer treinar 🏋️`;
   return '';
 }
 const COMIDA = { gato: '🐟', gatinho: '🐟', cachorro: '🦴', cao: '🦴', coelho: '🥕', hamster: '🥜', esquilo: '🥜', macaco: '🍌', gorila: '🍌', panda: '🎋', coala: '🌿', cavalo: '🥕', unicornio: '🍓', vaca: '🌾', ovelha: '🌾', bode: '🌾',
   urso: '🍯', urso_polar: '🐟', pinguim: '🐟', foca: '🐟', lontra: '🐟', tubarao: '🐟', golfinho: '🐟', baleia: '🦐', abelha: '🌻', borboleta: '🌸', vampiro: '🍅', vampira: '🍅', zumbi: '🧠', robo: '🔋', alien: '🍕', monstro: '🍕', fantasma: '🍬', bruxo: '🍬', bruxa: '🍬', mago: '🍬' };
-const ACOES_PET = { comer: ['🍖', 'Comida', 'comeu', 'Hmm, que delícia! Obrigado!'], beber: ['💧', 'Água', 'bebeu', 'Ahh, refrescante!'], carinho: ['🤚', 'Carinho', 'carinho', 'Eu adoro carinho! ❤️'], dormir: ['😴', 'Dormir', '', 'Boa noite… zzz'] };
+const ACOES_PET = { comer: ['🍖', 'Comida', 'comeu', 'Hmm, que delícia! Obrigado!'], beber: ['💧', 'Água', 'bebeu', 'Ahh, refrescante!'], treinar: ['🏋️', 'Treinar', 'treinou', 'Bora! Treinei e fiquei mais forte 💪'], dormir: ['😴', 'Dormir', '', 'Boa noite… zzz'] };
 async function cuidarPet(acao) {
   const dono = S.papel === 'pai' ? 'pai' : S.eu; const m = mascoteDe(dono); const p = petDe(dono); const agora = Date.now(); const st = statusPet(p, agora);
   let fala = '';
@@ -1334,9 +1334,13 @@ async function cuidarPet(acao) {
   } else {
     if (p.dormindo) return toast(`${m.nome} está dormindo. Acorde primeiro 😴`);
     const [, , campo, f] = ACOES_PET[acao];
-    const antes = st[acao === 'comer' ? 'fome' : acao === 'beber' ? 'sede' : 'carinho'];
-    if (antes > 92) { fala = acao === 'comer' ? 'Estou cheio! Mais tarde 😅' : acao === 'beber' ? 'Já bebi bastante! 😄' : 'Hehe, já ganhei muito carinho hoje! 🥰'; }
-    else { p[campo] = agora; p.xp = (p.xp || 0) + 5; fala = f; }
+    const antes = st[acao === 'comer' ? 'fome' : acao === 'beber' ? 'sede' : 'treino'];
+    if (acao === 'treinar' && st.energia < 15) { fala = 'Estou sem energia… preciso dormir primeiro 😴'; }
+    else if (antes > 92) { fala = acao === 'comer' ? 'Estou cheio! Mais tarde 😅' : acao === 'beber' ? 'Já bebi bastante! 😄' : 'Já treinei bastante por hoje! Vamos descansar 😅'; }
+    else {
+      p[campo] = agora; p.xp = (p.xp || 0) + (acao === 'treinar' ? 10 : 5); fala = f;
+      if (acao === 'treinar') { p.energia = clamp(st.energia - 12); p.acordou = agora; }
+    }
     if (!p.acordou) { p.acordou = agora; p.energia = st.energia; }
   }
   const nivelAntes = st.nivel;
@@ -1355,7 +1359,7 @@ function festaPet(e) {
 }
 function barrasPet(st) {
   const b = (e, t, v) => `<div class="barra-pet"><span>${e} ${t}</span><div class="barra"><i style="width:${v}%;background:${v < 30 ? '#ef4444' : v < 60 ? '#f59e0b' : '#22c55e'}"></i></div><b>${v}%</b></div>`;
-  return `<div class="pet-status">${b('🍖', 'Fome', st.fome)}${b('💧', 'Sede', st.sede)}${b('❤️', 'Carinho', st.carinho)}${b('⚡', 'Energia', st.energia)}
+  return `<div class="pet-status">${b('🍖', 'Fome', st.fome)}${b('💧', 'Sede', st.sede)}${b('🏋️', 'Treino', st.treino)}${b('⚡', 'Energia', st.energia)}
     <div class="linha peq" style="margin-top:4px"><span class="esp">⭐ Nível <b>${st.nivel}</b> · ${st.xp % 50}/50 XP</span><span>${st.humor >= 70 ? '😄 Feliz' : st.humor >= 40 ? '🙂 Ok' : '😢 Precisa de você'}</span></div></div>`;
 }
 function cardPet(dono) {
