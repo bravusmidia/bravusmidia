@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '2.0.0';
+const VERSAO = '2.1.0';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -427,7 +427,7 @@ async function abrirApp() {
   render();
   verificarPedidosPai();
   inscreverPush(false);
-  checarBanco(); cumprimentoDoDia(); concluirLoginNotion();
+  checarBanco(); cumprimentoDoDia(); concluirLoginNotion(); checarNotif(); setInterval(checarNotif, 60000);
 }
 
 async function carregarTudo() {
@@ -518,7 +518,7 @@ function render() {
     ? { painel: telaPainel, tarefas: telaTarefasPai, work: telaWorkPai, estudo: telaEstudo, missoes: telaMissoes, mais: telaMaisPai }
     : { hoje: telaHoje, work: telaWorkFilho, estudo: telaEstudo, missoes: telaMissoes, premios: telaPremios, mais: telaMaisFilho };
   const fn = telas[S.tela] || Object.values(telas)[0];
-  $('#app').innerHTML = topo() + (S.papel === 'pai' ? barraFilhos() : '') + `<main>${fn()}</main>` + flutuantes() + nav();
+  $('#app').innerHTML = topo() + (S.papel === 'pai' ? barraFilhos() : '') + `<main>${fn()}</main>` + flutuantes() + nav() + telaBloqueioNotif();
   emoji3d($('#app'));
 
   if (foco) { const el = document.getElementById(foco.id); if (el) { el.value = foco.v; el.focus(); try { el.setSelectionRange(foco.s, foco.s); } catch { } } }
@@ -746,6 +746,7 @@ function telaPainel() {
     ${pend.map(p => `<div class="aviso warn linha"><div class="esp">🔐 <b>${esc(f.nome)}</b> pediu para ajustar <b>${esc(AREAS[p.area] || p.area)}</b>${p.mensagem ? `: "${esc(p.mensagem)}"` : ''}</div><button class="btn sm pri" data-act="abrirPedido" data-id="${esc(p.id)}">Ver</button></div>`).join('')}
     <div class="card"><div class="linha">${S.modo === 'online' ? `<span class="dot ${on ? 'on' : ''}"></span>` : ''}<div class="esp"><b>${esc(f.nome)}</b> <span class="mut peq">${S.modo === 'online' ? (on ? 'online agora' : (perfil && perfil.visto_em ? 'visto ' + dataHoraBR(perfil.visto_em) : (perfil ? 'offline' : 'acesso ainda não criado'))) : ''}</span></div>
       <input type="date" class="inp" style="width:auto;padding:7px 9px" value="${dia}" data-change="diaVer"></div></div>
+    ${S.modo === 'online' && perfil ? `<div class="aviso ${perfil.notif_estado === 'ativo' ? 'ok' : 'bad'}">${perfil.notif_estado === 'ativo' ? '🔔 Notificações de ' + esc(f.nome) + ' <b>ligadas</b>' : '🔕 Notificações de ' + esc(f.nome) + ' <b>' + (perfil.notif_estado ? 'DESLIGADAS' : 'ainda não ativadas') + '</b>' + (perfil.notif_em ? ' desde ' + dataHoraBR(perfil.notif_em) : '') + ' · o app dele fica bloqueado até religar'}</div>` : ''}
     ${S.modo === 'online' ? cardUso(f.id) : ''}${bannerProvas()}
     <div class="secao">📊 Resumo de ${esc(f.nome)}</div>${dashTarefas(f.id)}${dashWork(f.id)}${dashEstudo(f.id)}
     ${tars.length ? cardPremio(dia) : ''}
@@ -1413,6 +1414,41 @@ async function baixarPasta(aba) {
   } catch (e) { carregando(false); toast(msgErro(e), 'bad'); }
 }
 
+/* ---------- VIGIA DAS NOTIFICAÇÕES: o filho não usa o app com elas desligadas ---------- */
+async function estadoNotif() {
+  if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) return 'sem_suporte';
+  if (Notification.permission === 'denied') return 'bloqueado';
+  if (Notification.permission !== 'granted') return 'desligado';
+  try { const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); return sub ? 'ativo' : 'desligado'; } catch { return 'desligado'; }
+}
+let checandoNotif = false;
+async function checarNotif() {
+  if (S.modo !== 'online' || checandoNotif) return; checandoNotif = true;
+  try {
+    let e = await estadoNotif();
+    if (Notification && Notification.permission === 'granted' && e !== 'ativo') { await inscreverPush(false); e = await estadoNotif(); }
+    if (e === 'ativo') await inscreverPush(false); // garante o cadastro no servidor
+    try { await DB.rpc('mok_notif', { p_estado: e }); } catch { }
+    const antes = S.notifEstado; S.notifEstado = e;
+    if (antes !== e) render();
+  } finally { checandoNotif = false; }
+}
+function telaBloqueioNotif() {
+  if (S.papel !== 'filho' || S.modo !== 'online' || !S.notifEstado || S.notifEstado === 'ativo') return '';
+  const e = S.notifEstado; const ios = /iPhone|iPad/i.test(navigator.userAgent);
+  return `<div class="bloqueio-notif"><div class="bn-caixa">
+    <div class="grande">🔕</div><h2>Notificações desligadas</h2>
+    <p>O TáFeito só funciona com as notificações <b>ligadas</b>. Enquanto estiverem desligadas, o app e o jogo ficam <b>bloqueados</b> e o pai é avisado.</p>
+    ${e === 'bloqueado' ? `<div class="aviso warn" style="text-align:left"><b>Como religar:</b><br>
+      • <b>Android (Chrome):</b> toque no 🔒 ao lado do endereço → <b>Permissões</b> → <b>Notificações</b> → Permitir. Ou: Configurações do celular → Apps → Chrome (ou TáFeito) → Notificações → Ligar.<br>
+      • <b>PC:</b> clique no 🔒 ao lado do endereço → Notificações → Permitir.<br>
+      • <b>iPhone:</b> Ajustes → Notificações → TáFeito → Permitir.<br>Depois volte aqui e toque em <b>Já liguei</b>.</div>
+      <button class="btn pri" data-act="notifRechecar">✅ Já liguei</button>`
+    : e === 'sem_suporte' ? `<div class="aviso warn" style="text-align:left">${ios ? 'No iPhone, instale o app: botão <b>Compartilhar</b> → <b>Adicionar à Tela de Início</b>, abra pelo ícone e ative as notificações.' : 'Abra o TáFeito pelo <b>Google Chrome</b> para ativar as notificações.'}</div><button class="btn pri" data-act="notifRechecar">Tentar de novo</button>`
+    : `<button class="btn ok" data-act="notifAtivar">🔔 Ativar notificações</button>`}
+    <button class="btn ghost sm" style="margin-top:10px" data-act="sair">Sair</button></div></div>`;
+}
+
 /* ---------- CENTRAL DE NOTIFICAÇÕES ---------- */
 const avisosNaoLidos = () => (S.dados.avisos || []).filter(a => !a.lido).length;
 async function modalAvisos() {
@@ -2009,6 +2045,8 @@ const acoes = {
   calMes: d => { const [y, m] = S.calMes.split('-').map(Number); const n = new Date(y, m - 1 + Number(d.n), 1); S.calMes = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`; render(); },
   importar: () => modalImportar(),
   avisos: () => modalAvisos(),
+  notifAtivar: async () => { if (!('Notification' in window)) return; const p = await Notification.requestPermission(); if (p === 'granted') { await inscreverPush(true); } await checarNotif(); if (S.notifEstado === 'ativo') toast('🔔 Notificações ligadas! App liberado.', 'ok'); },
+  notifRechecar: () => checarNotif(),
   enviarImagens: () => modalEnviarImagens(),
   abaImg: d => { S.abaImg = d.aba; render(); },
   baixarImg: d => baixarImg(d.id),
@@ -2475,6 +2513,6 @@ function linkConvite() { const base = location.origin + location.pathname.replac
 function registrarSW() { if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(e => console.warn('sw', e)); }
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); promptInstalar = e; render(); });
 window.addEventListener('appinstalled', () => { promptInstalar = null; toast('App instalado ✅', 'ok'); });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.papel) { DB.ping(); aoMudarBanco(); checarLembretes(); checarProvas(); } });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.papel) { DB.ping(); aoMudarBanco(); checarLembretes(); checarProvas(); checarNotif(); } });
 
 iniciar().catch(e => { console.error(e); telaErro('Algo deu errado', msgErro(e)); });

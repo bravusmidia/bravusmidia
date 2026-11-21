@@ -1210,6 +1210,44 @@ exception when others then null;
 end $$;
 revoke all on function public.mok_push_enviar(text, text, text, text) from public, anon, authenticated;
 
+-- =====================================================================
+-- v2.0: VIGIA DAS NOTIFICAÇÕES (o pai é avisado se o filho desligar)
+-- =====================================================================
+alter table public.mok_perfis add column if not exists notif_estado text not null default '';
+alter table public.mok_perfis add column if not exists notif_em timestamptz;
+
+create or replace function public.mok_notif(p_estado text) returns void
+language plpgsql security definer set search_path = public as $$
+declare p mok_perfis%rowtype; e text := case when p_estado in ('ativo','desligado','bloqueado','sem_suporte') then p_estado else 'desligado' end;
+begin
+  select * into p from mok_perfis where id = auth.uid();
+  if p.id is null or p.notif_estado = e then return; end if;
+  update mok_perfis set notif_estado = e, notif_em = now() where id = p.id;
+  if p.papel = 'filho' then
+    if e = 'ativo' and p.notif_estado &lt;&gt; '' then
+      perform mok_push_enviar('pai', '🔔 ' || p.nome || ' religou as notificações', to_char(now() at time zone 'America/Fortaleza', 'DD/MM HH24:MI'), 'notif');
+    elsif e &lt;&gt; 'ativo' then
+      perform mok_push_enviar('pai', '🚨 ' || p.nome || ' DESLIGOU as notificações', 'O app dele fica bloqueado até religar. ' || to_char(now() at time zone 'America/Fortaleza', 'DD/MM HH24:MI'), 'notif');
+    end if;
+  end if;
+end $$;
+grant execute on function public.mok_notif(text) to authenticated;
+
+-- se o último aparelho do filho deixar de receber (celular cancelou a inscrição), o pai é avisado
+create or replace function public.mok_push_sumiu() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare nome text;
+begin
+  if old.alvo &lt;&gt; 'pai' and not exists (select 1 from mok_push where alvo = old.alvo) then
+    select f.nome into nome from mok_filhos f where f.id = old.alvo;
+    perform mok_push_enviar('pai', '🚨 ' || coalesce(nome, 'Filho') || ' parou de receber notificações', 'O celular dele cancelou os avisos. Peça para abrir o TáFeito e ativar de novo.', 'notif');
+    update mok_perfis set notif_estado = 'desligado', notif_em = now() where filho_id = old.alvo;
+  end if;
+  return null;
+end $$;
+drop trigger if exists mok_push_sumiu on public.mok_push;
+create trigger mok_push_sumiu after delete on public.mok_push for each row execute function public.mok_push_sumiu();
+
 -- Pronto! Agora abra o app e crie a conta do Pai.
 </pre>
 <script>document.getElementById('b').onclick=async()=>{const t=document.getElementById('s').textContent;try{await navigator.clipboard.writeText(t)}catch(e){const r=document.createRange();r.selectNodeContents(document.getElementById('s'));const s=getSelection();s.removeAllRanges();s.addRange(r);document.execCommand('copy')}document.getElementById('b').textContent='✅ Copiado! Agora cole no SQL Editor'}</script></body></html>

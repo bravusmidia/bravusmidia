@@ -375,3 +375,6 @@ main{padding-bottom:180px!important}
 canvas.masc3d{display:block;margin:0 auto;pointer-events:none}
 .flut-masc canvas.masc3d{filter:drop-shadow(0 10px 12px rgba(0,0,0,.45))}
 .flut-masc .balao{left:66px}
+
+.bloqueio-notif{position:fixed;inset:0;z-index:100;background:rgba(5,8,20,.94);backdrop-filter:blur(8px);display:grid;place-items:center;padding:18px;overflow:auto}
+.bn-caixa{max-width:420px;width:100%;background:var(--card);border:2px solid var(--bad);border-radius:22px;padding:20px;text-align:center}
