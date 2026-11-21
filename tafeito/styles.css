@@ -360,3 +360,14 @@ main{padding-bottom:180px!important}
 .aviso-item .tt{flex:1}.aviso-item small{display:block;color:var(--mut);margin-top:2px}
 .aviso-item.novo{background:rgba(79,124,255,.16);border-left:3px solid var(--pri)}
 .btn.notion{background:#fff;color:#111}
+
+/* v1.9 imagens */
+.abas-img{display:flex;gap:6px}.abas-img button{flex:1;border:1px solid var(--linha);background:var(--card2);color:var(--txt);border-radius:12px;padding:9px;font-weight:800;cursor:pointer}
+.abas-img button.on{background:linear-gradient(135deg,var(--pri),var(--pri2));border-color:transparent}
+.galeria{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:10px}
+.img-item{position:relative;border-radius:12px;overflow:hidden;background:var(--bg2);aspect-ratio:1}
+.galeria.story .img-item{aspect-ratio:9/16}
+.img-item img{width:100%;height:100%;object-fit:cover;display:block}
+.img-item .num{position:absolute;left:5px;top:5px;background:rgba(0,0,0,.72);color:#fff;font-weight:900;font-size:.75rem;padding:2px 7px;border-radius:99px}
+.img-item .nf{position:absolute;right:5px;top:5px;background:rgba(79,124,255,.85);color:#fff;font-weight:800;font-size:.65rem;padding:2px 6px;border-radius:99px}
+.img-acoes{position:absolute;right:4px;bottom:4px;display:flex;gap:4px}.img-acoes .icone-btn{width:30px;height:30px;background:rgba(0,0,0,.6)}

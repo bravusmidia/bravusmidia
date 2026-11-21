@@ -3,9 +3,9 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '1.8.0';
+const VERSAO = '1.9.0';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
-const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos'];
+const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
 const CATS = { casa: { nome: 'Casa', icone: '🏠' }, trabalho: { nome: 'Work', icone: '💼' } };
 // Estudo saiu do app (o filho já cuida disso sozinho): tarefas e missões antigas de estudo ficam ocultas.
@@ -133,6 +133,7 @@ class SupaStore {
     if (t === 'filhos') q = q.order('ordem');
     if (t === 'cientes') q = q.order('criado_em', { ascending: false }).limit(2000);
     if (t === 'uso') q = q.order('dia', { ascending: false }).limit(400);
+    if (t === 'imagens') q = q.order('numero', { ascending: false }).limit(2000);
     if (t === 'avisos') q = q.order('criado_em', { ascending: false }).limit(150);
     const { data, error } = await q;
     if (error) throw error;
@@ -242,7 +243,7 @@ function nivel(filhoId = fid()) {
   return { xp, n: n + 1, patente: PATENTES[Math.min(n, PATENTES.length - 1)], prox: PATENTES[Math.min(n + 1, PATENTES.length - 1)], pct: xp % 100 };
 }
 function carteira(filhoId = fid()) {
-  const ganho = concluidos(filhoId).reduce((s, r) => s + num(r.valor), 0) + deFilho('resgates', filhoId).reduce((s, r) => s + num(r.valor), 0);
+  const ganho = concluidos(filhoId).reduce((s, r) => s + num(r.valor), 0) + deFilho('resgates', filhoId).reduce((s, r) => s + num(r.valor), 0) + deFilho('imagens', filhoId).reduce((s, r) => s + num(r.valor), 0);
   const pago = deFilho('pagamentos', filhoId).reduce((s, p) => s + num(p.valor), 0);
   return { ganho, pago, saldo: ganho - pago };
 }
@@ -681,7 +682,7 @@ function telaHoje() {
 function telaWorkFilho() {
   const dia = hojeISO(); const tars = tarefasDoDia(dia, ['trabalho']); const c = carteira();
   const hist = concluidos().filter(r => num(r.valor) > 0).sort((a, b) => (b.feito_em || '').localeCompare(a.feito_em || '')).slice(0, 15);
-  return `${dashWork()}<div class="card destaque"><div class="linha"><div class="esp"><span class="mut peq">Seu saldo a receber</span><h1 style="margin:2px 0">${brl(c.saldo)}</h1><span class="mut peq">Ganho total ${brl(c.ganho)} · já recebido ${brl(c.pago)}</span></div><span style="font-size:2.4rem">💰</span></div></div>
+  return `${dashWork()}${secaoImagens()}<div class="card destaque"><div class="linha"><div class="esp"><span class="mut peq">Seu saldo a receber</span><h1 style="margin:2px 0">${brl(c.saldo)}</h1><span class="mut peq">Ganho total ${brl(c.ganho)} · já recebido ${brl(c.pago)}</span></div><span style="font-size:2.4rem">💰</span></div></div>
     <div class="secao">💼 Trabalhos</div>
     ${tars.length ? tars.map(t => cardTarefaFilho(t, dia)).join('') : `<div class="vazio"><span class="e">💼</span>Nenhum trabalho agora. O pai coloca novos trabalhos aqui.</div>`}
     ${hist.length ? `<div class="secao">Histórico</div><div class="card">${hist.map(r => `<div class="lista-item"><div class="tt">${esc((tarefaPorId(r.tarefa_id) || {}).titulo || 'Trabalho')}<small>${dataHoraBR(r.feito_em)}</small></div><b>${brl(r.valor)}</b></div>`).join('')}</div>` : ''}`;
@@ -775,7 +776,7 @@ function telaTarefasPai() {
 
 function telaWorkPai() {
   const c = carteira(); const pags = deFilho('pagamentos').sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || ''));
-  return `${dashWork()}<div class="card destaque"><span class="mut peq">${esc(filhoAtual().nome)} tem a receber</span><h1 style="margin:2px 0">${brl(c.saldo)}</h1>
+  return `${dashWork()}${secaoImagens()}<div class="card destaque"><span class="mut peq">${esc(filhoAtual().nome)} tem a receber</span><h1 style="margin:2px 0">${brl(c.saldo)}</h1>
     <span class="mut peq">Ganho ${brl(c.ganho)} · pago ${brl(c.pago)}</span>
     <div class="acoes"><button class="btn ok sm" data-act="pagar">💸 Registrar pagamento</button></div></div>
     <div class="linha" style="margin-top:6px"><div class="esp"><h2 style="margin:0">Trabalhos</h2><span class="mut peq">Tarefas que valem dinheiro</span></div>
@@ -1327,6 +1328,85 @@ async function enviarWhats(para) {
   window.open(`https://wa.me/${num}?text=${encodeURIComponent(corpo)}`, '_blank'); fecharModais();
 }
 
+/* ---------- IMAGENS DO WORK (feed e story) ---------- */
+const URLS_IMG = {};
+function resumoImagens(id = fid()) {
+  const l = deFilho('imagens', id); const f = S.dados.filhos.find(x => x.id === id) || {}; const g = Math.max(1, num(f.tamanho_grupo ?? 10));
+  return { total: l.length, feed: l.filter(i => i.formato === 'feed').length, story: l.filter(i => i.formato === 'story').length, grupos: Math.floor(l.length / g), faltam: g - (l.length % g), g, valor: l.reduce((s, i) => s + num(i.valor), 0), vi: num(f.valor_imagem ?? 1) };
+}
+function secaoImagens() {
+  const r = resumoImagens(); const aba = S.abaImg || 'feed'; const l = deFilho('imagens').filter(i => i.formato === aba).sort((a, b) => b.numero - a.numero);
+  setTimeout(carregarMiniaturas, 50);
+  return `${dash('🖼️ Minhas imagens', [{ n: r.total, r: 'imagens criadas', c: 'azul' }, { n: r.feed, r: 'feed', c: 'verde' }, { n: r.story, r: 'story', c: 'roxo' },
+      { n: r.grupos, r: `grupos de ${r.g}`, c: 'amarelo' }, { n: brl(r.valor), r: 'ganho com imagens', c: 'verde' }],
+      `<div class="dash-st info">Cada imagem vale <b>${brl(r.vi)}</b> · cada grupo de ${r.g} = <b>${brl(r.vi * r.g)}</b> · faltam ${r.faltam} para o próximo grupo</div>`)}
+    ${S.papel === 'filho' ? `<button class="dropzone" data-act="enviarImagens"><span style="font-size:1.8rem">📤</span><div><b>Enviar imagens</b><br><span class="peq">Uma por vez ou todas de uma vez · Feed e Story vão para pastas separadas</span></div></button>` : ''}
+    <div class="card"><div class="abas-img"><button class="${aba === 'feed' ? 'on' : ''}" data-act="abaImg" data-aba="feed">📁 Feed (${r.feed})</button><button class="${aba === 'story' ? 'on' : ''}" data-act="abaImg" data-aba="story">📁 Story (${r.story})</button></div>
+      ${S.papel === 'pai' && l.length ? `<button class="btn pri sm" style="margin:10px 0" data-act="baixarPasta" data-aba="${aba}">⬇️ Baixar pasta ${aba === 'feed' ? 'Feed' : 'Story'} (${l.length}) em .zip</button>` : ''}
+      ${l.length ? `<div class="galeria ${aba}">${l.map(i => `<div class="img-item" data-id="${esc(i.id)}"><img data-caminho="${esc(i.caminho)}" alt="#${i.numero}" loading="lazy"><span class="num">#${i.numero}</span><span class="nf">${aba === 'feed' ? 'F' : 'S'}${i.numero_formato}</span>
+        <div class="img-acoes"><button class="icone-btn" data-act="baixarImg" data-id="${esc(i.id)}" title="Baixar">⬇️</button>${S.papel === 'pai' ? `<button class="icone-btn" data-act="apagarImg" data-id="${esc(i.id)}" title="Apagar">🗑️</button>` : ''}</div></div>`).join('')}</div>`
+      : `<div class="vazio"><span class="e">🖼️</span>Nenhuma imagem de ${aba} ainda.</div>`}</div>`;
+}
+async function urlsAssinadas(caminhos) {
+  const falta = caminhos.filter(c => !URLS_IMG[c] || URLS_IMG[c].exp < Date.now());
+  for (let i = 0; i < falta.length; i += 100) {
+    const { data } = await DB.sb.storage.from('mok-imagens').createSignedUrls(falta.slice(i, i + 100), 3600);
+    (data || []).forEach(d => { if (d.signedUrl) URLS_IMG[d.path] = { url: d.signedUrl, exp: Date.now() + 3500e3 }; });
+  }
+}
+async function carregarMiniaturas() {
+  if (S.modo !== 'online') return; const imgs = [...document.querySelectorAll('.galeria img[data-caminho]')]; if (!imgs.length) return;
+  try { await urlsAssinadas(imgs.map(i => i.dataset.caminho)); imgs.forEach(i => { const u = URLS_IMG[i.dataset.caminho]; if (u && i.src !== u.url) i.src = u.url; }); } catch (e) { console.warn(e); }
+}
+function modalEnviarImagens() {
+  if (S.modo !== 'online') return toast('Envio de imagens funciona no modo online.', 'bad');
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>📤 Enviar imagens</h2>
+    <label class="campo"><span>Formato</span><select id="imgFormato"><option value="auto">🔎 Automático (pelo tamanho da imagem)</option><option value="feed">📁 Feed (quadrada / 4:5)</option><option value="story">📁 Story (vertical 9:16)</option></select></label>
+    <label class="dropzone grande-zona" id="zonaImg"><input type="file" id="arqImg" accept="image/*" multiple hidden><span style="font-size:2.2rem">🖼️</span><div><b>Toque para escolher as imagens</b><br><span class="peq">Pode escolher várias de uma vez · ou arraste aqui</span></div></label>
+    <div id="filaImg"></div>`);
+  const inp = $('#arqImg'); inp.onchange = () => inp.files.length && enviarImagens([...inp.files]);
+}
+function dimensoes(arq) { return new Promise(res => { const u = URL.createObjectURL(arq); const i = new Image(); i.onload = () => { res({ w: i.naturalWidth, h: i.naturalHeight }); URL.revokeObjectURL(u); }; i.onerror = () => { res({ w: 0, h: 0 }); URL.revokeObjectURL(u); }; i.src = u; }); }
+async function enviarImagens(arqs) {
+  const modo = ($('#imgFormato') || {}).value || 'auto'; const fila = $('#filaImg'); const lote = uid(); let ok = 0, erro = 0;
+  arqs = arqs.filter(a => /^image\//.test(a.type) || /\.(png|jpe?g|webp|gif|heic|avif)$/i.test(a.name));
+  if (!arqs.length) return toast('Escolha arquivos de imagem.', 'bad');
+  fila.innerHTML = `<div class="barra" style="margin:10px 0"><i id="imgProg" style="width:0%"></i></div><p class="mut peq" id="imgTxt">Enviando 0 de ${arqs.length}…</p>`;
+  for (const [n, a] of arqs.entries()) {
+    try {
+      const d = await dimensoes(a); const fmt = modo !== 'auto' ? modo : (d.h && d.h / d.w >= 1.45 ? 'story' : 'feed');
+      const nome = a.name.normalize('NFD').replace(/[^\w.\-]+/g, '_').slice(-60);
+      const caminho = `${fid()}/${fmt}/${Date.now()}_${n}_${nome}`;
+      const { error } = await DB.sb.storage.from('mok-imagens').upload(caminho, a, { contentType: a.type || 'image/jpeg', upsert: false });
+      if (error) throw error;
+      const row = await DB.inserir('imagens', { id: uid(), filho_id: fid(), formato: fmt, caminho, nome: a.name.slice(0, 120), tamanho: a.size, largura: d.w, altura: d.h, lote });
+      S.dados.imagens.unshift(row); ok++;
+    } catch (e) { console.warn(e); erro++; }
+    const p = Math.round((n + 1) / arqs.length * 100); const pr = $('#imgProg'); if (pr) pr.style.width = p + '%';
+    const tx = $('#imgTxt'); if (tx) tx.textContent = `Enviando ${n + 1} de ${arqs.length}…`;
+  }
+  try { await DB.rpc('mok_imagens_enviadas', { p_lote: lote }); } catch { }
+  fecharModais(); render(); if (ok) confete();
+  toast(`📤 ${ok} imagens enviadas${erro ? ` · ${erro} com erro` : ''} · +${brl(ok * resumoImagens().vi)}`, erro ? 'bad' : 'ok');
+}
+async function baixarArquivo(url, nome) { const b = await fetch(url).then(r => r.blob()); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = nome; document.body.appendChild(a); a.click(); a.remove(); }
+const nomeBaixa = i => `${i.formato}_${String(i.numero).padStart(4, '0')}_${i.nome || 'imagem.jpg'}`;
+async function baixarImg(id) {
+  const i = S.dados.imagens.find(x => x.id === id); if (!i) return;
+  try { await urlsAssinadas([i.caminho]); await baixarArquivo(URLS_IMG[i.caminho].url, nomeBaixa(i)); } catch (e) { toast(msgErro(e), 'bad'); }
+}
+async function baixarPasta(aba) {
+  const l = deFilho('imagens').filter(i => i.formato === aba).sort((a, b) => a.numero - b.numero); if (!l.length) return;
+  carregando(true, `Preparando ${l.length} imagens…`);
+  try {
+    await carregarScript('jszip.min.js'); await urlsAssinadas(l.map(i => i.caminho));
+    const zip = new JSZip(); const pasta = zip.folder(`${filhoAtual().nome}_${aba}`);
+    for (const i of l) pasta.file(nomeBaixa(i), await fetch(URLS_IMG[i.caminho].url).then(r => r.blob()));
+    const b = await zip.generateAsync({ type: 'blob' }); carregando(false);
+    const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `${filhoAtual().nome}_${aba}_${hojeISO()}.zip`; document.body.appendChild(a); a.click(); a.remove();
+  } catch (e) { carregando(false); toast(msgErro(e), 'bad'); }
+}
+
 /* ---------- CENTRAL DE NOTIFICAÇÕES ---------- */
 const avisosNaoLidos = () => (S.dados.avisos || []).filter(a => !a.lido).length;
 async function modalAvisos() {
@@ -1623,6 +1703,8 @@ async function salvarImport(f) {
 document.addEventListener('dragover', e => { if (e.target.closest && e.target.closest('#zonaImp')) { e.preventDefault(); e.target.closest('#zonaImp').classList.add('arrastando'); } });
 document.addEventListener('dragleave', e => { const z = e.target.closest && e.target.closest('#zonaImp'); if (z) z.classList.remove('arrastando'); });
 document.addEventListener('drop', e => { const z = e.target.closest && e.target.closest('#zonaImp'); if (!z) return; e.preventDefault(); z.classList.remove('arrastando'); const a = e.dataTransfer.files[0]; if (a) processarImport(a); });
+document.addEventListener('dragover', e => { const z = e.target.closest && e.target.closest('#zonaImg'); if (z) { e.preventDefault(); z.classList.add('arrastando'); } });
+document.addEventListener('drop', e => { const z = e.target.closest && e.target.closest('#zonaImg'); if (!z) return; e.preventDefault(); z.classList.remove('arrastando'); if (e.dataTransfer.files.length) enviarImagens([...e.dataTransfer.files]); });
 document.addEventListener('paste', e => { if (!$('#zonaImp')) return; const a = [...(e.clipboardData?.files || [])][0]; if (a) { e.preventDefault(); processarImport(a); } });
 
 /* ===================================================================
@@ -1712,6 +1794,8 @@ function formFilho(f) {
     <div class="grid2"><label class="campo"><span>💻 Horas de computador</span><input type="number" name="horas_pc" min="0" step="0.5" value="${num(f.horas_pc)}"></label>
     <label class="campo"><span>📱 Horas de celular</span><input type="number" name="horas_cel" min="0" step="0.5" value="${num(f.horas_cel)}"></label></div>
     <label class="campo"><span>📲 WhatsApp do filho (para o botão de WhatsApp)</span><input name="whatsapp" inputmode="tel" value="${esc(f.whatsapp || '')}" placeholder="85 99999-9999"></label>
+    <div class="grid2"><label class="campo"><span>🖼️ R$ por imagem</span><input type="number" name="valor_imagem" min="0" step="0.5" value="${num(f.valor_imagem ?? 1)}"></label>
+    <label class="campo"><span>Imagens por grupo</span><input type="number" name="tamanho_grupo" min="1" step="1" value="${num(f.tamanho_grupo ?? 10)}"></label></div>
     <label class="campo"><span>Prêmio extra do dia (opcional)</span><input name="premio_extra" value="${esc(f.premio_extra)}" placeholder="Ex.: sobremesa liberada"></label>
     <label class="check"><input type="checkbox" name="exigir_todas" ${f.exigir_todas !== false ? 'checked' : ''}> 🎮 Só jogar depois de concluir TODAS as tarefas do dia (inclusive opcionais e trabalhos)</label>
     <label class="check"><input type="checkbox" name="exigir_aprovacao" ${f.exigir_aprovacao ? 'checked' : ''}> Só liberar depois que eu aprovar as fotos</label>
@@ -1919,6 +2003,15 @@ const acoes = {
   calMes: d => { const [y, m] = S.calMes.split('-').map(Number); const n = new Date(y, m - 1 + Number(d.n), 1); S.calMes = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`; render(); },
   importar: () => modalImportar(),
   avisos: () => modalAvisos(),
+  enviarImagens: () => modalEnviarImagens(),
+  abaImg: d => { S.abaImg = d.aba; render(); },
+  baixarImg: d => baixarImg(d.id),
+  baixarPasta: d => baixarPasta(d.aba),
+  apagarImg: async d => {
+    if (!confirm('Apagar esta imagem? O valor dela sai do saldo.')) return;
+    const i = S.dados.imagens.find(x => x.id === d.id);
+    try { await DB.remover('imagens', d.id); await DB.sb.storage.from('mok-imagens').remove([i.caminho]); S.dados.imagens = S.dados.imagens.filter(x => x.id !== d.id); render(); toast('Imagem apagada'); } catch (e) { toast(msgErro(e), 'bad'); }
+  },
   notionEntrar: () => notionEntrar(),
   notionDesconectar: async () => { try { await chamarNotion({ acao: 'sair' }); } catch { } localStorage.removeItem('mok_notion_token'); fecharModais(); modalConectores(); },
   icalImportar: () => icalImportar(),
@@ -2055,7 +2148,7 @@ const forms = {
     const id = f.dataset.id; const ant = id ? S.dados.filhos.find(x => x.id === id) : null;
     let novoId = id;
     if (!ant) { novoId = f.nome.value.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '') || 'filho'; if (S.dados.filhos.some(x => x.id === novoId)) novoId += Math.floor(Math.random() * 90 + 10); }
-    const x = { ...(ant || { id: novoId, ordem: S.dados.filhos.length + 1, criado_em: agoraISO() }), nome: f.nome.value.trim(), horas_pc: num(f.horas_pc.value), horas_cel: num(f.horas_cel.value), premio_extra: f.premio_extra.value.trim(), exigir_aprovacao: f.exigir_aprovacao.checked, exigir_todas: f.exigir_todas.checked, whatsapp: f.whatsapp.value.replace(/\D/g, '') };
+    const x = { ...(ant || { id: novoId, ordem: S.dados.filhos.length + 1, criado_em: agoraISO() }), nome: f.nome.value.trim(), horas_pc: num(f.horas_pc.value), horas_cel: num(f.horas_cel.value), premio_extra: f.premio_extra.value.trim(), exigir_aprovacao: f.exigir_aprovacao.checked, exigir_todas: f.exigir_todas.checked, whatsapp: f.whatsapp.value.replace(/\D/g, ''), valor_imagem: num(f.valor_imagem.value), tamanho_grupo: Math.max(1, num(f.tamanho_grupo.value) || 10) };
     try { const s = await DB.salvar('filhos', x); const i = S.dados.filhos.findIndex(y => y.id === x.id); if (i >= 0) S.dados.filhos[i] = s || x; else S.dados.filhos.push(s || x); if (!S.filhoSel) S.filhoSel = x.id; fecharModais(); render(); toast('Salvo ✅', 'ok'); }
     catch (e) { toast(msgErro(e), 'bad'); }
   },

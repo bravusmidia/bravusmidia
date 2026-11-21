@@ -1100,4 +1100,111 @@ exception when others then null;
 end $$;
 revoke all on function public.mok_push_enviar(text, text, text, text) from public, anon, authenticated;
 
+-- =====================================================================
+-- v1.9: IMAGENS DO WORK (feed e story, numeradas, R$ por imagem, pai baixa)
+-- =====================================================================
+alter table public.mok_filhos add column if not exists valor_imagem numeric(10,2) not null default 1;
+alter table public.mok_filhos add column if not exists tamanho_grupo int not null default 10;
+
+create table if not exists public.mok_imagens (
+  id text primary key,
+  filho_id text not null references public.mok_filhos(id) on delete cascade,
+  formato text not null check (formato in ('feed','story')),
+  numero int not null default 0,
+  numero_formato int not null default 0,
+  caminho text not null,
+  nome text not null default '',
+  tamanho int not null default 0,
+  largura int not null default 0,
+  altura int not null default 0,
+  valor numeric(10,2) not null default 0,
+  lote text not null default '',
+  criado_em timestamptz not null default now()
+);
+create index if not exists mok_imagens_filho on public.mok_imagens (filho_id, numero);
+
+-- número sequencial e valor definidos pelo banco (o filho não escolhe)
+create or replace function public.mok_imagem_guarda() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if not mok_is_pai() then
+    new.filho_id := mok_meu_filho();
+    if new.filho_id is null then raise exception 'Perfil não encontrado.'; end if;
+  end if;
+  perform pg_advisory_xact_lock(hashtext('mok_img_' || new.filho_id));
+  new.numero := coalesce((select max(numero) from mok_imagens where filho_id = new.filho_id), 0) + 1;
+  new.numero_formato := coalesce((select max(numero_formato) from mok_imagens where filho_id = new.filho_id and formato = new.formato), 0) + 1;
+  new.valor := coalesce((select valor_imagem from mok_filhos where id = new.filho_id), 1);
+  new.criado_em := now();
+  if new.caminho !~ ('^' || new.filho_id || '/(feed|story)/') then raise exception 'Pasta inválida.'; end if;
+  return new;
+end $$;
+drop trigger if exists mok_imagem_guarda on public.mok_imagens;
+create trigger mok_imagem_guarda before insert on public.mok_imagens for each row execute function public.mok_imagem_guarda();
+
+-- um aviso por envio (não um por imagem)
+create or replace function public.mok_imagens_enviadas(p_lote text) returns json
+language plpgsql security definer set search_path = public as $$
+declare f text := mok_meu_filho(); nome text; nf int; ns int; tot int; v numeric;
+begin
+  if f is null then return null; end if;
+  select count(*) filter (where formato = 'feed'), count(*) filter (where formato = 'story'), sum(valor) into nf, ns, v from mok_imagens where filho_id = f and lote = p_lote;
+  select count(*) into tot from mok_imagens where filho_id = f;
+  select m.nome into nome from mok_filhos m where m.id = f;
+  if coalesce(nf, 0) + coalesce(ns, 0) > 0 then
+    perform mok_push_enviar('pai', '🖼️ ' || nome || ' enviou ' || (nf + ns) || ' imagens', nf || ' feed · ' || ns || ' story · +R$ ' || replace(to_char(v, 'FM999990.00'), '.', ',') || ' · total ' || tot, 'imagens');
+  end if;
+  return json_build_object('feed', nf, 'story', ns, 'total', tot);
+end $$;
+grant execute on function public.mok_imagens_enviadas(text) to authenticated;
+
+grant select, insert, delete on public.mok_imagens to authenticated;
+alter table public.mok_imagens enable row level security;
+drop policy if exists mok_img_ler on public.mok_imagens;
+create policy mok_img_ler on public.mok_imagens for select to authenticated using (mok_pode_ver(filho_id));
+drop policy if exists mok_img_ins on public.mok_imagens;
+create policy mok_img_ins on public.mok_imagens for insert to authenticated with check (mok_pode_ver(filho_id));
+drop policy if exists mok_img_del on public.mok_imagens;
+create policy mok_img_del on public.mok_imagens for delete to authenticated using (mok_is_pai());
+
+-- pasta privada no Storage: <filho>/feed/... e <filho>/story/...
+insert into storage.buckets (id, name, public) values ('mok-imagens', 'mok-imagens', false) on conflict (id) do nothing;
+drop policy if exists "mok imagens enviar" on storage.objects;
+create policy "mok imagens enviar" on storage.objects for insert to authenticated
+  with check (bucket_id = 'mok-imagens' and (public.mok_is_pai() or (storage.foldername(name))[1] = public.mok_meu_filho()));
+drop policy if exists "mok imagens ler" on storage.objects;
+create policy "mok imagens ler" on storage.objects for select to authenticated
+  using (bucket_id = 'mok-imagens' and (public.mok_is_pai() or (storage.foldername(name))[1] = public.mok_meu_filho()));
+drop policy if exists "mok imagens apagar" on storage.objects;
+create policy "mok imagens apagar" on storage.objects for delete to authenticated
+  using (bucket_id = 'mok-imagens' and public.mok_is_pai());
+
+do $$ begin
+  begin execute 'alter publication supabase_realtime add table public.mok_imagens'; exception when duplicate_object then null; end;
+end $$;
+
+-- o pai também vê no sininho uma cópia de tudo que foi enviado ao filho (confirmação de entrega)
+create or replace function public.mok_push_enviar(p_alvo text, p_titulo text, p_corpo text, p_tag text) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare c mok_push_cfg%rowtype; nome text;
+begin
+  begin
+    insert into mok_avisos (alvo, titulo, corpo, tag) values (p_alvo, left(coalesce(p_titulo, ''), 200), left(coalesce(p_corpo, ''), 500), coalesce(p_tag, ''));
+    if p_alvo <> 'pai' and auth.uid() is not null and mok_is_pai() then
+      select f.nome into nome from mok_filhos f where f.id = p_alvo;
+      insert into mok_avisos (alvo, titulo, corpo, tag, lido) values ('pai', left('📤 ' || coalesce(nome, p_alvo) || ' foi avisado: ' || coalesce(p_titulo, ''), 200), left(coalesce(p_corpo, ''), 500), 'copia', false);
+    end if;
+    delete from mok_avisos where criado_em < now() - interval '60 days';
+  exception when others then null;
+  end;
+  select * into c from mok_push_cfg where id = 1;
+  if c.base is null or not exists (select 1 from mok_push where alvo = p_alvo) then return; end if;
+  perform net.http_post(
+    url := c.base || '/functions/v1/tafeito-push',
+    body := jsonb_build_object('alvo', p_alvo, 'titulo', p_titulo, 'corpo', coalesce(p_corpo, ''), 'tag', p_tag),
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-tafeito-segredo', c.segredo));
+exception when others then null;
+end $$;
+revoke all on function public.mok_push_enviar(text, text, text, text) from public, anon, authenticated;
+
 -- Pronto! Agora abra o app e crie a conta do Pai.
