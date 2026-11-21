@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '1.3.0';
+const VERSAO = '1.4.0';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -346,7 +346,7 @@ async function telaLogin() {
       </form></div>
       <button class="btn ghost" data-act="trocarConexao">Trocar conexão</button></div>`;
   }
-  const pessoas = [`<button class="pessoa" data-act="loginPai"><div class="av" style="background:linear-gradient(135deg,#4f7cff,#7b5cff)">👨</div><div><b>Pai</b><span class="mut peq">Administrador</span></div></button>`]
+  const pessoas = [`<button class="pessoa" data-act="loginPai"><div class="av" style="background:linear-gradient(135deg,#4f7cff,#7b5cff)">👨</div><div><b>Pai 👑</b><span class="mut peq">Administrador · e-mail e senha</span></div></button>`]
     .concat(ini.filhos.map((f, i) => `<button class="pessoa" data-act="loginFilho" data-id="${esc(f.id)}" data-nome="${esc(f.nome)}">
       <div class="av" style="background:${CORES[(i + 1) % CORES.length]}">${esc(f.nome[0] || '?')}</div>
       <div><b>${esc(f.nome)}</b><span class="mut peq">${ini.com_acesso.includes(f.id) ? 'Entrar com PIN' : 'Acesso ainda não criado'}</span></div></button>`));
@@ -380,7 +380,7 @@ async function entrarComSessao(user) {
     if (!perfil) {
       return $('#app').innerHTML = `<div class="login"><div class="card"><h2>Conta sem perfil</h2><p class="mut">Esta conta não está cadastrada no TáFeito.</p><button class="btn pri" data-act="sair">Voltar</button></div></div>`;
     }
-    S.papel = perfil.papel; S.eu = perfil.papel === 'pai' ? 'pai' : perfil.filho_id;
+    S.papel = perfil.papel; S.eu = perfil.papel === 'pai' ? 'pai' : perfil.filho_id; S.email = user.email || '';
     await abrirApp();
   } catch (e) { telaErro('Não consegui entrar', msgErro(e)); }
 }
@@ -500,7 +500,7 @@ function topo() {
     const on = S.online.has('pai');
     pres = `<span class="presenca"><span class="dot ${on ? 'on' : ''}"></span>Pai ${on ? 'online' : (pai && pai.visto_em ? 'visto ' + hora(pai.visto_em) : 'offline')}</span>`;
   }
-  const sub = S.papel === 'pai' ? 'Painel do Pai' : `Olá, ${esc(filhoAtual().nome)}!`;
+  const sub = S.papel === 'pai' ? '👑 Pai · Administrador' : `🔑 ${esc(filhoAtual().nome)} · logado`;
   return `<header class="topo"><div class="marca">${logoImg()}<div>TáFeito<small>${sub}</small></div></div><div class="esp"></div>
     ${promptInstalar ? `<button class="icone-btn" data-act="instalar" title="Instalar">⬇️</button>` : ''}${pres}</header>`;
 }
@@ -662,7 +662,7 @@ function telaPremios() {
 
 function telaMaisFilho() {
   const meus = deFilho('pedidos').sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || '')).slice(0, 20);
-  return `${bannerPermissoes()}
+  return `${bannerPermissoes()}${cardConta()}
     <div class="card"><h3>✋ Pedir permissão ao pai</h3><p class="mut peq">Para mudar algo no app você precisa da autorização do pai.</p>
     <button class="btn pri" data-act="pedir">Fazer um pedido</button></div>
     ${meus.length ? `<div class="card"><h3>Meus pedidos</h3>${meus.map(p => `<div class="lista-item"><div class="tt">${esc(AREAS[p.area] || p.area)}<small>${esc(p.mensagem || '')} · ${dataHoraBR(p.criado_em)}</small></div>${tagPedido(p)}</div>`).join('')}</div>` : ''}
@@ -671,9 +671,19 @@ function telaMaisFilho() {
     <div class="card"><h3>⚙️ Aparelho</h3>
       <button class="btn ghost" data-act="ativarNotif">🔔 Ativar / testar notificações</button><div style="height:8px"></div>
       <button class="btn ghost" data-act="agenda">📅 Pôr lembretes na agenda / despertador</button><div style="height:8px"></div>
-      <button class="btn ghost" data-act="instalar">⬇️ Instalar o app</button><div style="height:8px"></div>
-      <button class="btn bad" data-act="sair">Sair</button></div>
+      <button class="btn ghost" data-act="instalar">⬇️ Instalar o app</button></div>
     <p class="rodape">TáFeito v${VERSAO} · Desenvolvido por Andrade</p>`;
+}
+
+function cardConta() {
+  const souPai = S.papel === 'pai';
+  const email = S.modo === 'online' ? (S.email || '') : 'modo demonstração';
+  return `<div class="card"><h3>${souPai ? '👑 Minha conta (Administrador)' : '🔑 Minha conta'}</h3>
+    <div class="lista-item"><div class="chip" style="padding:6px 10px;background:${souPai ? 'linear-gradient(135deg,#4f7cff,#7b5cff)' : corFilho(S.eu)}">${souPai ? '👨' : esc((filhoAtual().nome || '?')[0])}</div>
+    <div class="tt"><b>${souPai ? esc((S.dados.perfis.find(p => p.papel === 'pai') || {}).nome || 'Pai') : esc(filhoAtual().nome)}</b><small>${souPai ? esc(email) + ' · controla tudo' : 'Entra com PIN · só o pai altera as regras'}</small></div>
+    <span class="tag ${souPai ? 'ok' : ''}">${souPai ? 'ADMIN' : 'filho'}</span></div>
+    ${souPai && S.modo === 'online' ? `<button class="btn ghost" style="margin-top:8px" data-act="trocarSenha">🔒 Trocar minha senha</button>` : ''}
+    <button class="btn bad" style="margin-top:8px" data-act="sair">🚪 Sair da conta</button></div>`;
 }
 
 function tagPedido(p) {
@@ -765,7 +775,7 @@ function telaChat() {
 
 function telaMaisPai() {
   const peds = S.dados.pedidos.slice().sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || '')).slice(0, 25);
-  return `<div class="card"><h3>👨‍👦 Filhos e acessos</h3>${S.dados.filhos.map(f => {
+  return `${cardConta()}<div class="card"><h3>👨‍👦 Filhos e acessos</h3>${S.dados.filhos.map(f => {
       const tem = S.dados.perfis.some(p => p.filho_id === f.id);
       return `<div class="lista-item"><div class="chip" style="padding:6px 10px;background:${corFilho(f.id)}">${esc(f.nome[0])}</div><div class="tt"><b>${esc(f.nome)}</b><small>💻 ${horasTxt(f.horas_pc)} · 📱 ${horasTxt(f.horas_cel)}${S.modo === 'online' ? (tem ? ' · acesso criado' : ' · sem acesso') : ''}</small></div>
       <button class="icone-btn" data-act="editarFilho" data-id="${esc(f.id)}">⚙️</button></div>`;
@@ -777,8 +787,9 @@ function telaMaisPai() {
       <button class="btn ghost" data-act="ativarNotif">🔔 Ativar / testar notificações</button><div style="height:8px"></div>
       <button class="btn ghost" data-act="agenda">📅 Lembretes na agenda (tarefas de ${esc(filhoAtual().nome)})</button><div style="height:8px"></div>
       <button class="btn ghost" data-act="instalar">⬇️ Instalar o app</button><div style="height:8px"></div>
-      <button class="btn ghost" data-act="ajudaBloqueio">🔒 Como bloquear o PC/celular de verdade</button><div style="height:8px"></div>
-      <button class="btn bad" data-act="sair">Sair</button></div>
+      <button class="btn ghost" data-act="ajudaBloqueio">🔒 Como bloquear o PC/celular de verdade</button></div>
+    <div class="card"><h3>💾 Backup</h3><p class="mut peq">Tudo fica salvo no banco de dados (Supabase). Para guardar uma cópia no Google Drive, baixe o backup e salve na pasta do TáFeito no Drive.</p>
+      <button class="btn ghost" data-act="backup">💾 Baixar backup completo</button></div>
     <p class="rodape">TáFeito v${VERSAO} · Desenvolvido por Andrade</p>`;
 }
 
@@ -1178,6 +1189,21 @@ const acoes = {
       <p class="mut peq">Se já estiver instalado, é só abrir pelo ícone.</p><button class="btn pri" data-act="fechar">Entendi</button>`);
   },
   agenda: () => modalAgenda(),
+  trocarSenha: () => modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>🔒 Trocar senha do Pai</h2><form data-form="trocarSenha">
+    <label class="campo"><span>Nova senha (mín. 6 caracteres)</span><input name="senha" type="password" minlength="6" required autocomplete="new-password"></label>
+    <label class="campo"><span>Repita a nova senha</span><input name="senha2" type="password" minlength="6" required autocomplete="new-password"></label>
+    <button class="btn pri">Salvar nova senha</button></form>`),
+  backup: async () => {
+    carregando(true, 'Gerando backup…');
+    try {
+      await carregarTudo();
+      const dados = { app: 'TáFeito', versao: VERSAO, gerado_em: agoraISO(), tabelas: {} };
+      for (const t of TABELAS) dados.tabelas[t] = S.dados[t];
+      const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `tafeito-backup-${hojeISO()}.json`; document.body.appendChild(a); a.click(); a.remove();
+      carregando(false); toast('Backup baixado 💾 Agora salve no Drive.', 'ok');
+    } catch (e) { carregando(false); toast(msgErro(e), 'bad'); }
+  },
   calMes: d => { const [y, m] = S.calMes.split('-').map(Number); const n = new Date(y, m - 1 + Number(d.n), 1); S.calMes = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`; render(); },
   calHoje: () => { S.calMes = hojeISO().slice(0, 7); render(); },
   calDia: d => { const l = S.dados.provas.filter(p => p.filho_id === fid() && p.data === d.dia); if (l.length) modalDiaProvas(d.dia, l); else formProva(null, d.dia); },
@@ -1327,6 +1353,10 @@ const forms = {
       S.vistos.prv && (S.vistos.prv[p.id] = p.materia + p.data + p.horario);
       S.calMes = p.data.slice(0, 7); fecharModais(); render(); toast(ant ? 'Prova atualizada ✅' : '📅 Prova marcada! Vou te lembrar 2 dias, 1 dia e 2 horas antes.', 'ok');
     } catch (e) { toast(msgErro(e), 'bad'); }
+  },
+  trocarSenha: async f => {
+    if (f.senha.value !== f.senha2.value) return toast('As senhas não são iguais.', 'bad');
+    try { const { error } = await DB.sb.auth.updateUser({ password: f.senha.value }); if (error) throw error; fecharModais(); toast('Senha trocada ✅', 'ok'); } catch (e) { toast(msgErro(e), 'bad'); }
   },
   pagar: async f => {
     const p = { id: uid(), filho_id: fid(), valor: num(f.valor.value), obs: f.obs.value.trim(), criado_em: agoraISO() };

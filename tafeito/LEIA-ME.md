@@ -50,6 +50,7 @@ Se quiser só olhar antes, abra o endereço e toque em **"Abrir modo demonstraç
 - **Avisos de tudo (v1.3):** o filho recebe aviso quando uma tarefa é criada, alterada, pausada ou removida, quando muda missão, prêmio, pagamento ou prova.
 - **Área de Estudo (v1.3):** aba 📚 Estudo com calendário. O filho marca, edita e exclui as provas do ano (matéria, data e horário). A lista fica vermelha até 1 semana, amarela até 1 mês e verde com mais de 1 mês. O celular avisa 2 dias, 1 dia e 2 horas antes, mesmo com o app fechado. No app aparece um alerta que só fecha quando ele toca em **Ciente**. Cada Ciente fica gravado no banco e ninguém consegue editar ou apagar. O pai é avisado.
 - **Tempo online (v1.3):** o banco soma o tempo que o filho fica com o app aberto, usando o relógio do servidor, e guarda a última vez que ele entrou. Aparece no Painel do pai (hoje, 7 dias e total).
+- **Login e admin (v1.4):** o Pai entra com e-mail e senha e é o Administrador, o único que muda regras, tarefas, prêmios e PIN. O filho entra com PIN. Em **Mais → Minha conta** aparecem quem está logado, Trocar senha e Sair. Em **Mais → Backup** você baixa uma cópia de tudo para guardar no Drive.
 - **Trocar o PIN depois:** ⚙️ do filho → Trocar PIN.
 
 Desenvolvido por Andrade
