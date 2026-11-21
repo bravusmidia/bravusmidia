@@ -479,3 +479,6 @@ canvas.masc3d{display:block;margin:0 auto;pointer-events:none}
 body:has(#visorImg) .flut-masc,body:has(#visorImg) .flut-chat{display:none}
 .item-notif .esp{flex:1;min-width:0}
 .visor-img{background:#04060d}
+
+.visor-palco img{transition:transform .28s,opacity .28s}
+.visor-palco.saindo img{transform:translateX(-40px);opacity:0}

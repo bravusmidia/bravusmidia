@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '2.5.0';
+const VERSAO = '2.5.1';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -1580,6 +1580,13 @@ function desenharVisor() {
   if (!u) urlsAssinadas([i.caminho]).then(() => { const im = v.querySelector('.visor-palco img'); const x = URLS_IMG[i.caminho]; if (im && x) im.src = x.url; }).catch(() => { });
 }
 document.addEventListener('keydown', e => { if (!VISOR) return; if (e.key === 'Escape') { VISOR = null; desenharVisor(); } else if (e.key === 'ArrowRight') irVisor(1); else if (e.key === 'ArrowLeft') irVisor(-1); });
+/* depois de aprovar/reprovar no visor, pula sozinho para a próxima imagem */
+function proximaNoVisor() {
+  if (!VISOR) return;
+  if (VISOR.pos >= VISOR.lista.length - 1) { setTimeout(() => toast('🏁 Essa era a última imagem desta pasta'), 400); return; }
+  const el = document.querySelector('.visor-palco'); if (el) el.classList.add('saindo');
+  setTimeout(() => irVisor(1), 280);
+}
 function irVisor(d) { if (!VISOR) return; const n = VISOR.pos + d; if (n < 0 || n >= VISOR.lista.length) return; VISOR.pos = n; VISOR.zoom = false; desenharVisor(); }
 { let x0 = null; document.addEventListener('touchstart', e => { if (VISOR && e.target.closest('.visor-palco') && !VISOR.zoom) x0 = e.touches[0].clientX; }, { passive: true });
   document.addEventListener('touchend', e => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 50) { ignorarZoomVisor = true; irVisor(dx < 0 ? 1 : -1); } }, { passive: true }); }
@@ -2319,9 +2326,9 @@ const acoes = {
   petAcao: d => cuidarPet(d.v),
   sugerirMascote: async d => { await enviarMsg(`💡 Sugestão de mascote: "${d.v}" — pode colocar no app?`, S.eu); toast('💡 Sugestão enviada para o pai!', 'ok'); },
   notifPaiTodas: d => salvarNotifPai(d.v === '1' ? [] : NOTIF_PAI.map(x => x[0]).filter(k => k !== 'notif')),
-  aprovarImg: d => { const i = S.dados.imagens.find(x => x.id === d.id); avaliarImagem(d.id, i && i.status === 'aprovada' ? 'pendente' : 'aprovada'); },
+  aprovarImg: async d => { const i = S.dados.imagens.find(x => x.id === d.id); const novo = i && i.status === 'aprovada' ? 'pendente' : 'aprovada'; if (await avaliarImagem(d.id, novo) && novo === 'aprovada') proximaNoVisor(); },
   reprovarImg: d => modalReprovar(d.id),
-  salvarReprova: async d => { const m = ($('#motivoImg') || {}).value || ''; if (!m.trim()) return toast('Escreva o motivo.', 'bad'); if (await avaliarImagem(d.id, 'reprovada', m)) fecharTopo(); },
+  salvarReprova: async d => { const m = ($('#motivoImg') || {}).value || ''; if (!m.trim()) return toast('Escreva o motivo.', 'bad'); if (await avaliarImagem(d.id, 'reprovada', m)) { fecharTopo(); proximaNoVisor(); } },
   motivoRapido: d => { const t = $('#motivoImg'); if (t) { t.value = (t.value.trim() ? t.value.trim() + '; ' : '') + d.v; t.focus(); } },
   desfazerReprova: async d => { if (await avaliarImagem(d.id, 'pendente')) fecharTopo(); },
   apagarImg: async d => {
