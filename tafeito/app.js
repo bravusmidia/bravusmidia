@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '2.7.1';
+const VERSAO = '2.7.2';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -1503,10 +1503,12 @@ function modalAssistente() {
 }
 function flutuantes() {
   const nl = S.papel === 'pai' ? naoLidas() : naoLidas(S.eu);
-  const pos = k => { const p = lsGet('mok_pos_' + k); return p ? `style="left:${Math.min(p.x, innerWidth - 60)}px;top:${Math.min(p.y, innerHeight - 70)}px;right:auto;bottom:auto"` : ''; };
+  const posCss = k => { const p = lsGet('mok_pos_' + k); return p ? `left:${Math.max(4, Math.min(p.x, innerWidth - 60))}px;top:${Math.max(4, Math.min(p.y, innerHeight - 70))}px;right:auto;bottom:auto;` : ''; };
+  const pos = k => { const c = posCss(k); return c ? `style="${c}"` : ''; };
+  const ladoDir = k => { const p = lsGet('mok_pos_' + k); return p && p.x > innerWidth / 2; };
   let h = `<button class="flut-chat" data-arrastar="chat" ${pos('chat')} data-act="chatAbrir" title="Chat (arraste para mover)">💬${nl ? `<span class="badge">${nl}</span>` : ''}</button>`;
   if (S.papel === 'filho' || S.papel === 'pai') { const m = { ...mascoteDe(S.eu), _dormindo: statusPet(petDe(S.eu)).dormindo }; const d = dicaMascote(); const tam = tamMasc(), mudo = !!lsGet('mok_masc_mudo');
-    h += `<div class="flut-masc" data-arrastar="masc" ${pos('masc')} style="--tam:${tam}px">
+    h += `<div class="flut-masc${ladoDir('masc') ? ' lado-dir' : ''}" data-arrastar="masc" style="${posCss('masc')}--tam:${tam}px">
       <button class="masc-toque" data-act="mascote" title="${esc(m.nome)} — toque para abrir, arraste para mover">${d ? `<span class="balao">${esc(d)}</span>` : ''}${mascoteVisual(m, tam)}</button>
       <div class="masc-ctrl sem3d"><button data-act="mascMudo" title="${mudo ? 'Ligar a voz' : 'Silenciar'}">${mudo ? '🔇' : '🔊'}</button><button data-act="mascTam" data-v="-1" title="Diminuir">−</button><button data-act="mascTam" data-v="1" title="Aumentar">+</button></div></div>`; }
   if (S.chatAberto) h += `<div class="chat-flut-bg" data-act="chatFechar"></div><div class="chat-flut"><div class="linha" style="margin-bottom:6px"><b class="esp">💬 Chat</b><button class="btn zap sm" style="width:auto" data-act="whats">📲 WhatsApp</button><button class="icone-btn" data-act="chatFechar">✕</button></div>${telaChat()}</div>`;
@@ -2591,7 +2593,7 @@ document.addEventListener('pointermove', e => {
 }, { passive: false });
 document.addEventListener('pointerup', () => {
   if (!arrasto) return; const a = arrasto; arrasto = null;
-  if (a.moveu) { a.el.classList.remove('arrastando'); lsSet('mok_pos_' + a.k, { x: a.x, y: a.y }); ignorarClique = true; setTimeout(() => { ignorarClique = false; }, 50); }
+  if (a.moveu) { a.el.classList.remove('arrastando'); lsSet('mok_pos_' + a.k, { x: a.x, y: a.y }); a.el.classList.toggle('lado-dir', a.x > innerWidth / 2); ignorarClique = true; setTimeout(() => { ignorarClique = false; }, 50); }
 });
 document.addEventListener('click', e => {
   if (ignorarClique) { ignorarClique = false; e.preventDefault(); return; }

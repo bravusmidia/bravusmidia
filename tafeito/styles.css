@@ -551,3 +551,7 @@ body:has(#visorImg) .flut-masc,body:has(#visorImg) .flut-chat{display:none}
 .masc-animal.toon .acc-oculos{top:20%;width:40%}
 .masc-animal.toon .acc-chapeu{top:-16%;width:44%}
 @media (min-width:1000px){.topo{padding-left:28px;padding-right:28px}}
+
+/* balão do mascote sempre ao lado (nunca em cima do pet) */
+.flut-masc .balao{left:calc(var(--tam,72px) + 4px)!important;right:auto;top:6px;z-index:2;max-width:min(220px,60vw)}
+.flut-masc.lado-dir .balao{left:auto!important;right:calc(var(--tam,72px) + 4px);border-radius:12px 12px 2px 12px}
