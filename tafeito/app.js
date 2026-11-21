@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '1.4.0';
+const VERSAO = '1.4.1';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -15,6 +15,13 @@ const DSEM = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const RRDIA = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 const TIPOS_MISSAO = { total: 'Concluir X tarefas', categoria: 'Concluir X tarefas de uma categoria', sequencia: 'X dias seguidos com tudo feito', dias: 'X dias (não precisa ser seguido) com tudo feito' };
 const ETAPAS = { '2d': { h: 48, tit: '📚 Prova em 2 dias' }, '1d': { h: 24, tit: '⚠️ Prova AMANHÃ' }, '2h': { h: 2, tit: '🚨 Prova em 2 HORAS' } };
+const ICONES = {
+  'Casa': ['🛏️','👕','🧺','🧹','🧽','🪣','🧼','🗑️','🍽️','🍳','🥘','🚿','🛁','🚽','🪟','🪑','🛋️','🚪','🧸','📦','👟','🌱','🐶','🐱','🐟','🚗','🧴','🪥','🔌','💡'],
+  'Estudo': ['📚','📖','✏️','📝','📐','🧮','🔬','🧪','🌎','🗺️','💻','⌨️','🎓','🧠','📅','🗣️','🇺🇸','🎹','🎸','🎨'],
+  'Esporte e saúde': ['🏋️','💪','🏃','🚴','⚽','🏀','🏐','🥊','🥋','🏊','🧘','🤸','🛹','🥗','🍎','💧','😴','🦷','💊','❤️'],
+  'Trabalho': ['💼','🖼️','📲','📸','🎬','🖥️','📊','📈','🛒','📣','✂️','🧾','💰','💵','🤝','📧','🔧','🛠️','⚙️','🧰'],
+  'Prêmios': ['🏆','🎖️','🥇','⭐','🔥','🎯','🎮','🕹️','🎁','🍕','🍔','🍦','🎉','🚀','👑','💎','🏅','🎟️','📺','🎧']
+};
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const CORES = ['#4f7cff', '#f5a524', '#22c55e', '#e649a6', '#14b8a6'];
 
@@ -957,8 +964,9 @@ function formTarefa(t, cat) {
   t = t || { categoria: cat || 'casa', recorrencia: cat === 'trabalho' ? 'unica' : 'diaria', dias: [], data_unica: hojeISO(), horario: '', foto: true, obrigatoria: cat !== 'trabalho', xp: cat === 'trabalho' ? 20 : 10, valor: 0, ativa: true, icone: '', titulo: '', descricao: '' };
   modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>${novo ? 'Nova tarefa' : 'Editar tarefa'}</h2>
   <form data-form="tarefa" data-id="${esc(t.id || '')}">
-    <div class="grid2" style="grid-template-columns:70px 1fr"><label class="campo"><span>Ícone</span><input name="icone" value="${esc(t.icone)}" placeholder="🧹" maxlength="4" style="text-align:center"></label>
+    <div class="grid2" style="grid-template-columns:70px 1fr"><label class="campo"><span>Ícone</span><input name="icone" value="${esc(t.icone)}" placeholder="🧹" maxlength="8" autocomplete="off" style="text-align:center"></label>
     <label class="campo"><span>Título</span><input name="titulo" value="${esc(t.titulo)}" required placeholder="Ex.: Arrumar o quarto"></label></div>
+    <details class="icones"><summary>😀 Escolher ícone</summary>${Object.entries(ICONES).map(([g, l]) => `<div class="mut peq" style="margin:8px 0 4px">${g}</div><div class="grade-icones">${l.map(i => `<button type="button" data-act="escolherIcone" data-i="${i}">${i}</button>`).join('')}</div>`).join('')}</details>
     <label class="campo"><span>Categoria</span><select name="categoria">${Object.entries(CATS).map(([k, v]) => `<option value="${k}" ${t.categoria === k ? 'selected' : ''}>${v.icone} ${v.nome}</option>`).join('')}</select></label>
     <label class="campo"><span>Explicação (o que precisa ficar feito)</span><textarea name="descricao">${esc(t.descricao)}</textarea></label>
     <label class="campo"><span>Itens para marcar um por um (um por linha, opcional)</span><textarea name="itens" rows="3" placeholder="Ex.: Lixeira da cozinha&#10;Lixeira do banheiro&#10;Lixeira do quarto" ${souPai ? '' : 'readonly'}>${esc(itensDe(t).join('\n'))}</textarea></label>
@@ -981,8 +989,9 @@ function formMissao(m) {
   m = m || { icone: '🏆', titulo: '', descricao: '', tipo: 'total', meta: 10, categoria: 'casa', premio: '', valor: 0, xp: 50, ativa: true };
   modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>${novo ? 'Nova missão' : 'Editar missão'}</h2>
   <form data-form="missao" data-id="${esc(m.id || '')}">
-    <div class="grid2" style="grid-template-columns:70px 1fr"><label class="campo"><span>Ícone</span><input name="icone" value="${esc(m.icone)}" maxlength="4" style="text-align:center"></label>
+    <div class="grid2" style="grid-template-columns:70px 1fr"><label class="campo"><span>Ícone</span><input name="icone" value="${esc(m.icone)}" maxlength="8" autocomplete="off" style="text-align:center"></label>
     <label class="campo"><span>Nome da missão</span><input name="titulo" value="${esc(m.titulo)}" required></label></div>
+    <details class="icones"><summary>😀 Escolher ícone</summary>${Object.entries(ICONES).map(([g, l]) => `<div class="mut peq" style="margin:8px 0 4px">${g}</div><div class="grade-icones">${l.map(i => `<button type="button" data-act="escolherIcone" data-i="${i}">${i}</button>`).join('')}</div>`).join('')}</details>
     <label class="campo"><span>Descrição</span><input name="descricao" value="${esc(m.descricao)}"></label>
     <label class="campo"><span>Tipo</span><select name="tipo">${Object.entries(TIPOS_MISSAO).map(([k, v]) => `<option value="${k}" ${m.tipo === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
     <div class="grid2"><label class="campo"><span>Meta (X)</span><input type="number" name="meta" min="1" value="${num(m.meta)}"></label>
@@ -1189,6 +1198,11 @@ const acoes = {
       <p class="mut peq">Se já estiver instalado, é só abrir pelo ícone.</p><button class="btn pri" data-act="fechar">Entendi</button>`);
   },
   agenda: () => modalAgenda(),
+  escolherIcone: (d, b) => {
+    const f = b.closest('form'); if (!f || !f.icone) return;
+    f.icone.value = d.i; f.querySelectorAll('.grade-icones button.on').forEach(x => x.classList.remove('on')); b.classList.add('on');
+    const det = b.closest('details'); if (det) det.open = false;
+  },
   trocarSenha: () => modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>🔒 Trocar senha do Pai</h2><form data-form="trocarSenha">
     <label class="campo"><span>Nova senha (mín. 6 caracteres)</span><input name="senha" type="password" minlength="6" required autocomplete="new-password"></label>
     <label class="campo"><span>Repita a nova senha</span><input name="senha2" type="password" minlength="6" required autocomplete="new-password"></label>
