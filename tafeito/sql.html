@@ -1394,6 +1394,22 @@ end $$;
 revoke all on function public.mok_ler_mensagens(text) from public, anon;
 grant execute on function public.mok_ler_mensagens(text) to authenticated;
 
+-- =====================================================================
+-- v2.9: ÁREAS DO WORK (menu: Imagens, Web design, Prospecção…)
+-- =====================================================================
+alter table public.mok_tarefas add column if not exists area text not null default &#x27;&#x27;;
+alter table public.mok_config add column if not exists work_areas jsonb;
+
+create or replace function public.mok_work_areas(p_areas jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not mok_is_pai() then raise exception &#x27;Só o pai muda as áreas.&#x27;; end if;
+  if p_areas is null or jsonb_typeof(p_areas) &lt;&gt; &#x27;array&#x27; or jsonb_array_length(p_areas) = 0 or octet_length(p_areas::text) &gt; 4000 then raise exception &#x27;Áreas inválidas.&#x27;; end if;
+  update mok_config set work_areas = p_areas where id = 1;
+end $$;
+revoke all on function public.mok_work_areas(jsonb) from public, anon;
+grant execute on function public.mok_work_areas(jsonb) to authenticated;
+
 -- Pronto! Agora abra o app e crie a conta do Pai.
 </pre>
 <script>document.getElementById('b').onclick=async()=>{const t=document.getElementById('s').textContent;try{await navigator.clipboard.writeText(t)}catch(e){const r=document.createRange();r.selectNodeContents(document.getElementById('s'));const s=getSelection();s.removeAllRanges();s.addRange(r);document.execCommand('copy')}document.getElementById('b').textContent='✅ Copiado! Agora cole no SQL Editor'}</script></body></html>

@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '2.8.0';
+const VERSAO = '2.9.0';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -98,6 +98,7 @@ class LocalStore {
       else { const c = db.config[0]; if (a.p_foto != null) c.foto_pai = a.p_foto; if (a.p_whatsapp != null) c.whatsapp_pai = a.p_whatsapp.replace(/\D/g, ''); if (a.p_mascote) c.mascote_pai = a.p_mascote; }
       this._save(db); return null;
     }
+    if (n === 'mok_work_areas') { const db = this._load(); db.config[0].work_areas = a.p_areas; this._save(db); return null; }
     if (n === 'mok_notif_pai') { const db = this._load(); db.config[0].notif_pai_off = a.p_off || []; this._save(db); return null; }
     if (n === 'mok_ciente') { const db = this._load(); db.cientes = db.cientes || []; const pr = (db.provas || []).find(x => x.id === a.p_prova);
       db.cientes.push({ id: Date.now(), filho_id: pr.filho_id, prova_id: pr.id, materia: pr.materia, etapa: a.p_etapa, criado_em: agoraISO() }); this._save(db);
@@ -680,12 +681,34 @@ function telaHoje() {
     <p class="rodape">Desenvolvido por Andrade</p>`;
 }
 
+/* ---------- ÁREAS DO WORK (menu: Imagens, Web design, Prospecção…) ---------- */
+const WORK_PADRAO = [{ id: 'imagens', nome: 'Imagens (Feed e Story)', icone: '🖼️' }, { id: 'webdesign', nome: 'Web design', icone: '💻' }, { id: 'prospeccao', nome: 'Prospecção', icone: '📞' }];
+const areasWork = () => Array.isArray(S.config.work_areas) && S.config.work_areas.length ? S.config.work_areas : WORK_PADRAO;
+const areaAtual = () => { const a = S.areaWork || 'todas'; return a === 'todas' || a === 'sem' || areasWork().some(x => x.id === a) ? a : 'todas'; };
+const tarefasArea = (lista, area) => area === 'todas' ? lista : area === 'sem' ? lista.filter(t => !t.area || !areasWork().some(x => x.id === t.area)) : lista.filter(t => t.area === area);
+function menuWork() {
+  const a = areaAtual(); const todas = deFilho('tarefas').filter(t => t.categoria === 'trabalho' && (S.papel === 'pai' || t.ativa !== false));
+  const n = id => tarefasArea(todas, id).length + (id === 'imagens' ? deFilho('imagens').length : 0);
+  const sem = tarefasArea(todas, 'sem').length;
+  return `<div class="menu-work"><div class="menu-work-tit"><b>💼 Áreas do Work</b>${S.papel === 'pai' ? '<button class="btn ghost sm" style="width:auto" data-act="areasWork">⚙️ Editar áreas</button>' : ''}</div>
+    <div class="menu-work-lista">${[{ id: 'todas', nome: 'Tudo', icone: '📋' }, ...areasWork(), ...(sem ? [{ id: 'sem', nome: 'Outros', icone: '📦' }] : [])].map(x => `<button class="${a === x.id ? 'on' : ''}" data-act="areaWork" data-v="${esc(x.id)}"><span class="ic">${esc(x.icone || '📁')}</span><span class="nm">${esc(x.nome)}</span><span class="qt">${x.id === 'todas' ? todas.length + deFilho('imagens').length : x.id === 'sem' ? sem : n(x.id)}</span></button>`).join('')}</div></div>`;
+}
+function modalAreasWork() {
+  const l = areasWork();
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>⚙️ Áreas do Work</h2><p class="mut peq">Cada área vira um item do menu dentro de Work. Os trabalhos são separados por área.</p>
+    <form data-form="areasWork"><div id="listaAreas">${l.map((x, i) => linhaArea(x, i)).join('')}</div>
+    <button type="button" class="btn ghost sm" data-act="addArea">＋ Adicionar área</button>
+    <button class="btn ok" style="margin-top:12px">💾 Salvar áreas</button></form>`);
+}
+const linhaArea = (x, i) => `<div class="linha area-linha" style="margin-bottom:6px"><input class="inp" name="ai" value="${esc(x.icone || '📁')}" maxlength="4" style="width:58px;text-align:center"><input class="inp esp" name="an" value="${esc(x.nome || '')}" placeholder="Ex.: Tráfego pago" maxlength="40"><input type="hidden" name="aid" value="${esc(x.id || '')}"><button type="button" class="icone-btn" data-act="delArea" title="Remover">🗑️</button></div>`;
+const slugArea = t => semAcento(t).replace(/[^a-z0-9]+/g, '').slice(0, 20) || ('a' + Date.now().toString(36));
+
 function telaWorkFilho() {
-  const dia = hojeISO(); const tars = tarefasDoDia(dia, ['trabalho']); const c = carteira();
+  const dia = hojeISO(); const area = areaAtual(); const tars = tarefasArea(tarefasDoDia(dia, ['trabalho']), area); const c = carteira();
   const hist = concluidos().filter(r => num(r.valor) > 0).sort((a, b) => (b.feito_em || '').localeCompare(a.feito_em || '')).slice(0, 15);
-  return `${dashWork()}${secaoImagens()}<div class="card destaque"><div class="linha"><div class="esp"><span class="mut peq">Seu saldo a receber</span><h1 style="margin:2px 0">${brl(c.saldo)}</h1><span class="mut peq">Ganho total ${brl(c.ganho)} · já recebido ${brl(c.pago)}</span></div><span style="font-size:2.4rem">💰</span></div></div>
-    <div class="secao">💼 Trabalhos</div>
-    ${tars.length ? tars.map(t => cardTarefaFilho(t, dia)).join('') : `<div class="vazio"><span class="e">💼</span>Nenhum trabalho agora. O pai coloca novos trabalhos aqui.</div>`}
+  return `${menuWork()}${area === 'todas' ? dashWork() : ''}${area === 'todas' || area === 'imagens' ? secaoImagens() : ''}<div class="card destaque"><div class="linha"><div class="esp"><span class="mut peq">Seu saldo a receber</span><h1 style="margin:2px 0">${brl(c.saldo)}</h1><span class="mut peq">Ganho total ${brl(c.ganho)} · já recebido ${brl(c.pago)}</span></div><span style="font-size:2.4rem">💰</span></div></div>
+    <div class="secao">💼 Trabalhos${area !== 'todas' ? ' · ' + esc((areasWork().find(x => x.id === area) || { nome: 'Outros' }).nome) : ''}</div>
+    ${tars.length ? tars.map(t => cardTarefaFilho(t, dia)).join('') : `<div class="vazio"><span class="e">💼</span>Nenhum trabalho ${area === 'todas' ? 'agora' : 'nesta área'}. O pai coloca novos trabalhos aqui.</div>`}
     ${hist.length ? `<div class="secao">Histórico</div><div class="card">${hist.map(r => `<div class="lista-item"><div class="tt">${esc((tarefaPorId(r.tarefa_id) || {}).titulo || 'Trabalho')}<small>${dataHoraBR(r.feito_em)}</small></div><b>${brl(r.valor)}</b></div>`).join('')}</div>` : ''}`;
 }
 
@@ -762,8 +785,8 @@ function telaPainel() {
     <p class="rodape">Desenvolvido por Andrade</p>`;
 }
 
-function listaGerenciar(cats) {
-  const tars = deFilho('tarefas').filter(t => cats.includes(t.categoria)).sort((a, b) => (a.horario || '99').localeCompare(b.horario || '99'));
+function listaGerenciar(cats, area = 'todas') {
+  const tars = tarefasArea(deFilho('tarefas').filter(t => cats.includes(t.categoria)), area).sort((a, b) => (a.horario || '99').localeCompare(b.horario || '99'));
   if (!tars.length) return `<div class="vazio"><span class="e">📋</span>Nenhuma tarefa ainda.</div>`;
   return cats.map(c => {
     const l = tars.filter(t => t.categoria === c); if (!l.length) return '';
@@ -782,12 +805,13 @@ function telaTarefasPai() {
 
 function telaWorkPai() {
   const c = carteira(); const pags = deFilho('pagamentos').sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || ''));
-  return `${dashWork()}${secaoImagens()}<div class="card destaque"><span class="mut peq">${esc(filhoAtual().nome)} tem a receber</span><h1 style="margin:2px 0">${brl(c.saldo)}</h1>
+  const area = areaAtual(); const nomeA = (areasWork().find(x => x.id === area) || {}).nome;
+  return `${menuWork()}${area === 'todas' ? dashWork() : ''}${area === 'todas' || area === 'imagens' ? secaoImagens() : ''}<div class="card destaque"><span class="mut peq">${esc(filhoAtual().nome)} tem a receber</span><h1 style="margin:2px 0">${brl(c.saldo)}</h1>
     <span class="mut peq">Ganho ${brl(c.ganho)} · pago ${brl(c.pago)}</span>
     <div class="acoes"><button class="btn ok sm" data-act="pagar">💸 Registrar pagamento</button></div></div>
-    <div class="linha" style="margin-top:6px"><div class="esp"><h2 style="margin:0">Trabalhos</h2><span class="mut peq">Tarefas que valem dinheiro</span></div>
-    <button class="btn pri sm" data-act="novaTarefa" data-cat="trabalho">＋ Novo trabalho</button></div>
-    ${listaGerenciar(['trabalho'])}
+    <div class="linha" style="margin-top:6px"><div class="esp"><h2 style="margin:0">Trabalhos${nomeA ? ' · ' + esc(nomeA) : ''}</h2><span class="mut peq">Tarefas que valem dinheiro</span></div>
+    <button class="btn pri sm" data-act="novaTarefa" data-cat="trabalho" data-area="${esc(area === 'todas' || area === 'sem' ? '' : area)}">＋ Novo trabalho</button></div>
+    ${listaGerenciar(['trabalho'], area)}
     ${pags.length ? `<div class="secao">Pagamentos feitos</div><div class="card">${pags.map(p => `<div class="lista-item"><div class="tt">${esc(p.obs || 'Pagamento')}<small>${dataHoraBR(p.criado_em)}</small></div><b>${brl(p.valor)}</b><button class="icone-btn" data-act="apagarPagamento" data-id="${esc(p.id)}">🗑️</button></div>`).join('')}</div>` : ''}`;
 }
 
@@ -2056,15 +2080,16 @@ function carregando(on, txt = 'Enviando…') {
   if (!on && carregandoEl) { carregandoEl.remove(); carregandoEl = null; }
 }
 
-function formTarefa(t, cat) {
+function formTarefa(t, cat, area = '') {
   const novo = !t; const souPai = S.papel === 'pai';
-  t = t || { categoria: cat || 'casa', recorrencia: cat === 'trabalho' ? 'unica' : 'diaria', dias: [], data_unica: hojeISO(), horario: '', aviso_antes: 30, foto: true, obrigatoria: cat !== 'trabalho', xp: cat === 'trabalho' ? 20 : 10, valor: 0, ativa: true, icone: '', titulo: '', descricao: '' };
+  t = t || { area, categoria: cat || 'casa', recorrencia: cat === 'trabalho' ? 'unica' : 'diaria', dias: [], data_unica: hojeISO(), horario: '', aviso_antes: 30, foto: true, obrigatoria: cat !== 'trabalho', xp: cat === 'trabalho' ? 20 : 10, valor: 0, ativa: true, icone: '', titulo: '', descricao: '' };
   modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>${novo ? 'Nova tarefa' : 'Editar tarefa'}</h2>
   <form data-form="tarefa" data-id="${esc(t.id || '')}">
     <div class="grid2" style="grid-template-columns:70px 1fr"><label class="campo"><span>Ícone</span><input name="icone" value="${esc(t.icone)}" placeholder="🧹" maxlength="8" autocomplete="off" style="text-align:center"></label>
     <label class="campo"><span>Título</span><input name="titulo" value="${esc(t.titulo)}" required placeholder="Ex.: Arrumar o quarto"></label></div>
     <details class="icones"><summary>😀 Escolher ícone</summary>${Object.entries(ICONES).map(([g, l]) => `<div class="mut peq" style="margin:8px 0 4px">${g}</div><div class="grade-icones">${l.map(i => `<button type="button" data-act="escolherIcone" data-i="${i}">${i}</button>`).join('')}</div>`).join('')}</details>
     <label class="campo"><span>Categoria</span><select name="categoria">${Object.entries(CATS).map(([k, v]) => `<option value="${k}" ${t.categoria === k ? 'selected' : ''}>${v.icone} ${v.nome}</option>`).join('')}</select></label>
+    <label class="campo"><span>Área do Work (para trabalhos)</span><select name="area"><option value="">— Sem área —</option>${areasWork().map(x => `<option value="${esc(x.id)}" ${t.area === x.id ? 'selected' : ''}>${esc(x.icone || '')} ${esc(x.nome)}</option>`).join('')}</select></label>
     <label class="campo"><span>Explicação (o que precisa ficar feito)</span><textarea name="descricao">${esc(t.descricao)}</textarea></label>
     <label class="campo"><span>Itens para marcar um por um (um por linha, opcional)</span><textarea name="itens" rows="3" placeholder="Ex.: Lixeira da cozinha&#10;Lixeira do banheiro&#10;Lixeira do quarto" ${souPai ? '' : 'readonly'}>${esc(itensDe(t).join('\n'))}</textarea></label>
     <label class="campo"><span>Repetição</span><select name="recorrencia" data-change="recorrencia"><option value="diaria" ${t.recorrencia === 'diaria' ? 'selected' : ''}>Repete (dias da semana)</option><option value="unica" ${t.recorrencia === 'unica' ? 'selected' : ''}>Uma vez só (fica até ser feita)</option></select></label>
@@ -2224,7 +2249,11 @@ const acoes = {
       ${S.papel === 'filho' && !ehFeita(r) ? `<button class="btn ghost" data-act="refotografar" data-id="${esc(r.tarefa_id)}">📷 Tirar as fotos de novo</button>` : ''}`);
   },
   refotografar: async d => { fecharModais(); await acoes.refazer(d); },
-  novaTarefa: d => formTarefa(null, d.cat),
+  novaTarefa: d => formTarefa(null, d.cat, d.area || ''),
+  areaWork: d => { S.areaWork = d.v; render(); },
+  areasWork: () => modalAreasWork(),
+  addArea: () => { const l = $('#listaAreas'); if (l && l.children.length < 12) l.insertAdjacentHTML('beforeend', linhaArea({ icone: '📁', nome: '' }, l.children.length)); const ins = l.querySelectorAll('input[name=an]'); ins[ins.length - 1].focus(); },
+  delArea: (d, b) => { const l = b.closest('.area-linha'); if (l) l.remove(); },
   editarTarefa: d => formTarefa(tarefaPorId(d.id)),
   apagarTarefa: async d => {
     if (!confirm('Apagar esta tarefa?')) return;
@@ -2466,7 +2495,7 @@ const forms = {
     const dias = [...f.querySelectorAll('input[name=dia]:checked')].map(i => Number(i.value));
     const t = {
       ...(ant || { id: uid(), filho_id: fid(), criado_em: agoraISO() }),
-      icone: f.icone.value.trim(), titulo: f.titulo.value.trim(), categoria: f.categoria.value, descricao: f.descricao.value.trim(),
+      icone: f.icone.value.trim(), titulo: f.titulo.value.trim(), categoria: f.categoria.value, area: f.categoria.value === 'trabalho' && f.area ? f.area.value : '', descricao: f.descricao.value.trim(),
       recorrencia: f.recorrencia.value, dias: dias.length === 7 ? [] : dias, data_unica: f.recorrencia.value === 'unica' ? (f.data_unica.value || hojeISO()) : null,
       horario: f.horario.value, aviso_antes: num(f.aviso_antes.value), xp: num(f.xp.value)
     };
@@ -2545,6 +2574,13 @@ const forms = {
     } catch (e) { toast(msgErro(e), 'bad'); }
   },
   salvarImport: f => salvarImport(f),
+  areasWork: async f => {
+    const ic = [...f.querySelectorAll('[name=ai]')], nm = [...f.querySelectorAll('[name=an]')], id = [...f.querySelectorAll('[name=aid]')];
+    const usados = new Set(); const l = [];
+    nm.forEach((n, i) => { const nome = n.value.trim(); if (!nome) return; let k = id[i].value || slugArea(nome); while (usados.has(k)) k += '2'; usados.add(k); l.push({ id: k, nome: nome.slice(0, 40), icone: (ic[i].value.trim() || '📁').slice(0, 4) }); });
+    if (!l.length) return toast('Deixe pelo menos uma área.', 'bad');
+    try { await DB.rpc('mok_work_areas', { p_areas: l }); S.config.work_areas = l; fecharTopo(); render(); toast('💼 Áreas salvas', 'ok'); } catch (e) { toast(msgErro(e), 'bad'); }
+  },
   whatsPai: async f => { try { await salvarPerfil('pai', { whatsapp: f.w.value }); toast('WhatsApp salvo ✅', 'ok'); } catch (e) { toast(msgErro(e), 'bad'); } },
   perfil2: async f => {
     const id = f.dataset.id;

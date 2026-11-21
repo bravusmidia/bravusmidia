@@ -1391,4 +1391,20 @@ end $$;
 revoke all on function public.mok_ler_mensagens(text) from public, anon;
 grant execute on function public.mok_ler_mensagens(text) to authenticated;
 
+-- =====================================================================
+-- v2.9: ÁREAS DO WORK (menu: Imagens, Web design, Prospecção…)
+-- =====================================================================
+alter table public.mok_tarefas add column if not exists area text not null default '';
+alter table public.mok_config add column if not exists work_areas jsonb;
+
+create or replace function public.mok_work_areas(p_areas jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not mok_is_pai() then raise exception 'Só o pai muda as áreas.'; end if;
+  if p_areas is null or jsonb_typeof(p_areas) <> 'array' or jsonb_array_length(p_areas) = 0 or octet_length(p_areas::text) > 4000 then raise exception 'Áreas inválidas.'; end if;
+  update mok_config set work_areas = p_areas where id = 1;
+end $$;
+revoke all on function public.mok_work_areas(jsonb) from public, anon;
+grant execute on function public.mok_work_areas(jsonb) to authenticated;
+
 -- Pronto! Agora abra o app e crie a conta do Pai.
