@@ -1,5 +1,5 @@
 // BRAVUS WORK — Service Worker (offline do app + notificações)
-const CACHE = 'bw-v2.9.0';
+const CACHE = 'bw-v2.9.1';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'config.js', 'version.json', 'manifest.webmanifest',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-180.png'];
 
