@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '2.6.1';
+const VERSAO = '2.7.0';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -1273,8 +1273,9 @@ const MISTICOS = [['bruxo', '', 'Bruxo'], ['bruxa', '', 'Bruxa'], ['mago', '', '
   ['abobora', '', 'Abóbora'], ['bola_cristal', '', 'Bola de cristal'], ['dragao_bebe', '', 'Dragão bebê'], ['mamute', '', 'Mamute'], ['dodo', '', 'Dodô']];
 MISTICOS.forEach(m => { m[3] = 'mistico'; ANIMAIS.push(m); });
 const REAIS = new Set(['aguia', 'gato', 'cachorro', 'falcao', 'tartaruga', 'peixe', 'leao', 'tigre', 'lobo', 'raposa', 'coruja', 'golfinho', 'cavalo', 'panda', 'coelho', 'dragao']);
-const miniMasc = a => REAIS.has(a[0]) ? `icons/real/${a[0]}.webp?v=1` : `icons/anim/mini/${a[0]}.webp?v=1`;
-const imgMasc = a => REAIS.has(a[0]) ? `icons/real/${a[0]}.webp?v=1` : `icons/anim/${a[0]}.webp?v=1`;
+const ehToon = k => (window.TOON || []).includes(k);
+const miniMasc = a => ehToon(a[0]) ? `icons/toon/${a[0]}.webp?v=1` : `icons/anim/mini/${a[0]}.webp?v=1`;
+const imgMasc = a => ehToon(a[0]) ? `icons/toon/${a[0]}.webp?v=1` : `icons/anim/${a[0]}.webp?v=1`;
 const ANIMAL_MOV = { fada: 'voar', fado: 'voar', genio: 'flutuar', fantasma: 'flutuar', heroi: 'voar', sereia: 'nadar', tritao: 'nadar', dragao_bebe: 'voar', aguia: 'voar', falcao: 'voar', coruja: 'voar', papagaio: 'voar', passaro: 'voar', borboleta: 'voar', abelha: 'voar', morcego: 'voar', dragao: 'voar', flamingo: 'flutuar', cisne: 'nadar', pato: 'nadar',
   peixe: 'nadar', peixe_tropical: 'nadar', baiacu: 'nadar', tubarao: 'nadar', golfinho: 'nadar', baleia: 'nadar', polvo: 'nadar', lula: 'nadar', foca: 'nadar', lontra: 'nadar', tartaruga: 'nadar', canguru: 'pular', coelho: 'pular', sapo: 'pular' };
 const ACESS_CHAPEU = [['nenhum', ''], ['bone', '🧢'], ['coroa', '👑'], ['cartola', '🎩'], ['formatura', '🎓'], ['capacete', '⛑️'], ['laco', '🎀'], ['fone', '🎧']];
@@ -1297,7 +1298,7 @@ function animalVisual(m, tam) {
   const a = ANIMAIS.find(x => x[0] === m.animal) || ANIMAIS[0];
   const mov = (m.movAnimal && m.movAnimal !== 'auto') ? m.movAnimal : (ANIMAL_MOV[a[0]] || 'flutuar');
   const ch = (ACESS_CHAPEU.find(x => x[0] === m.chapeuA) || [])[1], oc = (ACESS_OCULOS.find(x => x[0] === m.oculosA) || [])[1], au = (ACESS_AURA.find(x => x[0] === m.aura) || [])[1];
-  return `<div class="masc-animal sem3d mov-${mov}${REAIS.has(a[0]) ? ' real' : ''}${m._dormindo ? ' dormindo' : ''}" style="width:${tam}px;height:${tam}px;--fundo:${esc(m.fundo || '#2f3f86')}">
+  return `<div class="masc-animal sem3d mov-${mov}${ehToon(a[0]) ? ' toon' : ''}${m._dormindo ? ' dormindo' : ''}" style="width:${tam}px;height:${tam}px;--fundo:${esc(m.fundo || '#2f3f86')}">
     ${m.fundo ? '<span class="aura-fundo"></span>' : ''}${au ? `<span class="aura-orbita">${img3d(au)}</span>` : ''}
     <div class="corpo-animal"><img class="bicho" src="${imgMasc(a)}" onerror="this.onerror=null;this.src='${miniMasc(a)}'" alt="${esc(a[2])}" draggable="false">${img3d(ch, 'acc-chapeu')}${img3d(oc, 'acc-oculos')}</div><span class="sombra-animal"></span></div>`;
 }
@@ -1348,9 +1349,12 @@ async function cuidarPet(acao) {
   festaPet(acao === 'comer' ? (COMIDA[m.animal] || '🍖') : ACOES_PET[acao][0]);
   if (m.voz !== false) falar(fala);
   const novo = statusPet(p); if (novo.nivel > nivelAntes) setTimeout(() => toast(`🎉 ${m.nome} subiu para o nível ${novo.nivel}!`, 'ok'), 600);
-  atualizarPetUI(); render();
+  atualizarPetUI(); render(); setTimeout(() => reagirPet(acao), 30);
   try { await DB.rpc('mok_pet', { p_pet: p }); } catch (e) { console.warn(e); }
   const fl = document.querySelector('.fala-pet'); if (fl) fl.textContent = fala;
+}
+function reagirPet(acao) {
+  document.querySelectorAll('.masc-animal').forEach(el => { el.classList.remove('reage-comer', 'reage-beber', 'reage-treinar', 'reage-dormir'); void el.offsetWidth; el.classList.add('reage-' + acao); setTimeout(() => el.classList.remove('reage-' + acao), 1600); });
 }
 function festaPet(e) {
   document.querySelectorAll('.masc-palco, .flut-masc').forEach(alvo => {
@@ -1379,7 +1383,10 @@ function mascoteVisual(m, tam = 80) {
 }
 import(new URL('lib/three/mascote3d.js?v=1', location.href).href).then(() => { if (!window.Masc3D.ok) render(); }).catch(() => { window.Masc3D = { ok: false }; render(); });
 /* fala do mascote (voz do próprio celular) */
-function falar(txt) {
+const TAMS_MASC = [56, 72, 96, 124, 156];
+const tamMasc = () => { const t = Number(lsGet('mok_masc_tam')); return TAMS_MASC.includes(t) ? t : 72; };
+function falar(txt, forcar = false) {
+  if (!forcar && lsGet('mok_masc_mudo')) return false;
   try {
     if (!('speechSynthesis' in window)) return false; speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(txt.replace(/[\u{1F000}-\u{1FAFF}☀-➿]/gu, '')); u.lang = 'pt-BR'; u.rate = 1.05; u.pitch = 1.15;
@@ -1434,7 +1441,7 @@ function modalMascote(id, rascunho) {
       <div class="masc-grupo"><span>Escolha o seu mascote (${ANIMAIS.length})</span>
         <div class="busca-masc"><input id="buscaMasc" class="inp" placeholder="🔎 Procurar: gato, dragão, bruxo, fada…" autocomplete="off"></div>
         <div id="semMasc" class="sugerir-masc" hidden></div>
-        ${[['real', '📸 Realistas'], ['animal', '🐾 Animais animados'], ['mistico', '✨ Místicos e fantasia']].map(([g, t]) => `<div class="sub-grade" data-g="${g}"><b class="mut peq">${t}</b><div class="grade-animais">${ANIMAIS.filter(a => g === 'real' ? REAIS.has(a[0]) : (a[3] || 'animal') === g && !REAIS.has(a[0])).map(a => `<button type="button" class="${MASC_EDIT.animal === a[0] ? 'on' : ''}" data-act="mascoteOpc" data-k="animal" data-v="${a[0]}" data-nome="${esc(semAcento(a[2]))}" title="${esc(a[2])}"><img src="${miniMasc(a)}" alt="" loading="lazy"><small>${esc(a[2])}</small></button>`).join('')}</div></div>`).join('')}</div>
+        ${[['animal', '🐾 Animais'], ['mistico', '✨ Místicos e fantasia']].map(([g, t]) => `<div class="sub-grade" data-g="${g}"><b class="mut peq">${t}</b><div class="grade-animais">${ANIMAIS.filter(a => (a[3] || 'animal') === g).sort((x, y) => ehToon(y[0]) - ehToon(x[0])).map(a => `<button type="button" class="${MASC_EDIT.animal === a[0] ? 'on' : ''}" data-act="mascoteOpc" data-k="animal" data-v="${a[0]}" data-nome="${esc(semAcento(a[2]))}" title="${esc(a[2])}"><img src="${miniMasc(a)}" alt="" loading="lazy"><small>${esc(a[2])}</small></button>`).join('')}</div></div>`).join('')}</div>
       <div class="masc-grupo"><span>Movimento</span><div class="masc-opcs">${MOVS_ANIMAL.map(([v, n]) => `<button type="button" class="opc ${(MASC_EDIT.movAnimal || 'auto') === v ? 'on' : ''}" data-act="mascoteOpc" data-k="movAnimal" data-v="${v}">${n}</button>`).join('')}</div></div>
       <div class="masc-grupo"><span>Na cabeça</span><div class="masc-opcs">${ACESS_CHAPEU.map(([v, e]) => `<button type="button" class="opc ${(MASC_EDIT.chapeuA || 'nenhum') === v ? 'on' : ''}" data-act="mascoteOpc" data-k="chapeuA" data-v="${v}">${e || 'Nenhum'}</button>`).join('')}</div></div>
       <div class="masc-grupo"><span>Óculos</span><div class="masc-opcs">${ACESS_OCULOS.map(([v, e]) => `<button type="button" class="opc ${(MASC_EDIT.oculosA || 'nenhum') === v ? 'on' : ''}" data-act="mascoteOpc" data-k="oculosA" data-v="${v}">${e || 'Nenhum'}</button>`).join('')}</div></div>
@@ -1498,7 +1505,10 @@ function flutuantes() {
   const nl = S.papel === 'pai' ? naoLidas() : naoLidas(S.eu);
   const pos = k => { const p = lsGet('mok_pos_' + k); return p ? `style="left:${Math.min(p.x, innerWidth - 60)}px;top:${Math.min(p.y, innerHeight - 70)}px;right:auto;bottom:auto"` : ''; };
   let h = `<button class="flut-chat" data-arrastar="chat" ${pos('chat')} data-act="chatAbrir" title="Chat (arraste para mover)">💬${nl ? `<span class="badge">${nl}</span>` : ''}</button>`;
-  if (S.papel === 'filho' || S.papel === 'pai') { const m = { ...mascoteDe(S.eu), _dormindo: statusPet(petDe(S.eu)).dormindo }; const d = dicaMascote(); h += `<button class="flut-masc" data-arrastar="masc" ${pos('masc')} data-act="mascote" title="${esc(m.nome)} (arraste para mover)"><span class="balao">${esc(d)}</span>${mascoteVisual(m, 72)}</button>`; }
+  if (S.papel === 'filho' || S.papel === 'pai') { const m = { ...mascoteDe(S.eu), _dormindo: statusPet(petDe(S.eu)).dormindo }; const d = dicaMascote(); const tam = tamMasc(), mudo = !!lsGet('mok_masc_mudo');
+    h += `<div class="flut-masc" data-arrastar="masc" ${pos('masc')} style="--tam:${tam}px">
+      <button class="masc-toque" data-act="mascote" title="${esc(m.nome)} — toque para abrir, arraste para mover">${d ? `<span class="balao">${esc(d)}</span>` : ''}${mascoteVisual(m, tam)}</button>
+      <div class="masc-ctrl sem3d"><button data-act="mascMudo" title="${mudo ? 'Ligar a voz' : 'Silenciar'}">${mudo ? '🔇' : '🔊'}</button><button data-act="mascTam" data-v="-1" title="Diminuir">−</button><button data-act="mascTam" data-v="1" title="Aumentar">+</button></div></div>`; }
   if (S.chatAberto) h += `<div class="chat-flut-bg" data-act="chatFechar"></div><div class="chat-flut"><div class="linha" style="margin-bottom:6px"><b class="esp">💬 Chat</b><button class="btn zap sm" style="width:auto" data-act="whats">📲 WhatsApp</button><button class="icone-btn" data-act="chatFechar">✕</button></div>${telaChat()}</div>`;
   return h;
 }
@@ -2364,8 +2374,10 @@ const acoes = {
     try { await salvarPerfil(d.id, { mascote: { ...MASC_EDIT } }); fecharModais(); toast(`🎨 ${MASC_EDIT.nome} está pronto!`, 'ok'); } catch (e) { toast(msgErro(e), 'bad'); }
   },
   mascote: () => { modalAssistente(); const m = mascoteDe(S.eu); if (m.voz !== false) falar(textoMascote()); },
-  mascoteFalar: () => falar(textoMascote()),
-  mascoteTestarVoz: () => { const n = ($('#mascNome') || {}).value || MASC_EDIT.nome; falar(S.papel === 'pai' && MASC_ID === 'pai' ? `${saudacao()}, ${nomePai()}! Eu sou o ${n}. Vou te contar como os meninos estão.` : `${saudacao()}, ${filhoAtual().nome}! Eu sou o ${n}, seu assistente. Vamos fazer as tarefas?`); },
+  mascoteFalar: () => falar(textoMascote(), true),
+  mascMudo: () => { const m = !lsGet('mok_masc_mudo'); lsSet('mok_masc_mudo', m ? 1 : 0); if (m && 'speechSynthesis' in window) speechSynthesis.cancel(); render(); toast(m ? '🔇 Mascote silenciado' : '🔊 Mascote com voz'); },
+  mascTam: d => { const i = TAMS_MASC.indexOf(tamMasc()); const n = TAMS_MASC[Math.max(0, Math.min(TAMS_MASC.length - 1, i + Number(d.v)))]; lsSet('mok_masc_tam', n); render(); },
+  mascoteTestarVoz: () => { const fl = (t) => falar(t, true); const n = ($('#mascNome') || {}).value || MASC_EDIT.nome; fl(S.papel === 'pai' && MASC_ID === 'pai' ? `${saudacao()}, ${nomePai()}! Eu sou o ${n}. Vou te contar como os meninos estão.` : `${saudacao()}, ${filhoAtual().nome}! Eu sou o ${n}, seu assistente. Vamos fazer as tarefas?`); },
   chatAbrir: () => { S.chatAberto = true; render(); setTimeout(() => { const i = $('#chatTxt'); if (i && innerWidth > 700) i.focus(); }, 50); },
   chatFechar: () => { S.chatAberto = false; render(); },
   whats: () => modalWhats(),

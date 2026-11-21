@@ -493,3 +493,61 @@ body:has(#visorImg) .flut-masc,body:has(#visorImg) .flut-chat{display:none}
 .masc-animal.real.dormindo .bicho{animation:respirar 4s ease-in-out infinite}
 .msg small .visto{color:#7dd3fc;font-weight:800}
 .msg small .enviado{opacity:.75}
+/* ===== v2.7 pets estilo desenho: mais movimento ===== */
+.masc-animal.toon .bicho{filter:drop-shadow(0 10px 12px rgba(0,0,0,.45));transform-origin:50% 100%;animation:boing 2.4s ease-in-out infinite}
+@keyframes boing{0%,100%{transform:scale(1,1) rotate(0)}12%{transform:scale(1.06,.93)}24%{transform:scale(.95,1.06) translateY(-7%)}36%{transform:scale(1.02,.98) translateY(0)}55%{transform:rotate(-4deg)}75%{transform:rotate(4deg)}}
+.masc-animal.toon.mov-voar .bicho{animation:boingVoar 1.6s ease-in-out infinite}
+@keyframes boingVoar{0%,100%{transform:translateY(0) rotate(-3deg) scaleX(1)}50%{transform:translateY(-10%) rotate(3deg) scaleX(.94)}}
+.masc-animal.toon.mov-nadar .bicho{animation:boingNadar 2.2s ease-in-out infinite}
+@keyframes boingNadar{0%,100%{transform:rotate(-7deg) translateX(-4%)}50%{transform:rotate(7deg) translateX(4%) translateY(-4%)}}
+.masc-animal.toon.dormindo .bicho{animation:soninho 3.4s ease-in-out infinite}
+@keyframes soninho{0%,100%{transform:scale(1,1) rotate(-6deg)}50%{transform:scale(1.03,.96) rotate(-6deg)}}
+/* reações ao cuidar */
+.masc-animal.reage-comer .bicho{animation:comer .25s ease-in-out 5!important}
+@keyframes comer{0%,100%{transform:scale(1,1)}50%{transform:scale(1.08,.9)}}
+.masc-animal.reage-beber .bicho{animation:beber 1.4s ease-in-out!important}
+@keyframes beber{0%,100%{transform:rotate(0)}30%,70%{transform:rotate(-16deg) translateY(4%)}}
+.masc-animal.reage-treinar .bicho{animation:treinar .4s cubic-bezier(.3,0,.4,1) 4!important}
+@keyframes treinar{0%,100%{transform:translateY(0) scale(1,1)}20%{transform:scale(1.1,.88)}55%{transform:translateY(-28%) scale(.92,1.1)}}
+.masc-animal.reage-dormir .bicho{animation:deitar 1.4s ease-in-out!important}
+@keyframes deitar{0%{transform:rotate(0)}100%{transform:rotate(-6deg) scale(1.02,.95)}}
+
+/* ===== mascote flutuante: canto da tela, arrastar, tamanho e silenciar ===== */
+.flut-masc{position:fixed;left:12px;bottom:calc(100px + env(safe-area-inset-bottom));z-index:35;display:flex;flex-direction:column;align-items:center;gap:2px;animation:none;filter:none;touch-action:none;user-select:none}
+.flut-masc .masc-toque{background:none;border:0;padding:0;cursor:grab;position:relative;display:block}
+.flut-masc.arrastando .masc-toque{cursor:grabbing}
+.flut-masc .balao{left:calc(var(--tam) - 6px);top:4px}
+.masc-ctrl{display:flex;gap:4px;background:rgba(15,22,48,.88);border:1px solid rgba(255,255,255,.12);border-radius:99px;padding:3px;backdrop-filter:blur(8px);box-shadow:0 6px 16px rgba(0,0,0,.4);opacity:.92;transition:opacity .2s}
+.masc-ctrl button{width:28px;height:26px;border:0;border-radius:99px;background:rgba(255,255,255,.08);color:#fff;font-weight:900;font-size:.95rem;cursor:pointer;line-height:1}
+.masc-ctrl button:hover{background:rgba(79,124,255,.5)}
+@media (hover:hover){.masc-ctrl{opacity:0}.flut-masc:hover .masc-ctrl{opacity:.95}}
+
+/* ===== layout profissional no computador (barra lateral) ===== */
+@media (min-width:1000px){
+  body{background:radial-gradient(1200px 600px at 70% -10%,rgba(79,124,255,.12),transparent 60%),var(--bg)}
+  #app{max-width:1180px;padding:0 24px 40px 252px;position:relative}
+  .topo{margin:0 -24px 0 -252px;padding-left:252px;padding-right:24px;border-radius:0}
+  main{max-width:880px;margin:0 auto;padding:22px 8px 60px!important}
+  .nav{left:max(16px,calc(50% - 574px));right:auto;top:86px;bottom:auto;width:212px;max-width:none;margin:0;padding:12px 10px;border-radius:22px}
+  .nav-in{flex-direction:column;gap:4px}
+  .nav button{flex:none;flex-direction:row;justify-content:flex-start;gap:12px;padding:8px 10px;border-radius:14px;font-size:.92rem;font-weight:700}
+  .nav button span.i{width:40px;height:36px;border-radius:12px}
+  .nav button.on{background:rgba(91,134,255,.14)}
+  .nav button.on span.i{transform:none}
+  .nav button.on::after{display:none}
+  .nav .badge{top:2px;right:auto;left:42px}
+  .flut-chat{right:28px;bottom:28px}
+  .flut-masc{left:max(24px,calc(50% - 566px));bottom:28px}
+  .modal-bg{align-items:center}
+  .modal{border-radius:24px;max-width:640px;max-height:88vh;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+  .card,.dash{border-radius:20px}
+  .dash-grid{grid-template-columns:repeat(auto-fit,minmax(118px,1fr))}
+  .galeria{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .grade-animais{grid-template-columns:repeat(auto-fill,minmax(78px,1fr))}
+}
+@media (min-width:1400px){main{max-width:960px}}
+/* celular: respiro e leitura */
+@media (max-width:420px){main{padding:12px 10px}.card{padding:14px}}
+.masc-animal.toon .acc-oculos{top:20%;width:40%}
+.masc-animal.toon .acc-chapeu{top:-16%;width:44%}
+@media (min-width:1000px){.topo{padding-left:28px;padding-right:28px}}
