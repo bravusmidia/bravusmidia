@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '1.4.2';
+const VERSAO = '1.6.0';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -92,6 +92,12 @@ class LocalStore {
     this._save(db);
   }
   async rpc(n, a) {
+    if (n === 'mok_meu_perfil') {
+      const db = this._load(); const id = S.papel === 'pai' ? null : S.eu;
+      if (id) { const f = db.filhos.find(x => x.id === id); if (a.p_foto != null) f.foto = a.p_foto; if (a.p_mascote) f.mascote = a.p_mascote; if (a.p_whatsapp != null) f.whatsapp = a.p_whatsapp.replace(/\D/g, ''); }
+      else { const c = db.config[0]; if (a.p_foto != null) c.foto_pai = a.p_foto; if (a.p_whatsapp != null) c.whatsapp_pai = a.p_whatsapp.replace(/\D/g, ''); }
+      this._save(db); return null;
+    }
     if (n === 'mok_ciente') { const db = this._load(); db.cientes = db.cientes || []; const pr = (db.provas || []).find(x => x.id === a.p_prova);
       db.cientes.push({ id: Date.now(), filho_id: pr.filho_id, prova_id: pr.id, materia: pr.materia, etapa: a.p_etapa, criado_em: agoraISO() }); this._save(db);
       return db.cientes.filter(c => c.filho_id === pr.filho_id).length; }
@@ -444,7 +450,7 @@ function detectarNovidades() {
   for (const m of D.mensagens) {
     if (V.msgs.has(m.id)) continue; V.msgs.add(m.id);
     const deOutro = m.autor !== (S.papel === 'pai' ? 'pai' : S.eu);
-    if (deOutro && !(S.tela === 'chat' && m.filho_id === fid())) avisar(`💬 ${m.autor === 'pai' ? 'Pai' : nomeFilho(m.autor)}`, m.texto, 'msg');
+    if (deOutro && !(S.chatAberto && m.filho_id === fid())) avisar(`💬 ${m.autor === 'pai' ? 'Pai' : nomeFilho(m.autor)}`, m.texto, 'msg');
   }
   for (const p of D.pedidos) {
     const ant = V.ped[p.id]; V.ped[p.id] = p.status;
@@ -489,14 +495,15 @@ function render() {
   const msgsEl = $('#msgs'); const rolagem = msgsEl ? msgsEl.scrollHeight - msgsEl.scrollTop - msgsEl.clientHeight : 0;
 
   const telas = S.papel === 'pai'
-    ? { painel: telaPainel, tarefas: telaTarefasPai, work: telaWorkPai, estudo: telaEstudo, missoes: telaMissoes, chat: telaChat, mais: telaMaisPai }
-    : { hoje: telaHoje, work: telaWorkFilho, estudo: telaEstudo, missoes: telaMissoes, premios: telaPremios, chat: telaChat, mais: telaMaisFilho };
+    ? { painel: telaPainel, tarefas: telaTarefasPai, work: telaWorkPai, estudo: telaEstudo, missoes: telaMissoes, mais: telaMaisPai }
+    : { hoje: telaHoje, work: telaWorkFilho, estudo: telaEstudo, missoes: telaMissoes, premios: telaPremios, mais: telaMaisFilho };
   const fn = telas[S.tela] || Object.values(telas)[0];
-  $('#app').innerHTML = topo() + (S.papel === 'pai' ? barraFilhos() : '') + `<main>${fn()}</main>` + nav();
+  $('#app').innerHTML = topo() + (S.papel === 'pai' ? barraFilhos() : '') + `<main>${fn()}</main>` + flutuantes() + nav();
+  emoji3d($('#app'));
 
   if (foco) { const el = document.getElementById(foco.id); if (el) { el.value = foco.v; el.focus(); try { el.setSelectionRange(foco.s, foco.s); } catch { } } }
   const m2 = $('#msgs'); if (m2) m2.scrollTop = rolagem > 80 ? m2.scrollHeight - m2.clientHeight - rolagem : m2.scrollHeight;
-  if (S.tela === 'chat') marcarLidas();
+  if (S.chatAberto) marcarLidas();
 }
 
 function topo() {
@@ -509,21 +516,23 @@ function topo() {
   }
   const sub = S.papel === 'pai' ? '👑 Pai · Administrador' : `🔑 ${esc(filhoAtual().nome)} · logado`;
   return `<header class="topo"><div class="marca">${logoImg()}<div>TáFeito<small>${sub}</small></div></div><div class="esp"></div>
-    ${promptInstalar ? `<button class="icone-btn" data-act="instalar" title="Instalar">⬇️</button>` : ''}${pres}</header>`;
+    ${promptInstalar ? `<button class="icone-btn" data-act="instalar" title="Instalar">⬇️</button>` : ''}${pres}
+    <button class="avatar-btn" data-act="meuPerfil" title="Meu perfil">${avatar(S.papel === 'pai' ? 'pai' : S.eu, 36)}</button>
+    ${S.papel === 'pai' ? `<button class="icone-btn engrenagem" data-act="ir" data-tela="mais" title="Configurações (só admin)">⚙️${pedidosPendentes().length ? '<span class="badge">' + pedidosPendentes().length + '</span>' : ''}</button>` : ''}</header>`;
 }
 
 function barraFilhos() {
   return `<div class="filhos-bar">${S.dados.filhos.map(f => {
     const on = S.online.has(f.id); const nl = naoLidas(f.id); const pp = S.dados.pedidos.filter(p => p.filho_id === f.id && p.status === 'pendente').length;
-    return `<button class="chip ${f.id === S.filhoSel ? 'on' : ''}" data-act="selFilho" data-id="${esc(f.id)}">
-      ${S.modo === 'online' ? `<span class="dot ${on ? 'on' : ''}"></span>` : ''}${esc(f.nome)}${nl + pp ? `<span class="badge">${nl + pp}</span>` : ''}</button>`;
+    return `<button class="chip com-foto ${f.id === S.filhoSel ? 'on' : ''}" data-act="selFilho" data-id="${esc(f.id)}" title="${f.id === S.filhoSel ? 'Toque de novo para editar o perfil' : ''}">
+      <span class="av-wrap">${avatar(f.id, 30)}${S.modo === 'online' ? `<span class="dot ${on ? 'on' : ''}"></span>` : ''}</span>${esc(f.nome)}${f.id === S.filhoSel ? '<span class="lapis">✏️</span>' : ''}${nl + pp ? `<span class="badge">${nl + pp}</span>` : ''}</button>`;
   }).join('')}</div>`;
 }
 
 function nav() {
   const itens = S.papel === 'pai'
-    ? [['painel', '📊', 'Painel'], ['tarefas', '✅', 'Tarefas'], ['work', '💼', 'Work'], ['estudo', '📚', 'Estudo'], ['missoes', '🎯', 'Missões'], ['chat', '💬', 'Chat'], ['mais', '☰', 'Mais']]
-    : [['hoje', '✅', 'Tarefas'], ['work', '💼', 'Work'], ['estudo', '📚', 'Estudo'], ['missoes', '🎯', 'Missões'], ['premios', '🏆', 'Prêmios'], ['chat', '💬', 'Chat'], ['mais', '☰', 'Mais']];
+    ? [['painel', '📊', 'Painel'], ['tarefas', '✅', 'Tarefas'], ['work', '💼', 'Work'], ['estudo', '📚', 'Estudo'], ['missoes', '🎯', 'Missões'], ['mais', '⚙️', 'Config']]
+    : [['hoje', '✅', 'Tarefas'], ['work', '💼', 'Work'], ['estudo', '📚', 'Estudo'], ['missoes', '🎯', 'Missões'], ['premios', '🏆', 'Prêmios'], ['mais', '👤', 'Perfil']];
   const badge = id => {
     let n = 0;
     if (id === 'chat') n = S.papel === 'pai' ? naoLidas() : naoLidas(S.eu);
@@ -639,7 +648,7 @@ function telaHoje() {
   const st = statusDia(dia);
   const casa = tars.filter(t => t.categoria === 'casa');
   const pct = st.total ? Math.round(st.feitas / st.total * 100) : 0;
-  return `${avisoNotificacao()}${bannerPermissoes()}${bannerProvas()}
+  return `${avisoNotificacao()}${bannerPermissoes()}${bannerProvas()}${dashTarefas()}
     <div class="card"><div class="linha"><div class="esp"><b>Missões de hoje</b><br><span class="mut peq">${new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</span></div><b style="font-size:1.4rem">${st.feitas}/${st.total}</b></div>
     <div class="barra" style="margin-top:10px"><i style="width:${pct}%"></i></div></div>
     ${!tars.length ? `<div class="vazio"><span class="e">🎉</span>Nenhuma tarefa de casa hoje.</div>` : ''}
@@ -652,7 +661,7 @@ function telaHoje() {
 function telaWorkFilho() {
   const dia = hojeISO(); const tars = tarefasDoDia(dia, ['trabalho']); const c = carteira();
   const hist = concluidos().filter(r => num(r.valor) > 0).sort((a, b) => (b.feito_em || '').localeCompare(a.feito_em || '')).slice(0, 15);
-  return `<div class="card destaque"><div class="linha"><div class="esp"><span class="mut peq">Seu saldo a receber</span><h1 style="margin:2px 0">${brl(c.saldo)}</h1><span class="mut peq">Ganho total ${brl(c.ganho)} · já recebido ${brl(c.pago)}</span></div><span style="font-size:2.4rem">💰</span></div></div>
+  return `${dashWork()}<div class="card destaque"><div class="linha"><div class="esp"><span class="mut peq">Seu saldo a receber</span><h1 style="margin:2px 0">${brl(c.saldo)}</h1><span class="mut peq">Ganho total ${brl(c.ganho)} · já recebido ${brl(c.pago)}</span></div><span style="font-size:2.4rem">💰</span></div></div>
     <div class="secao">💼 Trabalhos</div>
     ${tars.length ? tars.map(t => cardTarefaFilho(t, dia)).join('') : `<div class="vazio"><span class="e">💼</span>Nenhum trabalho agora. O pai coloca novos trabalhos aqui.</div>`}
     ${hist.length ? `<div class="secao">Histórico</div><div class="card">${hist.map(r => `<div class="lista-item"><div class="tt">${esc((tarefaPorId(r.tarefa_id) || {}).titulo || 'Trabalho')}<small>${dataHoraBR(r.feito_em)}</small></div><b>${brl(r.valor)}</b></div>`).join('')}</div>` : ''}`;
@@ -669,7 +678,12 @@ function telaPremios() {
 
 function telaMaisFilho() {
   const meus = deFilho('pedidos').sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || '')).slice(0, 20);
-  return `${bannerPermissoes()}${cardConta()}
+  const f = filhoAtual(); const mc = mascoteDe(S.eu);
+  return `${bannerPermissoes()}
+    <div class="card perfil-topo"><button class="avatar-btn" data-act="meuPerfil">${avatar(S.eu, 84)}</button><div class="esp"><h2 style="margin:0">${esc(f.nome)}</h2><span class="mut peq">Toque na foto para trocar e ajustar</span>
+      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="btn pri sm" style="width:auto" data-act="meuPerfil">✏️ Editar perfil</button><button class="btn ghost sm" style="width:auto" data-act="mascoteEditar">🎨 Mascote ${esc(mc.nome)}</button><button class="btn zap sm" style="width:auto" data-act="whats">📲 WhatsApp</button></div></div></div>
+    ${cardConta()}
+    <button class="btn ghost" style="margin-bottom:12px" data-act="conectores">🔌 Conectores (Notion e arquivos)</button>
     <div class="card"><h3>✋ Pedir permissão ao pai</h3><p class="mut peq">Para mudar algo no app você precisa da autorização do pai.</p>
     <button class="btn pri" data-act="pedir">Fazer um pedido</button></div>
     ${meus.length ? `<div class="card"><h3>Meus pedidos</h3>${meus.map(p => `<div class="lista-item"><div class="tt">${esc(AREAS[p.area] || p.area)}<small>${esc(p.mensagem || '')} · ${dataHoraBR(p.criado_em)}</small></div>${tagPedido(p)}</div>`).join('')}</div>` : ''}
@@ -712,6 +726,7 @@ function telaPainel() {
     <div class="card"><div class="linha">${S.modo === 'online' ? `<span class="dot ${on ? 'on' : ''}"></span>` : ''}<div class="esp"><b>${esc(f.nome)}</b> <span class="mut peq">${S.modo === 'online' ? (on ? 'online agora' : (perfil && perfil.visto_em ? 'visto ' + dataHoraBR(perfil.visto_em) : (perfil ? 'offline' : 'acesso ainda não criado'))) : ''}</span></div>
       <input type="date" class="inp" style="width:auto;padding:7px 9px" value="${dia}" data-change="diaVer"></div></div>
     ${S.modo === 'online' ? cardUso(f.id) : ''}${bannerProvas()}
+    <div class="secao">📊 Resumo de ${esc(f.nome)}</div>${dashTarefas(f.id)}${dashWork(f.id)}${dashEstudo(f.id)}
     ${tars.length ? cardPremio(dia) : ''}
     ${aguard ? `<div class="aviso info" style="margin-top:12px">⭐ ${aguard} tarefa(s) esperando sua aprovação.</div>` : ''}
     <div class="secao">Tarefas de ${dia === hojeISO() ? 'hoje' : dataBR(dia)}</div>
@@ -733,14 +748,14 @@ function listaGerenciar(cats) {
 }
 
 function telaTarefasPai() {
-  return `<div class="linha" style="margin-bottom:6px"><div class="esp"><h2 style="margin:0">Tarefas de ${esc(filhoAtual().nome)}</h2><span class="mut peq">Tarefas de casa</span></div>
+  return `${dashTarefas()}<div class="linha" style="margin-bottom:6px"><div class="esp"><h2 style="margin:0">Tarefas de ${esc(filhoAtual().nome)}</h2><span class="mut peq">Tarefas de casa</span></div>
     <button class="btn pri sm" data-act="novaTarefa" data-cat="casa">＋ Nova</button></div>
     ${listaGerenciar(['casa'])}`;
 }
 
 function telaWorkPai() {
   const c = carteira(); const pags = deFilho('pagamentos').sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || ''));
-  return `<div class="card destaque"><span class="mut peq">${esc(filhoAtual().nome)} tem a receber</span><h1 style="margin:2px 0">${brl(c.saldo)}</h1>
+  return `${dashWork()}<div class="card destaque"><span class="mut peq">${esc(filhoAtual().nome)} tem a receber</span><h1 style="margin:2px 0">${brl(c.saldo)}</h1>
     <span class="mut peq">Ganho ${brl(c.ganho)} · pago ${brl(c.pago)}</span>
     <div class="acoes"><button class="btn ok sm" data-act="pagar">💸 Registrar pagamento</button></div></div>
     <div class="linha" style="margin-top:6px"><div class="esp"><h2 style="margin:0">Trabalhos</h2><span class="mut peq">Tarefas que valem dinheiro</span></div>
@@ -782,9 +797,13 @@ function telaChat() {
 
 function telaMaisPai() {
   const peds = S.dados.pedidos.slice().sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || '')).slice(0, 25);
-  return `${cardConta()}<div class="card"><h3>👨‍👦 Filhos e acessos</h3>${S.dados.filhos.map(f => {
+  return `<div class="linha" style="margin-bottom:10px"><h2 style="margin:0">⚙️ Configurações</h2><span class="tag ok">só admin</span></div>${cardConta()}
+    <button class="btn ghost" style="margin-bottom:12px" data-act="conectores">🔌 Conectores (Notion e arquivos)</button>
+    <div class="card"><h3>📲 WhatsApp do Pai</h3><p class="mut peq">Número que aparece no botão de WhatsApp do app dos filhos.</p>
+      <form data-form="whatsPai" class="linha"><input class="inp" name="w" inputmode="tel" value="${esc(S.config.whatsapp_pai || '')}" placeholder="85 99999-9999"><button class="btn pri sm" style="width:auto">Salvar</button></form></div>
+    <div class="card"><h3>👨‍👦 Filhos e acessos</h3>${S.dados.filhos.map(f => {
       const tem = S.dados.perfis.some(p => p.filho_id === f.id);
-      return `<div class="lista-item"><div class="chip" style="padding:6px 10px;background:${corFilho(f.id)}">${esc(f.nome[0])}</div><div class="tt"><b>${esc(f.nome)}</b><small>💻 ${horasTxt(f.horas_pc)} · 📱 ${horasTxt(f.horas_cel)}${S.modo === 'online' ? (tem ? ' · acesso criado' : ' · sem acesso') : ''}</small></div>
+      return `<div class="lista-item"><button class="avatar-btn" data-act="perfilFilho" data-id="${esc(f.id)}">${avatar(f.id, 40)}</button><div class="tt"><b>${esc(f.nome)}</b><small>💻 ${horasTxt(f.horas_pc)} · 📱 ${horasTxt(f.horas_cel)}${S.modo === 'online' ? (tem ? ' · acesso criado' : ' · sem acesso') : ''}</small></div>
       <button class="icone-btn" data-act="editarFilho" data-id="${esc(f.id)}">⚙️</button></div>`;
     }).join('')}
     <button class="btn ghost" style="margin-top:8px" data-act="novoFilho">＋ Adicionar filho</button></div>
@@ -801,12 +820,31 @@ function telaMaisPai() {
 }
 
 /* ---------- ÁREA DE ESTUDO (provas) ---------- */
-const dhProva = p => new Date(`${p.data}T${p.horario || '08:00'}:00`);
-const quandoProva = p => `${DSEM[dow(p.data)]} ${dataBR(p.data)} às ${p.horario || '08:00'}`;
-const provasDe = (id = fid()) => S.dados.provas.filter(p => p.filho_id === id).sort((a, b) => dhProva(a) - dhProva(b));
-const provasFuturas = (id = fid()) => provasDe(id).filter(p => dhProva(p) > new Date());
+const dhProva = p => p.data ? new Date(`${p.data}T${p.horario || '08:00'}:00`) : null;
+const quandoProva = p => p.data ? `${DSEM[dow(p.data)]} ${dataBR(p.data)} às ${p.horario || '08:00'}` : 'data a definir';
+const SITES = [
+  [/enem[\s-]*usp/i, ''], [/enem[\s-]*unicamp/i, 'https://www.comvest.unicamp.br/'],
+  [/\benem\b/i, 'https://enem.inep.gov.br/'], [/\bsisu\b/i, 'https://acessounico.mec.gov.br/sisu'],
+  [/\buece\b/i, 'https://www.cev.uece.br/'], [/fuvest/i, 'https://www.fuvest.br/'], [/unicamp|comvest/i, 'https://www.comvest.unicamp.br/'],
+  [/\buerj\b/i, 'https://www.vestibular.uerj.br/'], [/\bufsc\b/i, 'https://vestibularunificado.ufsc.br/'], [/\buel\b/i, 'https://www.cops.uel.br/'],
+  [/\buem\b/i, 'https://www.vestibular.uem.br/'], [/\bifce\b/i, 'https://ifce.edu.br/'], [/\bufabc\b/i, 'https://www.ufabc.edu.br/'],
+  [/\bufpr\b/i, 'https://www.nc.ufpr.br/'], [/\bunb\b/i, 'https://www.cebraspe.org.br/'], [/\bufc\b/i, 'https://www.ufc.br/']
+];
+function siteDaProva(p) {
+  if (p.site) return p.site;
+  const t = `${p.materia} ${p.instituicao || ''}`;
+  for (const [re, u] of SITES) if (re.test(t)) return u || '';
+  return '';
+}
+const linkProva = p => siteDaProva(p) || `https://www.google.com/search?q=${encodeURIComponent(nomeProva(p) + ' site oficial inscrição')}`;
+const nomeProva = p => p.materia + (p.instituicao ? ` · ${p.instituicao}` : '');
+const provasDe = (id = fid()) => S.dados.provas.filter(p => p.filho_id === id).sort((a, b) => (dhProva(a) || 9e15) - (dhProva(b) || 9e15));
+const provasFuturas = (id = fid()) => provasDe(id).filter(p => p.data && dhProva(p) > new Date());
+const provasRealizadas = (id = fid()) => provasDe(id).filter(p => p.data && dhProva(p) <= new Date());
+const provasSemData = (id = fid()) => provasDe(id).filter(p => !p.data);
 const cientesDe = (id = fid()) => S.dados.cientes.filter(c => c.filho_id === id);
 function corProva(p) {
+  if (!p.data) return 'semdata';
   const ms = dhProva(p) - new Date();
   if (ms <= 0) return 'passou';
   if (ms <= 7 * 864e5) return 'vermelho';
@@ -814,6 +852,7 @@ function corProva(p) {
   return 'verde';
 }
 function faltaTxt(p) {
+  if (!p.data) return 'sem data';
   const ms = dhProva(p) - new Date(); if (ms <= 0) return 'já passou';
   const h = Math.floor(ms / 36e5), d = Math.floor(h / 24);
   if (h < 1) return `em ${Math.max(1, Math.round(ms / 6e4))} min`;
@@ -821,8 +860,9 @@ function faltaTxt(p) {
   if (d === 1) return 'amanhã';
   return `em ${d} dias`;
 }
-const ROT_COR = { vermelho: '🔴 ALERTA · esta semana', amarelo: '🟡 em menos de 1 mês', verde: '🟢 mais de 1 mês', passou: '⚪ já passou' };
+const ROT_COR = { vermelho: '🔴 ALERTA · esta semana', amarelo: '🟡 em menos de 1 mês', verde: '🟢 mais de 1 mês', passou: '✅ realizada', semdata: '📌 sem data definida' };
 function etapaAtual(p) {
+  if (!p.data) return null;
   const h = (dhProva(p) - new Date()) / 36e5; if (h <= 0) return null;
   if (h <= 2) return '2h'; if (h <= 24) return '1d'; if (h <= 48) return '2d'; return null;
 }
@@ -831,7 +871,7 @@ const jaCiente = (p, etapa) => S.dados.cientes.some(c => c.prova_id === p.id && 
 function bannerProvas() {
   const l = provasFuturas().filter(p => corProva(p) === 'vermelho');
   if (!l.length) return '';
-  return l.map(p => `<button class="aviso bad linha prova-alerta" data-act="verProva" data-id="${esc(p.id)}"><span style="font-size:1.4rem">🚨</span><div class="esp" style="text-align:left"><b>Prova de ${esc(p.materia)} ${faltaTxt(p)}</b><br><span class="peq">${quandoProva(p)}</span></div><span class="peq">ver ›</span></button>`).join('');
+  return l.map(p => `<button class="aviso bad linha prova-alerta" data-act="verProva" data-id="${esc(p.id)}"><span style="font-size:1.4rem">🚨</span><div class="esp" style="text-align:left"><b>Prova: ${esc(nomeProva(p))} ${faltaTxt(p)}</b><br><span class="peq">${quandoProva(p)}</span></div><span class="peq">ver ›</span></button>`).join('');
 }
 
 function cardUso(id) {
@@ -848,7 +888,7 @@ function cardUso(id) {
 function calendario() {
   const [y, m] = S.calMes.split('-').map(Number);
   const ini = new Date(y, m - 1, 1), dias = new Date(y, m, 0).getDate(), pad = ini.getDay(), hoje = hojeISO();
-  const porDia = {}; provasDe().forEach(p => { if (p.data.startsWith(S.calMes)) (porDia[p.data] = porDia[p.data] || []).push(p); });
+  const porDia = {}; provasDe().forEach(p => { if (p.data && p.data.startsWith(S.calMes)) (porDia[p.data] = porDia[p.data] || []).push(p); });
   let cel = DSEM.map(d => `<div class="cal-sem">${d[0]}</div>`).join('') + '<div></div>'.repeat(pad);
   for (let d = 1; d <= dias; d++) {
     const iso = `${S.calMes}-${String(d).padStart(2, '0')}`; const l = porDia[iso] || [];
@@ -861,24 +901,60 @@ function calendario() {
 
 function itemProva(p) {
   const cor = corProva(p); const n = S.dados.cientes.filter(c => c.prova_id === p.id).length;
-  return `<button class="prova ${cor}" data-act="verProva" data-id="${esc(p.id)}"><div class="pdata"><b>${p.data.slice(8, 10)}</b><span>${MESES[Number(p.data.slice(5, 7)) - 1].slice(0, 3)}</span></div>
-    <div class="esp" style="text-align:left"><b>${esc(p.materia)}</b><br><span class="peq">${DSEM[dow(p.data)]} às ${esc(p.horario)} · ${faltaTxt(p)}</span><br><span class="peq">${ROT_COR[cor]}${n ? ` · 👍 ${n}` : ''}</span></div><span>›</span></button>`;
+  return `<div class="prova ${cor}" data-act="verProva" data-id="${esc(p.id)}" role="button" tabindex="0"><div class="pdata">${p.data ? `<b>${p.data.slice(8, 10)}</b><span>${MESES[Number(p.data.slice(5, 7)) - 1].slice(0, 3)} ${p.data.slice(2, 4)}</span>` : '<b>📌</b><span>sem data</span>'}</div>
+    <div class="esp" style="text-align:left"><a class="link-prova" href="${esc(linkProva(p))}" target="_blank" rel="noopener" data-act="abrirSite" data-url="${esc(linkProva(p))}" title="Abrir o site da prova">${esc(p.materia)} 🔗</a>${p.instituicao ? ` <span class="tag">${esc(p.instituicao)}</span>` : ''}<br><span class="peq">${p.data ? `${DSEM[dow(p.data)]} às ${esc(p.horario)} · ${faltaTxt(p)}` : 'Toque para definir a data'}</span><br><span class="peq">${ROT_COR[cor]}${n ? ` · 👍 ${n}` : ''}</span></div><span>›</span></div>`;
 }
 
 function telaEstudo() {
-  const fut = provasFuturas(); const pass = provasDe().filter(p => dhProva(p) <= new Date()).reverse().slice(0, 15);
-  const tot = cientesDe().length; const nome = filhoAtual().nome;
+  const fut = provasFuturas(); const pass = provasRealizadas().reverse().slice(0, 30); const sem = provasSemData();
+  const nome = filhoAtual().nome;
   return `${S.papel === 'filho' ? bannerPermissoes() : ''}
-    <div class="linha" style="margin-bottom:10px"><div class="esp"><h2 style="margin:0">📚 Área de estudo</h2><span class="mut peq">${S.papel === 'pai' ? 'Provas de ' + esc(nome) : 'Marque as datas das suas provas do ano todo'}</span></div>
+    <div class="linha" style="margin-bottom:10px"><div class="esp"><h2 style="margin:0">📚 Área de estudo</h2><span class="mut peq">${S.papel === 'pai' ? 'Provas de ' + esc(nome) : 'Suas provas do ano todo'}</span></div>
     <button class="btn pri sm" style="width:auto" data-act="novaProva">＋ Prova</button></div>
-    <div class="card destaque"><div class="grid3"><div class="stat"><b>${fut.length}</b><span>provas marcadas</span></div><div class="stat"><b style="color:#ff9a9a">${fut.filter(p => corProva(p) === 'vermelho').length}</b><span>esta semana</span></div><div class="stat"><b>👍 ${tot}</b><span>vezes ciente</span></div></div>
-    <p class="mut peq" style="margin:8px 0 0">🔒 O número de "Ciente" fica gravado no banco e não pode ser alterado.</p></div>
+    ${dashEstudo()}
+    <button class="dropzone" data-act="importar"><span style="font-size:1.8rem">📥</span><div><b>Importar provas de um arquivo ou foto</b><br><span class="peq">Foto, print, PDF, Excel, Word ou texto: o app lê e põe tudo no calendário</span></div></button>
     ${calendario()}
-    <div class="secao">Próximas provas</div>
-    ${fut.length ? fut.map(itemProva).join('') : `<div class="vazio"><span class="e">📅</span>Nenhuma prova marcada.<br>Toque num dia do calendário ou em <b>＋ Prova</b>.</div>`}
-    <div class="legenda peq"><span>🔴 até 1 semana</span><span>🟡 até 1 mês</span><span>🟢 mais de 1 mês</span></div>
+    ${sem.length ? `<div class="secao">📌 Sem data definida (${sem.length})</div><div class="aviso warn">Toque em cada uma e coloque a data para receber os lembretes.</div>${sem.map(itemProva).join('')}` : ''}
+    <div class="secao">Próximas provas (${fut.length})</div>
+    ${fut.length ? fut.map(itemProva).join('') : `<div class="vazio"><span class="e">📅</span>Nenhuma prova com data marcada.<br>Toque num dia do calendário, em <b>＋ Prova</b> ou importe um arquivo.</div>`}
+    <div class="legenda peq"><span>🔴 até 1 semana</span><span>🟡 até 1 mês</span><span>🟢 mais de 1 mês</span><span>📌 sem data</span></div>
     <div class="aviso info">🔔 Lembrete automático no celular: <b>2 dias antes</b>, <b>1 dia antes</b> e <b>2 horas antes</b> de cada prova. Em cada aviso, toque em <b>Ciente</b>.</div>
-    ${pass.length ? `<div class="secao">Já passaram</div>${pass.map(itemProva).join('')}` : ''}`;
+    ${pass.length ? `<div class="secao">✅ Provas realizadas (${provasRealizadas().length})</div>${pass.map(itemProva).join('')}` : ''}`;
+}
+
+/* ---------- DASHBOARDS simples (números grandes e cores) ---------- */
+function dash(titulo, tiles, extra = '') {
+  return `<div class="dash"><div class="dash-tit">${titulo}</div><div class="dash-grid">${tiles.map(t => `<div class="tile ${t.c}"><b>${t.n}</b><span>${t.r}</span></div>`).join('')}</div>${extra}</div>`;
+}
+function dashTarefas(id = fid()) {
+  const dia = hojeISO(), hm = new Date().toTimeString().slice(0, 5);
+  const tars = tarefasDoDia(dia, ['casa'], false, id);
+  const feitas = tars.filter(t => ehFeita(regDe(t, dia))), pend = tars.filter(t => !ehFeita(regDe(t, dia)));
+  const atras = pend.filter(t => t.horario && t.horario < hm);
+  const semana = S.dados.registros.filter(r => r.filho_id === id && r.categoria === 'casa' && ehFeita(r) && r.data > addDias(dia, -7)).length;
+  const st = statusDia(dia, false, id);
+  return dash('✅ Minhas tarefas · hoje', [
+    { n: feitas.length, r: 'feitas', c: 'verde' }, { n: pend.length, r: 'faltam', c: pend.length ? 'vermelho' : 'verde' },
+    { n: atras.length, r: 'atrasadas', c: atras.length ? 'amarelo' : 'cinza' }, { n: semana, r: 'feitas em 7 dias', c: 'azul' }],
+    `<div class="dash-st ${st.liberado ? 'ok' : 'bad'}">${st.total ? (st.liberado ? '🎮 Jogo LIBERADO' : `🔒 Jogo bloqueado · faltam ${st.total - st.feitas}`) : '🎮 Sem tarefas obrigatórias hoje'}</div>`);
+}
+function dashWork(id = fid()) {
+  const dia = hojeISO(); const tars = tarefasDoDia(dia, ['trabalho'], false, id);
+  const pend = tars.filter(t => !ehFeita(regDe(t, dia))).length;
+  const feitos = concluidos(id).filter(r => r.categoria === 'trabalho').length; const c = carteira(id);
+  return dash('💼 Meus trabalhos', [
+    { n: feitos, r: 'feitos', c: 'verde' }, { n: pend, r: 'pendentes', c: pend ? 'vermelho' : 'cinza' },
+    { n: brl(c.saldo), r: 'a receber', c: 'amarelo' }, { n: brl(c.pago), r: 'já recebido', c: 'azul' }]);
+}
+function dashEstudo(id = fid()) {
+  const fut = provasFuturas(id), sem = provasSemData(id);
+  const semana = fut.filter(p => corProva(p) === 'vermelho').length;
+  const prox = fut[0];
+  return dash('📚 Minhas provas', [
+    { n: provasRealizadas(id).length, r: 'realizadas', c: 'verde' }, { n: fut.length, r: 'próximas', c: 'azul' },
+    { n: semana, r: 'esta semana', c: semana ? 'vermelho' : 'cinza' }, { n: sem.length, r: 'sem data', c: sem.length ? 'amarelo' : 'cinza' },
+    { n: cientesDe(id).length, r: 'vezes ciente 🔒', c: 'roxo' }],
+    prox ? `<div class="dash-st ${corProva(prox) === 'vermelho' ? 'bad' : 'info'}">Próxima: <b>${esc(nomeProva(prox))}</b> · ${faltaTxt(prox)}</div>` : '');
 }
 
 function formProva(p, dia) {
@@ -886,7 +962,9 @@ function formProva(p, dia) {
   modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>${novo ? '📅 Marcar prova' : '✏️ Editar prova'}</h2>
   <form data-form="prova" data-id="${esc(p.id || '')}">
     <label class="campo"><span>Matéria</span><input name="materia" value="${esc(p.materia)}" required maxlength="80" placeholder="Ex.: Matemática"></label>
-    <div class="grid2"><label class="campo"><span>Data</span><input type="date" name="data" value="${esc(p.data)}" required></label>
+    <label class="campo"><span>🔗 Site da prova (opcional)</span><input name="site" type="url" value="${esc(p.site || '')}" placeholder="https://… (se vazio, o app procura sozinho)"></label>
+    <label class="campo"><span>Universidade / escola (opcional)</span><input name="instituicao" value="${esc(p.instituicao || '')}" maxlength="80" placeholder="Ex.: UECE"></label>
+    <div class="grid2"><label class="campo"><span>Data (deixe vazio se ainda não sabe)</span><input type="date" name="data" value="${esc(p.data || '')}"></label>
     <label class="campo"><span>Horário</span><input type="time" name="horario" value="${esc(p.horario)}" required></label></div>
     <label class="campo"><span>O que vai cair (opcional)</span><textarea name="conteudo" rows="3" placeholder="Ex.: capítulos 3 e 4, frações">${esc(p.conteudo)}</textarea></label>
     <button class="btn pri">Salvar prova</button>
@@ -897,10 +975,12 @@ function formProva(p, dia) {
 function modalProva(p) {
   const cor = corProva(p); const cs = S.dados.cientes.filter(c => c.prova_id === p.id);
   const et = etapaAtual(p);
-  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><div class="grande">📚</div><h2>${esc(p.materia)}</h2>
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><div class="grande">📚</div><h2>${esc(p.materia)}</h2>${p.instituicao ? `<p class="mut" style="margin:-6px 0 8px">${esc(p.instituicao)}</p>` : ''}
     <p style="margin:0"><b>${quandoProva(p)}</b> · ${faltaTxt(p)}</p><p><span class="tag ${cor === 'vermelho' ? 'bad' : cor === 'amarelo' ? 'warn' : cor === 'verde' ? 'ok' : ''}">${ROT_COR[cor]}</span></p>
     ${p.conteudo ? `<div class="aviso info">📖 ${esc(p.conteudo)}</div>` : ''}
+    <a class="btn ghost" href="${esc(linkProva(p))}" target="_blank" rel="noopener" data-act="abrirSite" data-url="${esc(linkProva(p))}">🔗 ${siteDaProva(p) ? 'Abrir site oficial' : 'Procurar site oficial'}</a>
     <p class="mut peq">Ciente nesta prova: <b>${cs.length}</b>${cs.length ? ' · último ' + dataHoraBR(cs[0].criado_em) : ''}</p>
+    ${!p.data ? `<button class="btn pri" data-act="editarProva" data-id="${esc(p.id)}">📅 Definir a data</button><div style="height:8px"></div>` : ''}
     ${S.papel === 'filho' && cor !== 'passou' ? `<button class="btn ok" data-act="ciente" data-id="${esc(p.id)}" data-etapa="${et && !jaCiente(p, et) ? et : 'lista'}">👍 Ciente</button><div style="height:8px"></div>` : ''}
     <div class="grid2"><button class="btn ghost" data-act="editarProva" data-id="${esc(p.id)}">✏️ Editar</button><button class="btn bad" data-act="apagarProva" data-id="${esc(p.id)}">🗑️ Excluir</button></div>`);
 }
@@ -929,12 +1009,445 @@ function checarProvas() {
   }
 }
 
+/* ---------- ÍCONES 3D (Fluent 3D, licença MIT) ---------- */
+const RE_EMOJI = /\p{Extended_Pictographic}(?:️|[\u{1F3FB}-\u{1F3FF}])?(?:‍\p{Extended_Pictographic}(?:️|[\u{1F3FB}-\u{1F3FF}])?)*|[0-9#*]️⃣/gu;
+const chaveEmoji = e => [...e].map(c => c.codePointAt(0).toString(16)).filter(c => c !== 'fe0f').join('-');
+function emoji3d(raiz) {
+  if (!raiz || !window.ICO3D) return;
+  const w = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT, { acceptNode: n => /^(SCRIPT|STYLE|TEXTAREA|INPUT|OPTION|SELECT|TITLE)$/.test(n.parentNode.nodeName) || n.parentNode.closest('.sem3d') ? NodeFilter.FILTER_REJECT : (RE_EMOJI.test(n.nodeValue) ? (RE_EMOJI.lastIndex = 0, NodeFilter.FILTER_ACCEPT) : NodeFilter.FILTER_REJECT) });
+  const nos = []; while (w.nextNode()) nos.push(w.currentNode);
+  for (const n of nos) {
+    const t = n.nodeValue; let ult = 0, mudou = false; const frag = document.createDocumentFragment(); RE_EMOJI.lastIndex = 0; let m;
+    while ((m = RE_EMOJI.exec(t))) {
+      const k = chaveEmoji(m[0]); if (!ICO3D.has(k)) continue;
+      if (m.index > ult) frag.append(t.slice(ult, m.index));
+      const img = document.createElement('img'); img.className = 'e3d'; img.src = `icons/3d/${k}.webp`; img.alt = m[0]; img.draggable = false; frag.append(img); ult = m.index + m[0].length; mudou = true;
+    }
+    if (!mudou) continue; if (ult < t.length) frag.append(t.slice(ult)); n.replaceWith(frag);
+  }
+}
+
+/* ---------- PERFIL: foto (com ajuste) e WhatsApp ---------- */
+const fotoDe = id => id === 'pai' ? (S.config.foto_pai || '') : ((S.dados.filhos.find(f => f.id === id) || {}).foto || '');
+function avatar(id, tam = 36) {
+  const foto = fotoDe(id); const nome = id === 'pai' ? 'Pai' : nomeFilho(id);
+  const bg = id === 'pai' ? 'linear-gradient(135deg,#4f7cff,#7b5cff)' : corFilho(id);
+  return foto ? `<img class="avatar" src="${esc(foto)}" alt="${esc(nome)}" style="width:${tam}px;height:${tam}px">`
+    : `<span class="avatar ini" style="width:${tam}px;height:${tam}px;background:${bg};font-size:${Math.round(tam * .45)}px">${id === 'pai' ? '👨' : esc((nome || '?')[0])}</span>`;
+}
+const podeEditarPerfil = id => S.papel === 'pai' || id === S.eu;
+function modalPerfil(id) {
+  if (!podeEditarPerfil(id)) return toast('Você só pode editar o seu próprio perfil.', 'bad');
+  const souPai = S.papel === 'pai'; const ehPai = id === 'pai'; const f = ehPai ? null : S.dados.filhos.find(x => x.id === id);
+  const nome = ehPai ? ((S.dados.perfis.find(p => p.papel === 'pai') || {}).nome || 'Pai') : f.nome;
+  const zap = ehPai ? (S.config.whatsapp_pai || '') : (f.whatsapp || '');
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>👤 Perfil de ${esc(nome)}</h2>
+    <div class="centro"><button class="avatar-btn" data-act="trocarFoto" data-id="${esc(id)}">${avatar(id, 120)}</button>
+    <div style="display:flex;gap:6px;justify-content:center;margin:10px 0"><button class="btn pri sm" style="width:auto" data-act="trocarFoto" data-id="${esc(id)}">📷 Trocar e ajustar foto</button>${fotoDe(id) ? `<button class="btn ghost sm" style="width:auto" data-act="removerFoto" data-id="${esc(id)}">Remover</button>` : ''}</div></div>
+    <form data-form="perfil2" data-id="${esc(id)}">
+      <label class="campo"><span>Nome ${souPai ? '' : '(só o pai altera)'}</span><input name="nome" value="${esc(nome)}" ${souPai ? '' : 'readonly'} required></label>
+      <label class="campo"><span>📲 WhatsApp</span><input name="whatsapp" inputmode="tel" value="${esc(zap)}" placeholder="85 99999-9999"></label>
+      <button class="btn pri">Salvar perfil</button></form>
+    ${!ehPai ? `<button class="btn ghost" style="margin-top:8px" data-act="mascoteEditar" data-id="${esc(id)}">🎨 Personalizar mascote</button>` : ''}`);
+}
+async function salvarPerfil(id, { foto = null, mascote = null, whatsapp = null }) {
+  const zap = whatsapp == null ? null : String(whatsapp).replace(/\D/g, '');
+  if (S.papel === 'pai' && id !== 'pai') {
+    const x = S.dados.filhos.find(y => y.id === id); const n = { ...x };
+    if (foto != null) n.foto = foto; if (mascote) n.mascote = mascote; if (zap != null) n.whatsapp = zap;
+    await DB.salvar('filhos', n); Object.assign(x, n);
+  } else {
+    if (!podeEditarPerfil(id)) throw new Error('Você só pode editar o seu próprio perfil.');
+    await DB.rpc('mok_meu_perfil', { p_foto: foto, p_mascote: mascote, p_whatsapp: zap });
+    if (id === 'pai') { if (foto != null) S.config.foto_pai = foto; if (zap != null) S.config.whatsapp_pai = zap; }
+    else { const x = S.dados.filhos.find(y => y.id === id); if (foto != null) x.foto = foto; if (mascote) x.mascote = mascote; if (zap != null) x.whatsapp = zap; }
+  }
+  render();
+}
+async function salvarFotoPerfil(id, url) { try { await salvarPerfil(id, { foto: url }); fecharModais(); toast(url ? 'Foto atualizada ✅' : 'Foto removida', 'ok'); } catch (e) { toast(msgErro(e), 'bad'); } }
+function escolherFotoPerfil(id) {
+  const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*';
+  i.onchange = () => { const a = i.files[0]; if (a) ajustarFoto(id, a); }; i.click();
+}
+function ajustarFoto(id, arq) {
+  const url = URL.createObjectURL(arq); const img = new Image();
+  img.onload = () => {
+    const T = 260; let z = 1, ox = 0, oy = 0; const base = T / Math.min(img.width, img.height);
+    const el = modal(`<h2>✂️ Ajustar foto</h2><p class="mut peq">Arraste para posicionar e use a barra para dar zoom.</p>
+      <div class="crop" style="width:${T}px;height:${T}px"><canvas width="${T}" height="${T}"></canvas></div>
+      <label class="campo" style="margin-top:12px"><span>🔍 Zoom</span><input type="range" min="1" max="4" step="0.01" value="1" class="zoom"></label>
+      <div class="grid2"><button class="btn ghost" data-crop="sair">Cancelar</button><button class="btn ok" data-crop="ok">✅ Usar foto</button></div>`, 'alerta');
+    const cv = el.querySelector('canvas'), g = cv.getContext('2d');
+    const lim = () => { const w = img.width * base * z, h = img.height * base * z; ox = Math.min(0, Math.max(T - w, ox)); oy = Math.min(0, Math.max(T - h, oy)); };
+    const desenha = () => { lim(); g.clearRect(0, 0, T, T); g.drawImage(img, ox, oy, img.width * base * z, img.height * base * z); };
+    ox = (T - img.width * base) / 2; oy = (T - img.height * base) / 2; desenha();
+    el.querySelector('.zoom').oninput = e => { const nz = Number(e.target.value); const cx = T / 2; ox = cx - (cx - ox) * nz / z; oy = cx - (cx - oy) * nz / z; z = nz; desenha(); };
+    let arr = null; cv.onpointerdown = e => { arr = [e.clientX, e.clientY]; cv.setPointerCapture(e.pointerId); };
+    cv.onpointermove = e => { if (!arr) return; ox += e.clientX - arr[0]; oy += e.clientY - arr[1]; arr = [e.clientX, e.clientY]; desenha(); };
+    cv.onpointerup = () => { arr = null; };
+    el.querySelector('[data-crop=sair]').onclick = () => { URL.revokeObjectURL(url); el.remove(); };
+    el.querySelector('[data-crop=ok]').onclick = async () => {
+      const out = document.createElement('canvas'); out.width = out.height = 400; const k = 400 / T;
+      out.getContext('2d').drawImage(img, ox * k, oy * k, img.width * base * z * k, img.height * base * z * k);
+      el.remove(); URL.revokeObjectURL(url); carregando(true, 'Salvando foto…');
+      try { const blob = await new Promise(r => out.toBlob(r, 'image/jpeg', .88)); const u = await DB.enviarFoto(blob); carregando(false); await salvarFotoPerfil(id, u); }
+      catch (e) { carregando(false); toast(msgErro(e), 'bad'); }
+    };
+  };
+  img.src = url;
+}
+
+/* ---------- MASCOTE personalizado (desenho original do TáFeito) ---------- */
+const MASC_OPC = {
+  pele: ['#ffdcc2', '#f1bc94', '#d39467', '#a8693f', '#6e4428'],
+  cabelo: ['curto', 'espetado', 'cacheado', 'topete', 'raspado'],
+  corCabelo: ['#2a1b12', '#5b3a26', '#b7792f', '#f0cf6a', '#e2483d', '#3c6df0', '#9b5cff'],
+  roupa: ['camiseta', 'moletom', 'jaqueta', 'uniforme'],
+  corRoupa: ['#4f7cff', '#22c55e', '#ef4444', '#f5a524', '#111827', '#e649a6', '#14b8a6'],
+  estampa: ['nenhuma', 'raio', 'estrela', 'numero'],
+  chapeu: ['nenhum', 'bone', 'fone', 'coroa', 'gorro'],
+  oculos: ['nenhum', 'redondo', 'escuro'],
+  extra: ['nenhum', 'mochila', 'capa', 'medalha'],
+  rosto: ['feliz', 'legal', 'animado']
+};
+const MASC_ROT = { pele: 'Pele', cabelo: 'Cabelo', corCabelo: 'Cor do cabelo', roupa: 'Roupa', corRoupa: 'Cor da roupa', estampa: 'Estampa', chapeu: 'Cabeça', oculos: 'Óculos', extra: 'Acessório', rosto: 'Rosto' };
+const MASC_NOMES = { curto: 'Curto', espetado: 'Espetado', cacheado: 'Cacheado', topete: 'Topete', raspado: 'Raspado', camiseta: 'Camiseta', moletom: 'Moletom', jaqueta: 'Jaqueta', uniforme: 'Uniforme', nenhuma: 'Nenhuma', raio: '⚡ Raio', estrela: '⭐ Estrela', numero: 'Nº 10', nenhum: 'Nenhum', bone: '🧢 Boné', fone: '🎧 Fone', coroa: '👑 Coroa', gorro: 'Gorro', redondo: '👓 Redondo', escuro: '🕶️ Escuro', mochila: '🎒 Mochila', capa: '🦸 Capa', medalha: '🏅 Medalha', feliz: '😀 Feliz', legal: '😎 Legal', animado: '🤩 Animado' };
+const MASC_PADRAO = { nome: 'Bolt', pele: '#f1bc94', cabelo: 'espetado', corCabelo: '#2a1b12', roupa: 'moletom', corRoupa: '#4f7cff', estampa: 'raio', chapeu: 'nenhum', oculos: 'nenhum', extra: 'nenhum', rosto: 'feliz' };
+const mascoteDe = id => ({ ...MASC_PADRAO, ...(((S.dados.filhos.find(f => f.id === id) || {}).mascote) || {}) });
+function escurece(h, f = .75) { const n = parseInt(h.slice(1), 16); const c = x => Math.round(x * f).toString(16).padStart(2, '0'); return '#' + c(n >> 16 & 255) + c(n >> 8 & 255) + c(n & 255); }
+function mascoteSVG(m, tam = 80) {
+  m = { ...MASC_PADRAO, ...m }; const u = 'm' + Math.random().toString(36).slice(2, 7);
+  const pele = m.pele, pe2 = escurece(pele, .82), cab = m.corCabelo, cab2 = escurece(cab, .7), rp = m.corRoupa, rp2 = escurece(rp, .7);
+  const cabelos = {
+    curto: `<path d="M40 58 Q40 22 80 20 Q120 22 120 58 Q112 40 80 38 Q48 40 40 58Z" fill="url(#${u}c)"/>`,
+    espetado: `<path d="M38 60 L42 30 L54 40 L58 16 L72 32 L80 10 L90 32 L104 16 L106 40 L118 30 L122 60 Q110 40 80 38 Q50 40 38 60Z" fill="url(#${u}c)"/>`,
+    cacheado: `<g fill="url(#${u}c)">${[[48, 40], [60, 28], [76, 22], [92, 24], [106, 32], [116, 46], [42, 54], [118, 60]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="15"/>`).join('')}</g>`,
+    topete: `<path d="M40 60 Q36 26 70 22 Q96 4 122 30 Q112 30 106 36 Q120 46 120 60 Q104 42 80 40 Q52 42 40 60Z" fill="url(#${u}c)"/>`,
+    raspado: `<path d="M42 56 Q44 26 80 24 Q116 26 118 56 Q100 42 80 41 Q60 42 42 56Z" fill="${cab}" opacity=".55"/>`
+  };
+  const olhos = m.rosto === 'legal' ? `<path d="M60 72 q6 -6 12 0" stroke="#1b1b1b" stroke-width="4" fill="none" stroke-linecap="round"/><circle cx="98" cy="72" r="6" fill="#1b1b1b"/><circle cx="100" cy="70" r="2" fill="#fff"/>`
+    : m.rosto === 'animado' ? `<g fill="#1b1b1b"><path d="M66 64 l2.5 6 6 .5 -4.6 4 1.5 6 -5.4 -3.3 -5.4 3.3 1.5 -6 -4.6 -4 6 -.5Z" fill="#f5a524"/><path d="M98 64 l2.5 6 6 .5 -4.6 4 1.5 6 -5.4 -3.3 -5.4 3.3 1.5 -6 -4.6 -4 6 -.5Z" fill="#f5a524"/></g>`
+    : `<circle cx="66" cy="72" r="6.5" fill="#1b1b1b"/><circle cx="94" cy="72" r="6.5" fill="#1b1b1b"/><circle cx="68" cy="70" r="2.2" fill="#fff"/><circle cx="96" cy="70" r="2.2" fill="#fff"/>`;
+  const boca = m.rosto === 'animado' ? `<path d="M68 88 Q80 102 92 88 Z" fill="#7a1f2b"/>` : `<path d="M68 88 Q80 98 92 88" stroke="#7a1f2b" stroke-width="4" fill="none" stroke-linecap="round"/>`;
+  const oculos = m.oculos === 'redondo' ? `<g fill="rgba(180,220,255,.25)" stroke="#222" stroke-width="3"><circle cx="66" cy="72" r="11"/><circle cx="94" cy="72" r="11"/><path d="M77 72 h6"/></g>`
+    : m.oculos === 'escuro' ? `<g><rect x="52" y="63" width="26" height="17" rx="7" fill="#111"/><rect x="82" y="63" width="26" height="17" rx="7" fill="#111"/><path d="M78 69 h4" stroke="#111" stroke-width="3"/><path d="M57 67 l7 0" stroke="#fff" stroke-width="2" opacity=".5"/></g>` : '';
+  const chapeu = {
+    nenhum: '', bone: `<path d="M40 52 Q42 22 80 20 Q118 22 120 52Z" fill="${rp}"/><path d="M40 52 Q80 44 120 52 L138 56 Q100 50 40 56Z" fill="${rp2}"/><circle cx="80" cy="22" r="4" fill="${rp2}"/>`,
+    fone: `<path d="M38 66 Q38 18 80 18 Q122 18 122 66" stroke="#222" stroke-width="7" fill="none"/><rect x="28" y="58" width="16" height="26" rx="7" fill="#e2483d"/><rect x="116" y="58" width="16" height="26" rx="7" fill="#e2483d"/>`,
+    coroa: `<path d="M50 30 L56 6 L68 22 L80 2 L92 22 L104 6 L110 30Z" fill="#fbbf24" stroke="#b7791f" stroke-width="2"/><circle cx="80" cy="18" r="4" fill="#ef4444"/>`,
+    gorro: `<path d="M40 54 Q40 14 80 14 Q120 14 120 54Z" fill="${rp}"/><rect x="38" y="46" width="84" height="12" rx="6" fill="${rp2}"/><circle cx="80" cy="12" r="8" fill="#fff"/>`
+  }[m.chapeu] || '';
+  const estampa = m.estampa === 'raio' ? `<path d="M84 122 L72 142 L82 142 L76 160 L92 136 L82 136 L88 122Z" fill="#fbbf24"/>`
+    : m.estampa === 'estrela' ? `<path d="M80 124 l4.7 9.5 10.5 1.5 -7.6 7.4 1.8 10.4 -9.4 -5 -9.4 5 1.8 -10.4 -7.6 -7.4 10.5 -1.5Z" fill="#fff"/>`
+    : m.estampa === 'numero' ? `<text x="80" y="152" font-family="Arial Black,Arial" font-weight="900" font-size="24" fill="#fff" text-anchor="middle">10</text>` : '';
+  const roupaExtra = m.roupa === 'jaqueta' ? `<path d="M80 114 L80 172" stroke="${rp2}" stroke-width="4"/><path d="M62 112 L80 128 L98 112" fill="none" stroke="#fff" stroke-width="3" opacity=".6"/>`
+    : m.roupa === 'moletom' ? `<path d="M60 112 Q80 126 100 112" fill="none" stroke="${rp2}" stroke-width="5"/><path d="M72 120 v14 M88 120 v14" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>`
+    : m.roupa === 'uniforme' ? `<path d="M66 110 L80 124 L94 110" fill="#fff"/><rect x="58" y="160" width="44" height="8" fill="#fff" opacity=".85"/>` : '';
+  const capa = m.extra === 'capa' ? `<path d="M52 112 Q30 160 40 196 L120 196 Q130 160 108 112Z" fill="#ef4444"/>` : '';
+  const mochila = m.extra === 'mochila' ? `<rect x="34" y="118" width="18" height="40" rx="7" fill="#f5a524"/><rect x="108" y="118" width="18" height="40" rx="7" fill="#f5a524"/>` : '';
+  const medalha = m.extra === 'medalha' ? `<path d="M72 112 L80 134 L88 112" stroke="#ef4444" stroke-width="4" fill="none"/><circle cx="80" cy="140" r="9" fill="#fbbf24" stroke="#b7791f" stroke-width="2"/>` : '';
+  return `<svg class="sem3d" viewBox="0 0 160 200" width="${tam}" height="${tam * 1.25}" xmlns="http://www.w3.org/2000/svg">
+    <defs><radialGradient id="${u}p" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".5" stop-color="${pele}"/><stop offset="1" stop-color="${pe2}"/></radialGradient>
+    <linearGradient id="${u}c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${escurece(cab, 1.25 > 1 ? 1 : 1)}"/><stop offset="1" stop-color="${cab2}"/></linearGradient>
+    <linearGradient id="${u}r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${rp}"/><stop offset="1" stop-color="${rp2}"/></linearGradient></defs>
+    <ellipse cx="80" cy="194" rx="36" ry="5" fill="#000" opacity=".25"/>
+    ${capa}${mochila}
+    <rect x="60" y="164" width="16" height="26" rx="7" fill="#24304f"/><rect x="84" y="164" width="16" height="26" rx="7" fill="#24304f"/>
+    <path d="M52 124 Q52 108 80 108 Q108 108 108 124 L108 170 Q80 176 52 170Z" fill="url(#${u}r)"/>
+    <path d="M52 122 Q36 132 38 150" stroke="url(#${u}r)" stroke-width="15" stroke-linecap="round" fill="none"/><circle cx="38" cy="152" r="8" fill="url(#${u}p)"/>
+    <path d="M108 122 Q126 116 128 98" stroke="url(#${u}r)" stroke-width="15" stroke-linecap="round" fill="none"/>
+    <g transform="translate(128 88)"><rect x="-9" y="-2" width="18" height="16" rx="6" fill="url(#${u}p)"/><rect x="-4" y="-16" width="8" height="18" rx="4" fill="url(#${u}p)"/></g>
+    ${roupaExtra}${estampa}${medalha}
+    <circle cx="40" cy="74" r="9" fill="${pe2}"/><circle cx="120" cy="74" r="9" fill="${pe2}"/>
+    <circle cx="80" cy="68" r="42" fill="url(#${u}p)"/>
+    <ellipse cx="60" cy="84" rx="7" ry="4" fill="#ff7a7a" opacity=".35"/><ellipse cx="100" cy="84" rx="7" ry="4" fill="#ff7a7a" opacity=".35"/>
+    ${cabelos[m.cabelo] || ''}${olhos}${boca}${oculos}${chapeu}
+  </svg>`;
+}
+let MASC_EDIT = {};
+function modalMascote(id) {
+  if (!podeEditarPerfil(id)) return toast('Você só pode personalizar o seu mascote.', 'bad');
+  MASC_EDIT = mascoteDe(id);
+  const cores = k => MASC_OPC[k].map(v => `<button type="button" class="cor-opc ${MASC_EDIT[k] === v ? 'on' : ''}" style="background:${v}" data-act="mascoteOpc" data-k="${k}" data-v="${v}"></button>`).join('');
+  const opcs = k => MASC_OPC[k].map(v => `<button type="button" class="opc ${MASC_EDIT[k] === v ? 'on' : ''}" data-act="mascoteOpc" data-k="${k}" data-v="${v}">${MASC_NOMES[v] || v}</button>`).join('');
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>🎨 Meu mascote</h2>
+    <div class="masc-preview">${mascoteSVG(MASC_EDIT, 150)}</div>
+    <label class="campo"><span>Nome do mascote</span><input id="mascNome" value="${esc(MASC_EDIT.nome)}" maxlength="20" placeholder="Dê um nome"></label>
+    ${Object.keys(MASC_OPC).map(k => `<div class="masc-grupo"><span>${MASC_ROT[k]}</span><div class="masc-opcs">${/^(pele|corCabelo|corRoupa)$/.test(k) ? cores(k) : opcs(k)}</div></div>`).join('')}
+    <button class="btn ok" style="margin-top:10px" data-act="mascoteSalvar" data-id="${esc(id)}">💾 Salvar mascote</button>`);
+}
+function dicaMascote() {
+  if (S.papel !== 'filho') return '';
+  const st = statusDia(); const p = provasFuturas()[0];
+  if (p && corProva(p) === 'vermelho') return `Prova de ${p.materia} ${faltaTxt(p)}! 📚`;
+  if (st.total && !st.liberado) return `Faltam ${st.total - st.feitas} tarefas para liberar o jogo 🎮`;
+  if (st.liberado) return 'Tudo feito! Jogo liberado 🎮';
+  return 'Toque em mim! 👋';
+}
+function modalAssistente() {
+  const m = mascoteDe(S.eu); const st = statusDia(); const fut = provasFuturas(); const c = carteira();
+  const pend = tarefasDoDia(hojeISO(), ['casa']).filter(t => !ehFeita(regDe(t, hojeISO())));
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><div class="centro">${mascoteSVG(m, 110)}</div>
+    <h2 class="centro" style="margin-top:4px">Oi, ${esc(filhoAtual().nome)}! Eu sou o ${esc(m.nome)} 👋</h2>
+    <div class="assist">
+      <div class="${st.liberado || !st.total ? 'ok' : 'bad'}">${st.total ? (st.liberado ? '🎮 Jogo liberado! Mandou bem.' : `🔒 Faltam <b>${st.total - st.feitas}</b> tarefas para liberar o jogo.`) : '🎮 Sem tarefas obrigatórias hoje.'}</div>
+      ${pend.length ? `<div>✅ Próxima tarefa: <b>${esc(pend[0].titulo)}</b>${pend[0].horario ? ' às ' + pend[0].horario : ''}</div>` : ''}
+      ${fut[0] ? `<div class="${corProva(fut[0]) === 'vermelho' ? 'bad' : ''}">📚 Próxima prova: <b>${esc(nomeProva(fut[0]))}</b> · ${faltaTxt(fut[0])}</div>` : '<div>📚 Nenhuma prova marcada.</div>'}
+      <div>💰 A receber: <b>${brl(c.saldo)}</b></div>
+    </div>
+    <div class="grid2" style="margin-top:12px"><button class="btn pri" data-act="chatAbrir">💬 Falar com o pai</button><button class="btn zap" data-act="whats">📲 WhatsApp</button>
+    <button class="btn ghost" data-act="ir" data-tela="estudo">📚 Minhas provas</button><button class="btn ghost" data-act="mascoteEditar">🎨 Personalizar</button></div>`);
+}
+function flutuantes() {
+  const nl = S.papel === 'pai' ? naoLidas() : naoLidas(S.eu);
+  let h = `<button class="flut-chat" data-act="chatAbrir" title="Chat">💬${nl ? `<span class="badge">${nl}</span>` : ''}</button>`;
+  if (S.papel === 'filho') { const m = mascoteDe(S.eu); const d = dicaMascote(); h += `<button class="flut-masc" data-act="mascote" title="${esc(m.nome)}"><span class="balao">${esc(d)}</span>${mascoteSVG(m, 62)}</button>`; }
+  if (S.chatAberto) h += `<div class="chat-flut-bg" data-act="chatFechar"></div><div class="chat-flut"><div class="linha" style="margin-bottom:6px"><b class="esp">💬 Chat</b><button class="btn zap sm" style="width:auto" data-act="whats">📲 WhatsApp</button><button class="icone-btn" data-act="chatFechar">✕</button></div>${telaChat()}</div>`;
+  return h;
+}
+
+/* ---------- WHATSAPP: notas e prints direto para o WhatsApp ---------- */
+const numZap = n => { n = String(n || '').replace(/\D/g, ''); if (!n) return ''; return n.length <= 11 ? '55' + n : n; };
+function modalWhats() {
+  const f = filhoAtual(); const meu = S.papel === 'pai' ? numZap(S.config.whatsapp_pai) : numZap(f.whatsapp);
+  const pai = numZap(S.config.whatsapp_pai);
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>📲 Enviar pelo WhatsApp</h2>
+    <p class="mut peq">Escreva uma nota e/ou anexe um print ou foto.</p>
+    <label class="campo"><span>Nota</span><textarea id="zapTxt" rows="4" placeholder="Ex.: matéria da prova de quinta: capítulos 3 e 4"></textarea></label>
+    <label class="campo"><span>Print ou foto (opcional)</span><input type="file" id="zapArq" accept="image/*,application/pdf"></label>
+    <div class="grid2">${S.papel === 'filho' ? `<button class="btn zap" data-act="whatsEnviar" data-para="eu" ${meu ? '' : 'disabled'}>Para o MEU WhatsApp</button>` : ''}
+    ${S.papel === 'filho' ? `<button class="btn zap" data-act="whatsEnviar" data-para="pai" ${pai ? '' : 'disabled'}>Para o Pai</button>` : `<button class="btn zap" data-act="whatsEnviar" data-para="filho" ${numZap(f.whatsapp) ? '' : 'disabled'}>Para ${esc(f.nome)}</button>`}</div>
+    ${S.papel === 'filho' && !meu ? '<p class="mut peq">Para usar "Meu WhatsApp", coloque seu número em Perfil → Editar perfil.</p>' : ''}
+    <p class="mut peq">Com print/foto, o celular abre a lista de apps: escolha <b>WhatsApp</b> e o contato.</p>`);
+}
+async function enviarWhats(para) {
+  const txt = ($('#zapTxt').value || '').trim(); const arq = $('#zapArq').files[0];
+  const num = para === 'pai' ? numZap(S.config.whatsapp_pai) : para === 'filho' ? numZap(filhoAtual().whatsapp) : numZap(S.papel === 'pai' ? S.config.whatsapp_pai : filhoAtual().whatsapp);
+  const corpo = (txt || (arq ? '📎 Segue o arquivo' : '')) + `\n\n— enviado pelo TáFeito`;
+  if (arq && navigator.canShare && navigator.canShare({ files: [arq] })) {
+    try { await navigator.share({ files: [arq], text: corpo }); fecharModais(); return; } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  if (!num) return toast('Número de WhatsApp não cadastrado.', 'bad');
+  if (arq) toast('Neste aparelho não dá para anexar direto: o WhatsApp vai abrir com a nota; anexe o print pelo clipe 📎.', '');
+  window.open(`https://wa.me/${num}?text=${encodeURIComponent(corpo)}`, '_blank'); fecharModais();
+}
+
+/* ---------- CONECTORES (Notion) ---------- */
+function modalConectores() {
+  const tok = lsGet('mok_notion_token');
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>🔌 Conectores</h2>
+    <p class="mut peq">Traga informações de outros apps para o TáFeito. Tudo cai no formato do app (calendário de provas) e você confere antes de salvar.</p>
+    <div class="card"><h3>📓 Notion</h3>
+    ${tok ? `<p class="mut peq">Conectado neste aparelho. Escolha a base de dados para importar:</p><div id="notionBases" class="mut peq">Buscando…</div>
+      <button class="btn ghost sm" style="margin-top:8px" data-act="notionSair">Desconectar Notion</button>`
+    : `<ol class="peq passos"><li>Abra <a href="https://www.notion.so/profile/integrations" target="_blank" rel="noopener">notion.so → Integrações</a> e crie uma <b>integração interna</b> chamada TáFeito.</li>
+      <li>Copie o <b>token</b> (começa com <code>ntn_</code>).</li><li>No Notion, abra a página/base com suas provas → <b>⋯ → Conexões → TáFeito</b>.</li><li>Cole o token aqui:</li></ol>
+      <input id="notionTok" class="inp" placeholder="ntn_..." autocomplete="off"><button class="btn pri" style="margin-top:8px" data-act="notionSalvarToken">Conectar Notion</button>
+      <p class="mut peq">O token fica só neste aparelho.</p>`}</div>
+    <div class="card"><h3>📥 Arquivo ou foto</h3><p class="mut peq">PDF, Excel, Word, print ou foto de lista de provas.</p><button class="btn ghost" data-act="importar">Importar arquivo</button></div>`);
+  if (tok) notionBases();
+}
+async function chamarNotion(corpo) {
+  if (S.modo !== 'online') throw new Error('O Notion só funciona no modo online (Supabase).');
+  const { data, error } = await DB.sb.functions.invoke('tafeito-notion', { body: { token: lsGet('mok_notion_token'), ...corpo } });
+  if (error) { let m = error.message; try { const j = await error.context.json(); m = j.erro || m; } catch { } if (/404|not found|Failed to send/i.test(m)) m = 'Conector ainda não ligado no servidor (falta a função tafeito-notion no Supabase).'; throw new Error(m); }
+  if (data && data.erro) throw new Error(data.erro); return data;
+}
+async function notionBases() {
+  const el = $('#notionBases'); if (!el) return;
+  try {
+    const { bases } = await chamarNotion({ acao: 'bases' });
+    el.innerHTML = bases.length ? bases.map(b => `<button class="btn ghost sm" style="margin:4px 0" data-act="notionImportar" data-id="${esc(b.id)}" data-nome="${esc(b.nome)}">📄 ${esc(b.nome)}</button>`).join('')
+      : 'Nenhuma base compartilhada com a integração. No Notion: ⋯ → Conexões → TáFeito.';
+  } catch (e) { el.innerHTML = '❌ ' + esc(msgErro(e)); }
+}
+async function notionImportar(id, nome) {
+  carregando(true, `Lendo "${nome}" no Notion…`);
+  try {
+    const { itens } = await chamarNotion({ acao: 'linhas', base: id }); carregando(false);
+    IMPORT = itens.filter(x => x.titulo).map(x => ({ id: uid(), materia: x.titulo.slice(0, 80), instituicao: (x.instituicao || '').slice(0, 80), data: x.data || '', horario: x.horario || '08:00', site: /^https?:/.test(x.site) ? x.site : '', ok: true }));
+    if (!IMPORT.length) return toast('Essa base não tem linhas com título.', 'bad');
+    fecharModais(); modalRevisao();
+  } catch (e) { carregando(false); toast(msgErro(e), 'bad'); }
+}
+
+/* ---------- IMPORTAR PROVAS: lê foto, PDF, Excel, Word ou texto ---------- */
+const LIB = new URL('lib/leitor/', location.href).href;
+const scriptsCarregados = {};
+function carregarScript(arq) {
+  return scriptsCarregados[arq] = scriptsCarregados[arq] || new Promise((ok, erro) => {
+    const el = document.createElement('script'); el.src = LIB + arq; el.onload = ok; el.onerror = () => erro(new Error('Não consegui carregar o leitor. Verifique a internet.'));
+    document.head.appendChild(el);
+  });
+}
+function progressoImport(txt) { const el = $('#impStatus'); if (el) el.innerHTML = `<div class="spin" style="width:22px;height:22px;border-width:3px"></div><span>${esc(txt)}</span>`; }
+async function ocr(img) {
+  await carregarScript('tesseract.min.js');
+  const w = await Tesseract.createWorker('por', 1, { workerPath: LIB + 'worker.min.js', corePath: LIB + 'core', langPath: LIB + 'lang',
+    logger: m => { if (m.status === 'recognizing text') progressoImport(`Lendo a imagem… ${Math.round(m.progress * 100)}%`); } });
+  try { const { data } = await w.recognize(img); return data.text || ''; } finally { await w.terminate(); }
+}
+async function lerArquivo(arq) {
+  const nome = (arq.name || '').toLowerCase(); const tipo = arq.type || '';
+  if (tipo.startsWith('image/') || /\.(png|jpe?g|webp|bmp|gif)$/.test(nome)) {
+    if (/heic|heif/.test(tipo + nome)) throw new Error('Foto HEIC (iPhone) não abre no navegador. Tire um print da foto e envie o print.');
+    progressoImport('Lendo a imagem (pode levar até 1 minuto na primeira vez)…'); return { text: await ocr(arq) };
+  }
+  if (tipo === 'application/pdf' || nome.endsWith('.pdf')) {
+    progressoImport('Lendo o PDF…'); await carregarScript('pdf.min.js');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = LIB + 'pdf.worker.min.js';
+    const pdf = await pdfjsLib.getDocument({ data: await arq.arrayBuffer() }).promise; let linhas = [];
+    for (let i = 1; i <= Math.min(pdf.numPages, 30); i++) {
+      const pg = await pdf.getPage(i); const tc = await pg.getTextContent(); const porY = {};
+      tc.items.forEach(it => { const y = Math.round(it.transform[5]); (porY[y] = porY[y] || []).push(it); });
+      Object.keys(porY).sort((a, b) => b - a).forEach(y => linhas.push(porY[y].sort((a, b) => a.transform[4] - b.transform[4]).map(it => it.str).join('\t')));
+    }
+    if (linhas.join('').replace(/\s/g, '').length < 15) { // PDF escaneado: lê como imagem
+      linhas = [];
+      for (let i = 1; i <= Math.min(pdf.numPages, 5); i++) {
+        progressoImport(`PDF escaneado: lendo página ${i}…`);
+        const pg = await pdf.getPage(i); const vp = pg.getViewport({ scale: 2 }); const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
+        await pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise; linhas.push(await ocr(c));
+      }
+    }
+    return { text: linhas.join('\n') };
+  }
+  if (/\.(xlsx|xlsm|xls|ods|csv)$/.test(nome) || /spreadsheet|excel|csv/.test(tipo)) {
+    progressoImport('Lendo a planilha…'); await carregarScript('xlsx.full.min.js');
+    const wb = XLSX.read(await arq.arrayBuffer(), { type: 'array', cellDates: true });
+    const rows = []; wb.SheetNames.forEach(n => XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: false, dateNF: 'dd/mm/yyyy', defval: '' }).forEach(r => { const l = r.map(x => String(x).trim()); if (l.some(Boolean)) rows.push(l); }));
+    return { rows };
+  }
+  if (nome.endsWith('.docx') || /wordprocessingml/.test(tipo)) {
+    progressoImport('Lendo o documento Word…'); await carregarScript('mammoth.browser.min.js');
+    const r = await mammoth.extractRawText({ arrayBuffer: await arq.arrayBuffer() }); return { text: r.value };
+  }
+  const txt = await arq.text();
+  if ((txt.match(/[\u0000-\u0008\u000e-\u001f�]/g) || []).length > txt.length * 0.05) throw new Error('Não consegui ler esse formato. Envie como foto/print, PDF, Excel, Word ou texto.');
+  return { text: txt.replace(/<[^>]+>/g, ' ') };
+}
+
+const MES_N = { jan: 1, fev: 2, mar: 3, abr: 4, mai: 5, jun: 6, jul: 7, ago: 8, set: 9, out: 10, nov: 11, dez: 12 };
+const CAB = { num: /^(n[ºo°.]?|#|item|ordem)$/i, nome: /^(nome( d[ao] (prova|exame|vestibular))?|provas?|mat[eé]rias?|disciplinas?|exames?|avalia[cç](ão|oes|ões)|vestibulares?|concursos?|eventos?|t[ií]tulo)$/i, inst: /^(universidades?|institui[cç](ão|ões)|escolas?|bancas?|[oó]rg[aã]os?|organizador(a|es)?|faculdades?|col[eé]gios?|local)$/i, data: /^(data|dia|quando|data da prova)$/i, hora: /^(hor[aá]rio|hora|in[ií]cio)$/i };
+const ehCab = c => Object.values(CAB).some(r => r.test(c.trim())) && c.trim().split(/\s+/).length <= 4;
+function iso(d, m, y) {
+  if (y < 100) y += 2000; const dt = new Date(y, m - 1, d);
+  return dt.getMonth() === m - 1 && d >= 1 && y >= 2000 && y <= 2100 ? `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` : null;
+}
+function acharData(s) {
+  let m;
+  if ((m = s.match(/\b(\d{4})-(\d{2})-(\d{2})\b/))) return { v: iso(+m[3], +m[2], +m[1]), t: m[0] };
+  if ((m = s.match(/\b(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})\b/))) return { v: iso(+m[1], +m[2], +m[3]), t: m[0] };
+  if ((m = s.match(/\b(\d{1,2})\s*(?:de\s+)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-zç]*\.?(?:\s*(?:de\s+)?(\d{4}))?/i))) {
+    const mes = MES_N[m[2].toLowerCase()]; let y = m[3] ? +m[3] : new Date().getFullYear(); let v = iso(+m[1], mes, y);
+    if (!m[3] && v && v < hojeISO()) v = iso(+m[1], mes, y + 1); return { v, t: m[0] };
+  }
+  if ((m = s.match(/\b(\d{1,2})\/(\d{1,2})\b/))) { const y = new Date().getFullYear(); let v = iso(+m[1], +m[2], y); if (v && v < hojeISO()) v = iso(+m[1], +m[2], y + 1); return { v, t: m[0] }; }
+  return { v: null, t: '' };
+}
+function acharHora(s) {
+  const m = s.match(/\b([01]?\d|2[0-3])\s*(?::|h)\s*([0-5]\d)?\s*(?:min)?\b/i);
+  return m ? { v: `${m[1].padStart(2, '0')}:${m[2] || '00'}`, t: m[0] } : { v: '', t: '' };
+}
+function linhasParaTabela(linhas) {
+  const sep = linhas.filter(l => /\t|;|\s\|\s/.test(l)).length;
+  if (sep >= 2 && sep >= linhas.length * 0.4) return linhas.map(l => l.split(/\t|;|\s\|\s/).map(x => x.trim()).filter(x => x !== ''));
+  // tabela "em pé" (cada célula numa linha, como quando se copia de um site)
+  const i0 = linhas.findIndex(ehCab);
+  if (i0 >= 0) {
+    let n = 0; while (i0 + n < linhas.length && ehCab(linhas[i0 + n])) n++;
+    if (n >= 2) {
+      const cab = linhas.slice(i0, i0 + n), resto = linhas.slice(i0 + n), rows = [cab];
+      if (CAB.num.test(cab[0].trim())) {
+        let atual = null, prox = 1;
+        for (const l of resto) { if (/^\d{1,3}$/.test(l) && +l === prox) { if (atual) rows.push(atual); atual = [l]; prox++; } else if (atual) atual.push(l); }
+        if (atual) rows.push(atual);
+      } else for (let i = 0; i < resto.length; i += n) rows.push(resto.slice(i, i + n));
+      return rows;
+    }
+  }
+  return linhas.map(l => [l]);
+}
+function interpretarProvas({ text, rows }) {
+  if (!rows) rows = linhasParaTabela(String(text || '').split(/\r?\n/).map(l => l.replace(/\s+/g, ' ').replace(/^[•\-–*·]+\s*/, '').trim()).filter(Boolean));
+  let col = {};
+  const hi = rows.findIndex(r => r.length >= 2 && r.filter(ehCab).length >= 2);
+  if (hi >= 0) { rows[hi].forEach((c, i) => { for (const k of ['num', 'data', 'hora', 'inst', 'nome']) if (col[k] === undefined && CAB[k].test(c.trim())) { col[k] = i; break; } }); rows = rows.slice(hi + 1); }
+  const itens = [], vistos = new Set();
+  for (const r of rows) {
+    const tudo = r.join(' '); const d = acharData(tudo); const h = acharHora(tudo.replace(d.t, ' '));
+    let nome = col.nome !== undefined ? r[col.nome] : '', inst = col.inst !== undefined ? r[col.inst] : '';
+    let data = col.data !== undefined ? (acharData(r[col.data] || '').v || d.v) : d.v;
+    const hora = col.hora !== undefined ? (acharHora(r[col.hora] || '').v || h.v) : h.v;
+    if (!nome) {
+      const livres = r.map((c, i) => i).filter(i => i !== col.num && i !== col.data && i !== col.hora && i !== col.inst)
+        .map(i => r[i].replace(d.t, ' ').replace(h.t, ' ').replace(/^\s*\d{1,3}\s*[.)\-–:]\s*/, '').replace(/^\d{1,3}\s+(?=\D)/, '').replace(/\s+/g, ' ').trim())
+        .filter(c => c && !/^\d{1,3}$/.test(c) && !ehCab(c));
+      nome = livres[0] || ''; if (!inst && livres[1]) inst = livres[1];
+      const m = nome.match(/^(.*?)\s*[\(\[]([^)\]]{2,30})[\)\]]\s*$/) || nome.match(/^(.*?)\s+[–\-|]\s+(.{2,30})$/);
+      if (m && !inst) { nome = m[1]; inst = m[2]; }
+    }
+    nome = (nome || '').replace(/\s+/g, ' ').replace(/[:\-–,]+$/, '').trim(); inst = (inst || '').trim();
+    if (nome.length < 2 || nome.length > 80 || ehCab(nome) || /^[\W\d]+$/.test(nome)) continue;
+    const k = (nome + '|' + inst + '|' + (data || '')).toLowerCase(); if (vistos.has(k)) continue; vistos.add(k);
+    itens.push({ id: uid(), materia: nome, instituicao: inst, data: data || '', horario: hora || '08:00', ok: true });
+  }
+  return itens;
+}
+
+let IMPORT = [];
+function modalImportar() {
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>📥 Importar provas</h2>
+    <p class="mut peq">Envie uma <b>foto ou print</b> da lista, um <b>PDF</b>, uma planilha <b>Excel</b>, um <b>Word</b> ou um texto. O app lê e organiza tudo. Você confere antes de salvar.</p>
+    <label class="dropzone grande-zona" id="zonaImp"><input type="file" id="arqImp" hidden><span style="font-size:2.2rem">📄</span><div><b>Toque para escolher o arquivo</b><br><span class="peq">ou arraste aqui · também dá para colar um print (Ctrl+V)</span></div></label>
+    <div id="impStatus" class="linha mut peq" style="min-height:26px;margin:8px 0"></div>
+    <label class="campo"><span>…ou cole o texto da lista aqui</span><textarea id="txtImp" rows="5" placeholder="Ex.:&#10;ENEM 2027 - INEP - 07/11/2027 13:00&#10;FUVEST 2028 (USP)"></textarea></label>
+    <button class="btn pri" data-act="lerTextoImp">Ler texto</button>`);
+  const inp = $('#arqImp'); inp.onchange = () => inp.files[0] && processarImport(inp.files[0]);
+}
+async function processarImport(arq) {
+  try {
+    const r = await lerArquivo(arq); const itens = interpretarProvas(r);
+    if (!itens.length) { $('#impStatus').innerHTML = '⚠️ Não encontrei provas nesse arquivo. Tente uma foto mais nítida ou cole o texto.'; return; }
+    IMPORT = itens; fecharModais(); modalRevisao();
+  } catch (e) { console.warn(e); const el = $('#impStatus'); if (el) el.innerHTML = '❌ ' + esc(msgErro(e)); else toast(msgErro(e), 'bad'); }
+}
+function modalRevisao() {
+  const comData = IMPORT.filter(i => i.data).length;
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>🔎 Confira as provas</h2>
+    <p class="mut peq">Encontrei <b>${IMPORT.length}</b> provas: <b>${comData}</b> com data e <b>${IMPORT.length - comData}</b> sem data. Ajuste o que precisar. As sem data ficam na lista "Sem data definida" até você colocar a data.</p>
+    <form data-form="salvarImport"><div class="rev-lista">${IMPORT.map((it, i) => `<div class="rev ${it.data ? '' : 'sem'}">
+      <label class="rev-ok"><input type="checkbox" name="ok${i}" ${it.ok ? 'checked' : ''}></label>
+      <div class="rev-campos"><input class="inp" name="m${i}" value="${esc(it.materia)}" maxlength="80" placeholder="Prova">
+      <div class="rev-linha"><input class="inp" name="i${i}" value="${esc(it.instituicao)}" maxlength="80" placeholder="Universidade">
+      <input class="inp" type="date" name="d${i}" value="${esc(it.data)}"><input class="inp" type="time" name="h${i}" value="${esc(it.horario)}"></div></div></div>`).join('')}</div>
+    <button class="btn ok" style="margin-top:10px">💾 Salvar no calendário</button></form>`);
+}
+async function salvarImport(f) {
+  const itens = IMPORT.map((it, i) => ({ id: it.id, materia: f['m' + i].value.trim(), instituicao: f['i' + i].value.trim(), data: f['d' + i].value || '', horario: f['h' + i].value || '08:00', ok: f['ok' + i].checked }))
+    .filter(it => it.ok && it.materia).map(it => ({ ...it, site: IMPORT.find(x => x.id === it.id)?.site || siteDaProva(it) }));
+  if (!itens.length) return toast('Nenhuma prova marcada.', 'bad');
+  carregando(true, 'Salvando provas…');
+  try {
+    let n;
+    if (S.modo === 'online') n = await DB.rpc('mok_importar_provas', { p_filho: fid(), p_itens: itens.map(({ ok, ...x }) => x) });
+    else { for (const it of itens) await DB.salvar('provas', { id: it.id, filho_id: fid(), materia: it.materia, instituicao: it.instituicao, site: it.site || '', conteudo: '', data: it.data || null, horario: it.horario, criado_por: S.papel === 'pai' ? 'pai' : S.eu, criado_em: agoraISO() }); n = itens.length; }
+    S.dados.provas = await DB.listar('provas'); S.dados.provas.forEach(p => S.vistos.prv && (S.vistos.prv[p.id] = p.materia + p.data + p.horario));
+    const prim = itens.filter(i => i.data).map(i => i.data).sort()[0]; if (prim) S.calMes = prim.slice(0, 7);
+    IMPORT = []; carregando(false); fecharModais(); S.tela = 'estudo'; render(); confete(); toast(`📥 ${n} provas salvas no calendário!`, 'ok');
+  } catch (e) { carregando(false); toast(msgErro(e), 'bad'); }
+}
+document.addEventListener('dragover', e => { if (e.target.closest && e.target.closest('#zonaImp')) { e.preventDefault(); e.target.closest('#zonaImp').classList.add('arrastando'); } });
+document.addEventListener('dragleave', e => { const z = e.target.closest && e.target.closest('#zonaImp'); if (z) z.classList.remove('arrastando'); });
+document.addEventListener('drop', e => { const z = e.target.closest && e.target.closest('#zonaImp'); if (!z) return; e.preventDefault(); z.classList.remove('arrastando'); const a = e.dataTransfer.files[0]; if (a) processarImport(a); });
+document.addEventListener('paste', e => { if (!$('#zonaImp')) return; const a = [...(e.clipboardData?.files || [])][0]; if (a) { e.preventDefault(); processarImport(a); } });
+
 /* ===================================================================
    MODAIS
    =================================================================== */
 function modal(html, cls = '') {
   const el = document.createElement('div'); el.className = 'modal-bg';
-  el.innerHTML = `<div class="modal ${cls}">${html}</div>`;
+  el.innerHTML = `<div class="modal ${cls}">${html}</div>`; emoji3d(el);
   el.addEventListener('click', e => { if (e.target === el && !cls.includes('alerta')) el.remove(); });
   $('#modais').appendChild(el); return el;
 }
@@ -942,7 +1455,7 @@ const fecharModais = () => { $('#modais').innerHTML = ''; };
 const fecharTopo = () => { const l = $('#modais').lastElementChild; if (l) l.remove(); };
 function toast(txt, tipo = '') {
   const el = document.createElement('div'); el.className = 'toast ' + tipo; el.textContent = txt;
-  $('#toasts').appendChild(el); setTimeout(() => el.remove(), 3200);
+  $('#toasts').appendChild(el); emoji3d(el); setTimeout(() => el.remove(), 3200);
 }
 function confete() {
   const em = ['🎉', '⭐', '✨', '🏆', '💪', '✅'];
@@ -1015,6 +1528,7 @@ function formFilho(f) {
     <label class="campo"><span>Nome</span><input name="nome" value="${esc(f.nome)}" required></label>
     <div class="grid2"><label class="campo"><span>💻 Horas de computador</span><input type="number" name="horas_pc" min="0" step="0.5" value="${num(f.horas_pc)}"></label>
     <label class="campo"><span>📱 Horas de celular</span><input type="number" name="horas_cel" min="0" step="0.5" value="${num(f.horas_cel)}"></label></div>
+    <label class="campo"><span>📲 WhatsApp do filho (para o botão de WhatsApp)</span><input name="whatsapp" inputmode="tel" value="${esc(f.whatsapp || '')}" placeholder="85 99999-9999"></label>
     <label class="campo"><span>Prêmio extra do dia (opcional)</span><input name="premio_extra" value="${esc(f.premio_extra)}" placeholder="Ex.: sobremesa liberada"></label>
     <label class="check"><input type="checkbox" name="exigir_todas" ${f.exigir_todas !== false ? 'checked' : ''}> 🎮 Só jogar depois de concluir TODAS as tarefas do dia (inclusive opcionais e trabalhos)</label>
     <label class="check"><input type="checkbox" name="exigir_aprovacao" ${f.exigir_aprovacao ? 'checked' : ''}> Só liberar depois que eu aprovar as fotos</label>
@@ -1051,7 +1565,7 @@ function verificarPedidosPai() {
 const acoes = {
   fechar: () => fecharTopo(),
   ir: d => { S.tela = d.tela; window.scrollTo(0, 0); render(); },
-  selFilho: d => { S.filhoSel = d.id; lsSet('mok_filho_sel', d.id); render(); },
+  selFilho: d => { if (S.filhoSel === d.id) return modalPerfil(d.id); S.filhoSel = d.id; lsSet('mok_filho_sel', d.id); render(); },
   modoDemo: () => { localStorage.setItem('mok_modo', 'demo'); location.reload(); },
   sairDemo: () => { localStorage.removeItem('mok_modo'); localStorage.removeItem('mok_demo_papel'); location.reload(); },
   trocarConexao: () => { localStorage.removeItem('mok_conn'); location.reload(); },
@@ -1220,6 +1734,28 @@ const acoes = {
     } catch (e) { carregando(false); toast(msgErro(e), 'bad'); }
   },
   calMes: d => { const [y, m] = S.calMes.split('-').map(Number); const n = new Date(y, m - 1 + Number(d.n), 1); S.calMes = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`; render(); },
+  importar: () => modalImportar(),
+  abrirSite: d => window.open(d.url, '_blank', 'noopener'),
+  conectores: () => modalConectores(),
+  notionSalvarToken: () => { const t = $('#notionTok').value.trim(); if (!/^(ntn_|secret_)/.test(t)) return toast('O token começa com ntn_ ou secret_.', 'bad'); lsSet('mok_notion_token', t); toast('Token salvo neste aparelho ✅', 'ok'); notionBases(); },
+  notionSair: () => { localStorage.removeItem('mok_notion_token'); fecharModais(); modalConectores(); },
+  notionImportar: d => notionImportar(d.id, d.nome),
+  meuPerfil: () => modalPerfil(S.papel === 'pai' ? 'pai' : S.eu),
+  perfilFilho: d => modalPerfil(d.id),
+  trocarFoto: d => escolherFotoPerfil(d.id),
+  removerFoto: d => salvarFotoPerfil(d.id, ''),
+  mascoteEditar: d => modalMascote(d.id || S.eu),
+  mascoteOpc: (d, b) => { MASC_EDIT[d.k] = d.v; const box = b.closest('.modal'); box.querySelector('.masc-preview').innerHTML = mascoteSVG(MASC_EDIT, 150); box.querySelectorAll(`[data-k="${d.k}"]`).forEach(x => x.classList.toggle('on', x.dataset.v === d.v)); },
+  mascoteSalvar: async d => {
+    const nm = $('#mascNome'); MASC_EDIT.nome = (nm && nm.value.trim().slice(0, 20)) || 'Bolt';
+    try { await salvarPerfil(d.id, { mascote: { ...MASC_EDIT } }); fecharModais(); toast(`🎨 ${MASC_EDIT.nome} está pronto!`, 'ok'); } catch (e) { toast(msgErro(e), 'bad'); }
+  },
+  mascote: () => modalAssistente(),
+  chatAbrir: () => { S.chatAberto = true; render(); setTimeout(() => { const i = $('#chatTxt'); if (i && innerWidth > 700) i.focus(); }, 50); },
+  chatFechar: () => { S.chatAberto = false; render(); },
+  whats: () => modalWhats(),
+  whatsEnviar: d => enviarWhats(d.para),
+  lerTextoImp: () => { const t = $('#txtImp').value.trim(); if (!t) return toast('Cole o texto primeiro.', 'bad'); const it = interpretarProvas({ text: t }); if (!it.length) return toast('Não encontrei provas nesse texto.', 'bad'); IMPORT = it; fecharModais(); modalRevisao(); },
   calHoje: () => { S.calMes = hojeISO().slice(0, 7); render(); },
   calDia: d => { const l = S.dados.provas.filter(p => p.filho_id === fid() && p.data === d.dia); if (l.length) modalDiaProvas(d.dia, l); else formProva(null, d.dia); },
   novaProva: d => formProva(null, d.dia),
@@ -1328,7 +1864,7 @@ const forms = {
     const id = f.dataset.id; const ant = id ? S.dados.filhos.find(x => x.id === id) : null;
     let novoId = id;
     if (!ant) { novoId = f.nome.value.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '') || 'filho'; if (S.dados.filhos.some(x => x.id === novoId)) novoId += Math.floor(Math.random() * 90 + 10); }
-    const x = { ...(ant || { id: novoId, ordem: S.dados.filhos.length + 1, criado_em: agoraISO() }), nome: f.nome.value.trim(), horas_pc: num(f.horas_pc.value), horas_cel: num(f.horas_cel.value), premio_extra: f.premio_extra.value.trim(), exigir_aprovacao: f.exigir_aprovacao.checked, exigir_todas: f.exigir_todas.checked };
+    const x = { ...(ant || { id: novoId, ordem: S.dados.filhos.length + 1, criado_em: agoraISO() }), nome: f.nome.value.trim(), horas_pc: num(f.horas_pc.value), horas_cel: num(f.horas_cel.value), premio_extra: f.premio_extra.value.trim(), exigir_aprovacao: f.exigir_aprovacao.checked, exigir_todas: f.exigir_todas.checked, whatsapp: f.whatsapp.value.replace(/\D/g, '') };
     try { const s = await DB.salvar('filhos', x); const i = S.dados.filhos.findIndex(y => y.id === x.id); if (i >= 0) S.dados.filhos[i] = s || x; else S.dados.filhos.push(s || x); if (!S.filhoSel) S.filhoSel = x.id; fecharModais(); render(); toast('Salvo ✅', 'ok'); }
     catch (e) { toast(msgErro(e), 'bad'); }
   },
@@ -1360,13 +1896,25 @@ const forms = {
   },
   prova: async f => {
     const id = f.dataset.id; const ant = id ? S.dados.provas.find(p => p.id === id) : null;
-    const p = { ...(ant || { id: uid(), filho_id: fid(), criado_por: S.papel === 'pai' ? 'pai' : S.eu, criado_em: agoraISO() }), materia: f.materia.value.trim(), conteudo: f.conteudo.value.trim(), data: f.data.value, horario: f.horario.value || '08:00' };
-    if (!p.data) return toast('Escolha a data da prova.', 'bad');
+    const p = { ...(ant || { id: uid(), filho_id: fid(), criado_por: S.papel === 'pai' ? 'pai' : S.eu, criado_em: agoraISO() }), materia: f.materia.value.trim(), instituicao: f.instituicao.value.trim(), site: /^https?:\/\//.test(f.site.value.trim()) ? f.site.value.trim() : '', conteudo: f.conteudo.value.trim(), data: f.data.value || null, horario: f.horario.value || '08:00' };
     try {
       const s = await DB.salvar('provas', p); const i = S.dados.provas.findIndex(x => x.id === p.id);
       if (i >= 0) S.dados.provas[i] = s || p; else S.dados.provas.push(s || p);
       S.vistos.prv && (S.vistos.prv[p.id] = p.materia + p.data + p.horario);
-      S.calMes = p.data.slice(0, 7); fecharModais(); render(); toast(ant ? 'Prova atualizada ✅' : '📅 Prova marcada! Vou te lembrar 2 dias, 1 dia e 2 horas antes.', 'ok');
+      if (p.data) S.calMes = p.data.slice(0, 7); fecharModais(); render(); toast(ant ? 'Prova atualizada ✅' : p.data ? '📅 Prova marcada! Vou te lembrar 2 dias, 1 dia e 2 horas antes.' : '📌 Prova salva sem data.', 'ok');
+    } catch (e) { toast(msgErro(e), 'bad'); }
+  },
+  salvarImport: f => salvarImport(f),
+  whatsPai: async f => { try { await salvarPerfil('pai', { whatsapp: f.w.value }); toast('WhatsApp salvo ✅', 'ok'); } catch (e) { toast(msgErro(e), 'bad'); } },
+  perfil2: async f => {
+    const id = f.dataset.id;
+    try {
+      if (f.nome && S.papel === 'pai') {
+        if (id === 'pai') { if (S.modo === 'online') await DB.rpc('mok_registrar_pai', { p_nome: f.nome.value.trim() }); }
+        else { const x = S.dados.filhos.find(y => y.id === id); await DB.salvar('filhos', { ...x, nome: f.nome.value.trim() }); }
+      }
+      await salvarPerfil(id, { whatsapp: f.whatsapp ? f.whatsapp.value : null });
+      fecharModais(); toast('Perfil salvo ✅', 'ok');
     } catch (e) { toast(msgErro(e), 'bad'); }
   },
   trocarSenha: async f => {

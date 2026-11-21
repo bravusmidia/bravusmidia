@@ -1,7 +1,7 @@
 // TáFeito — service worker (funciona offline e mostra notificações)
-const CACHE = 'tafeito-v12';
+const CACHE = 'tafeito-v13';
 const ARQUIVOS = ['./', './index.html', './styles.css', './app.js', './config.js', './manifest.webmanifest',
-  './lib/supabase.js', './icons/icon-192.png', './icons/icon-512.png'];
+  './lib/supabase.js', './icons/icon-192.png', './icons/icon-512.png', './icons/3d/lista.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARQUIVOS)).then(() => self.skipWaiting()));

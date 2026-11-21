@@ -784,6 +784,7 @@ create or replace function public.mok_push_gatilho2() returns trigger
 language plpgsql security definer set search_path = public as $$
 declare nome text; quando text; r record;
 begin
+  if current_setting('tafeito.silencio', true) = '1' then return null; end if;
   if tg_op = 'DELETE' then r := old; else r := new; end if;
   if tg_table_name &lt;&gt; 'mok_filhos' then select f.nome into nome from mok_filhos f where f.id = r.filho_id; end if;
   if tg_table_name = 'mok_tarefas' then
@@ -807,12 +808,12 @@ begin
   elsif tg_table_name = 'mok_pagamentos' then
     perform mok_push_enviar(new.filho_id, '💸 Pagamento recebido', 'R$ ' || replace(to_char(new.valor, 'FM999990.00'), '.', ','), 'pag');
   elsif tg_table_name = 'mok_provas' then
-    quando := to_char(r.data, 'DD/MM') || ' às ' || r.horario;
+    quando := coalesce(to_char(r.data, 'DD/MM') || ' às ' || r.horario, 'data ainda não definida');
     if tg_op = 'INSERT' then
       if new.criado_por = 'pai' then perform mok_push_enviar(new.filho_id, '📚 Nova prova: ' || new.materia, quando, 'prova');
       else perform mok_push_enviar('pai', '📚 ' || coalesce(nome, 'Filho') || ' marcou prova', new.materia || ' · ' || quando, 'prova'); end if;
-      perform mok_push_enviar(new.filho_id, '📅 Prova salva: ' || new.materia, 'Vou te lembrar 2 dias, 1 dia e 2 horas antes.', 'prova');
-    elsif tg_op = 'UPDATE' and (old.materia, old.data, old.horario) is distinct from (new.materia, new.data, new.horario) then
+      perform mok_push_enviar(new.filho_id, '📅 Prova salva: ' || new.materia, case when new.data is null then 'Defina a data no app para receber os lembretes.' else 'Vou te lembrar 2 dias, 1 dia e 2 horas antes.' end, 'prova');
+    elsif tg_op = 'UPDATE' and (old.materia, old.data, old.horario, old.instituicao) is distinct from (new.materia, new.data, new.horario) then
       perform mok_push_enviar(new.filho_id, '✏️ Prova alterada: ' || new.materia, quando, 'prova');
       perform mok_push_enviar('pai', '✏️ Prova de ' || coalesce(nome, 'filho') || ' alterada', new.materia || ' · ' || quando, 'prova');
     elsif tg_op = 'DELETE' then
@@ -865,6 +866,72 @@ do $$ begin
   if exists (select 1 from cron.job where jobname = 'tafeito-provas') then perform cron.unschedule('tafeito-provas'); end if;
   perform cron.schedule('tafeito-provas', '* * * * *', 'select public.mok_push_provas()');
 end $$;
+
+-- =====================================================================
+-- v1.5: IMPORTAR PROVAS DE ARQUIVO/FOTO · PROVA SEM DATA · INSTITUIÇÃO
+-- =====================================================================
+alter table public.mok_provas alter column data drop not null;
+alter table public.mok_provas add column if not exists instituicao text not null default '';
+alter table public.mok_provas add column if not exists site text not null default '';
+
+-- salva várias provas de uma vez e manda UM aviso só (em vez de um por prova)
+create or replace function public.mok_importar_provas(p_filho text, p_itens jsonb) returns int
+language plpgsql security definer set search_path = public as $$
+declare it jsonb; n int := 0; nome text; com_data int := 0;
+begin
+  if not mok_pode_ver(p_filho) then raise exception 'Sem permissão para esse filho.'; end if;
+  if jsonb_typeof(p_itens) &lt;&gt; 'array' or jsonb_array_length(p_itens) &gt; 300 then raise exception 'Lista inválida (máx. 300).'; end if;
+  perform set_config('tafeito.silencio', '1', true);
+  for it in select * from jsonb_array_elements(p_itens) loop
+    if coalesce(trim(it-&gt;&gt;'materia'), '') = '' then continue; end if;
+    insert into mok_provas (id, filho_id, materia, instituicao, site, conteudo, data, horario)
+    values (coalesce(nullif(it-&gt;&gt;'id', ''), gen_random_uuid()::text), p_filho, left(trim(it-&gt;&gt;'materia'), 80),
+      left(coalesce(it-&gt;&gt;'instituicao', ''), 80), case when coalesce(it-&gt;&gt;'site', '') ~ '^https?://' then left(it-&gt;&gt;'site', 300) else '' end,
+      left(coalesce(it-&gt;&gt;'conteudo', ''), 500),
+      nullif(it-&gt;&gt;'data', '')::date,
+      case when coalesce(it-&gt;&gt;'horario', '') ~ '^\d{2}:\d{2}$' then it-&gt;&gt;'horario' else '08:00' end)
+    on conflict (id) do nothing;
+    if found then n := n + 1; if nullif(it-&gt;&gt;'data', '') is not null then com_data := com_data + 1; end if; end if;
+  end loop;
+  perform set_config('tafeito.silencio', '0', true);
+  select f.nome into nome from mok_filhos f where f.id = p_filho;
+  if n &gt; 0 then
+    perform mok_push_enviar(p_filho, '📥 ' || n || ' provas no calendário', com_data || ' com data · ' || (n - com_data) || ' sem data (defina no app)', 'prova');
+    if not mok_is_pai() then perform mok_push_enviar('pai', '📥 ' || coalesce(nome, 'Filho') || ' importou ' || n || ' provas', com_data || ' com data', 'prova'); end if;
+  end if;
+  return n;
+end $$;
+revoke all on function public.mok_importar_provas(text, jsonb) from public, anon;
+grant execute on function public.mok_importar_provas(text, jsonb) to authenticated;
+
+-- =====================================================================
+-- v1.6: FOTO DE PERFIL · MASCOTE PERSONALIZADO · WHATSAPP
+-- =====================================================================
+alter table public.mok_filhos add column if not exists foto text not null default '';
+alter table public.mok_filhos add column if not exists mascote jsonb not null default '{}'::jsonb;
+alter table public.mok_filhos add column if not exists whatsapp text not null default '';
+alter table public.mok_config add column if not exists foto_pai text not null default '';
+alter table public.mok_config add column if not exists whatsapp_pai text not null default '5585991225865';
+
+-- cada um altera SÓ o próprio perfil (foto, mascote, WhatsApp). O filho não mexe no do pai nem no do irmão.
+create or replace function public.mok_meu_perfil(p_foto text, p_mascote jsonb, p_whatsapp text) returns void
+language plpgsql security definer set search_path = public as $$
+declare f text := mok_meu_filho();
+begin
+  if p_foto is not null and p_foto &lt;&gt; '' and p_foto !~ '^https://[a-z0-9]+\.supabase\.co/storage/v1/object/public/mok-fotos/' then
+    raise exception 'Foto inválida.';
+  end if;
+  if p_mascote is not null and (jsonb_typeof(p_mascote) &lt;&gt; 'object' or octet_length(p_mascote::text) &gt; 3000) then raise exception 'Mascote inválido.'; end if;
+  p_whatsapp := nullif(regexp_replace(coalesce(p_whatsapp, ''), '\D', '', 'g'), '');
+  if mok_is_pai() then
+    update mok_config set foto_pai = coalesce(p_foto, foto_pai), whatsapp_pai = coalesce(p_whatsapp, whatsapp_pai) where id = 1;
+  elsif f is not null then
+    update mok_filhos set foto = coalesce(p_foto, foto), mascote = coalesce(p_mascote, mascote), whatsapp = coalesce(p_whatsapp, whatsapp) where id = f;
+  else raise exception 'Perfil não encontrado.';
+  end if;
+end $$;
+revoke all on function public.mok_meu_perfil(text, jsonb, text) from public, anon;
+grant execute on function public.mok_meu_perfil(text, jsonb, text) to authenticated;
 
 -- Pronto! Agora abra o app e crie a conta do Pai.
 </pre>

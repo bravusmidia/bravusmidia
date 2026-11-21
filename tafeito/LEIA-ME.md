@@ -51,6 +51,8 @@ Se quiser só olhar antes, abra o endereço e toque em **"Abrir modo demonstraç
 - **Área de Estudo (v1.3):** aba 📚 Estudo com calendário. O filho marca, edita e exclui as provas do ano (matéria, data e horário). A lista fica vermelha até 1 semana, amarela até 1 mês e verde com mais de 1 mês. O celular avisa 2 dias, 1 dia e 2 horas antes, mesmo com o app fechado. No app aparece um alerta que só fecha quando ele toca em **Ciente**. Cada Ciente fica gravado no banco e ninguém consegue editar ou apagar. O pai é avisado.
 - **Tempo online (v1.3):** o banco soma o tempo que o filho fica com o app aberto, usando o relógio do servidor, e guarda a última vez que ele entrou. Aparece no Painel do pai (hoje, 7 dias e total).
 - **Login e admin (v1.4):** o Pai entra com e-mail e senha e é o Administrador, o único que muda regras, tarefas, prêmios e PIN. O filho entra com PIN. Em **Mais → Minha conta** aparecem quem está logado, Trocar senha e Sair. Em **Mais → Backup** você baixa uma cópia de tudo para guardar no Drive.
+- **v1.5/1.6:** painel de números com cores em Tarefas, Work e Estudo. Importação de provas por foto, print, PDF, Excel, Word ou texto, com revisão antes de salvar. O nome da prova abre o site oficial dela. Engrenagem ⚙️ de Configurações só para o admin. Foto de perfil com ajuste (cada um edita só o seu). Mascote com nome, roupas e acessórios. Chat flutuante. Botão de WhatsApp para notas e prints. Ícones 3D (Fluent 3D, licença MIT). Logo nova.
+- **Conector Notion:** crie a função **tafeito-notion** no Supabase (copie de bravusmidia.com.br/tafeito/notion.html), deixando Verify JWT ligado. No app: Perfil/Config → 🔌 Conectores → Notion.
 - **Trocar o PIN depois:** ⚙️ do filho → Trocar PIN.
 
 Desenvolvido por Andrade
