@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '2.7.0';
+const VERSAO = '2.7.1';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -310,7 +310,7 @@ async function iniciar() {
   telaBoasVindas();
 }
 
-function logoImg(cls = '') { return `<img src="icons/icon-192.png" alt="" class="${cls}">`; }
+function logoImg(cls = '') { return `<img src="icons/icon-192.png?v=2" alt="" class="${cls}">`; }
 
 function telaErro(t, m) {
   $('#app').innerHTML = `<div class="login"><div class="card centro"><h2>${esc(t)}</h2><p class="mut">${esc(m)}</p>
@@ -2751,7 +2751,7 @@ async function notificar(titulo, corpo, tag) {
   if (document.visibilityState === 'visible') { const c = corpo || ''; toast(`${titulo}${c ? ' — ' + (c.length > 70 ? c.slice(0, 70) + '…' : c) : ''}`); }
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   if (lsGet('mok_push_ok') && ['msg', 'ped', 'reg', 'tar', 'lembrete', 'mis', 'pag', 'prova', 'ciente', 'login', 'filho', 'teste', 'central'].includes(tag) && document.visibilityState !== 'visible') return; // o push do servidor já mostra
-  const op = { body: corpo || '', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: tag ? tag + '-' + Date.now() : undefined, vibrate: [200, 100, 200], requireInteraction: true };
+  const op = { body: corpo || '', icon: 'icons/icon-192.png?v=2', badge: 'icons/icon-192.png?v=2', tag: tag ? tag + '-' + Date.now() : undefined, vibrate: [200, 100, 200], requireInteraction: true };
   try { const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (reg) await reg.showNotification(titulo, op); else new Notification(titulo, op); }
   catch { try { new Notification(titulo, op); } catch { } }
 }
