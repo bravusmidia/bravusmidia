@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '2.2.1';
+const VERSAO = '2.3.0';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -1248,7 +1248,7 @@ function animalVisual(m, tam) {
   const ch = (ACESS_CHAPEU.find(x => x[0] === m.chapeuA) || [])[1], oc = (ACESS_OCULOS.find(x => x[0] === m.oculosA) || [])[1], au = (ACESS_AURA.find(x => x[0] === m.aura) || [])[1];
   return `<div class="masc-animal sem3d mov-${mov}" style="width:${tam}px;height:${tam}px;--fundo:${esc(m.fundo || '#2f3f86')}">
     ${m.fundo ? '<span class="aura-fundo"></span>' : ''}${au ? `<span class="aura-orbita">${img3d(au)}</span>` : ''}
-    <div class="corpo-animal"><img class="bicho" src="icons/3d/${a[1]}.webp" alt="${esc(a[2])}" draggable="false">${img3d(ch, 'acc-chapeu')}${img3d(oc, 'acc-oculos')}</div><span class="sombra-animal"></span></div>`;
+    <div class="corpo-animal"><img class="bicho" src="icons/anim/${a[0]}.webp?v=1" onerror="this.onerror=null;this.src='icons/3d/${a[1]}.webp'" alt="${esc(a[2])}" draggable="false">${img3d(ch, 'acc-chapeu')}${img3d(oc, 'acc-oculos')}</div><span class="sombra-animal"></span></div>`;
 }
 /* boneco 3D (Three.js). Sem 3D no aparelho, usa o desenho. */
 function mascoteVisual(m, tam = 80) {
