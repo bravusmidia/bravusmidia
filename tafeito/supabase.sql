@@ -199,7 +199,7 @@ language plpgsql security definer set search_path = public, extensions as $$
 declare v uuid;
 begin
   if not mok_is_pai() then raise exception 'Somente o pai pode trocar o PIN.'; end if;
-  if char_length(p_pin) < 6 then raise exception 'O PIN precisa ter pelo menos 6 dígitos.'; end if;
+  if p_pin !~ '^[0-9]{4}$' then raise exception 'O PIN precisa ter 4 números.'; end if;
   select id into v from mok_perfis where filho_id = p_filho limit 1;
   if v is null then raise exception 'Esse filho ainda não tem acesso criado.'; end if;
   update auth.users set encrypted_password = extensions.crypt(p_pin, extensions.gen_salt('bf')) where id = v;
@@ -472,7 +472,7 @@ language plpgsql security definer set search_path = public as $$
 declare v uuid; fam text;
 begin
   if not mok_is_pai() then raise exception 'Somente o pai pode criar acessos.'; end if;
-  if p_pin !~ '^[0-9]{6,12}$' then raise exception 'O PIN precisa ter de 6 a 12 números.'; end if;
+  if p_pin !~ '^[0-9]{4}$' then raise exception 'O PIN precisa ter 4 números.'; end if;
   if not exists (select 1 from mok_filhos where id = p_filho) then raise exception 'Filho não encontrado.'; end if;
   select familia into fam from mok_config where id = 1;
   v := mok_criar_usuario(p_filho || '.' || fam || '@missaook.app', p_pin);

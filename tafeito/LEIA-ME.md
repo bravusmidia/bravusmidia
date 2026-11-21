@@ -26,7 +26,7 @@ Se quiser só olhar antes, abra o endereço e toque em **"Abrir modo demonstraç
 
 ## 3. Liberar o Henrique
 1. Vá em **Mais → Filhos e acessos → ⚙️ do Henrique**. Ali você também define as horas de computador e de celular do prêmio.
-2. Crie um **PIN de 6 números** e toque em **Criar acesso**.
+2. Crie um **PIN de 4 números** e toque em **Criar acesso**.
 3. Toque em **Enviar link pelo WhatsApp**. O link já vai com a conexão; ele não precisa digitar nada técnico.
 4. O Henrique abre o link no **Chrome** (no PC ou no celular), instala (⋮ → Instalar app, ou o ícone ⊕ na barra de endereço do PC), toca no nome dele e digita o PIN.
 5. Peça para ele tocar em **Mais → Ativar notificações** e **Mais → Pôr lembretes na agenda**.

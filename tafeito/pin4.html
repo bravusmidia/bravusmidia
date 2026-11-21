@@ -1,0 +1,29 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>TáFeito – PIN de 4 números</title>
+<style>body{background:#0b1020;color:#eef1fb;font-family:system-ui,sans-serif;margin:0;padding:16px}button{background:linear-gradient(135deg,#4f7cff,#7b5cff);color:#fff;border:0;border-radius:12px;padding:14px 22px;font-size:1.1rem;font-weight:700;cursor:pointer;position:sticky;top:10px}pre{background:#151d38;border:1px solid #26315a;border-radius:12px;padding:12px;white-space:pre-wrap;font-size:12px}</style></head>
+<body><h2>TáFeito: PIN de 4 números</h2><p>1) Clique em <b>Copiar tudo</b>. 2) No Supabase da conta do TáFeito: SQL Editor → New query → cole (Ctrl+V) → Run.</p>
+<button id="b">📋 Copiar tudo</button><pre id="s">create or replace function public.mok_trocar_pin(p_filho text, p_pin text) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare v uuid;
+begin
+  if not mok_is_pai() then raise exception 'Somente o pai pode trocar o PIN.'; end if;
+  if p_pin !~ '^[0-9]{4}$' then raise exception 'O PIN precisa ter 4 números.'; end if;
+  select id into v from mok_perfis where filho_id = p_filho limit 1;
+  if v is null then raise exception 'Esse filho ainda não tem acesso criado.'; end if;
+  update auth.users set encrypted_password = extensions.crypt(p_pin, extensions.gen_salt('bf')) where id = v;
+end $$;
+
+create or replace function public.mok_criar_acesso_filho(p_filho text, p_pin text) returns void
+language plpgsql security definer set search_path = public as $$
+declare v uuid; fam text;
+begin
+  if not mok_is_pai() then raise exception 'Somente o pai pode criar acessos.'; end if;
+  if p_pin !~ '^[0-9]{4}$' then raise exception 'O PIN precisa ter 4 números.'; end if;
+  if not exists (select 1 from mok_filhos where id = p_filho) then raise exception 'Filho não encontrado.'; end if;
+  select familia into fam from mok_config where id = 1;
+  v := mok_criar_usuario(p_filho || '.' || fam || '@missaook.app', p_pin);
+  delete from mok_perfis where filho_id = p_filho and id &lt;&gt; v;
+  insert into mok_perfis (id, papel, filho_id, nome) values (v, 'filho', p_filho, (select nome from mok_filhos where id = p_filho))
+  on conflict (id) do update set papel = 'filho', filho_id = excluded.filho_id, nome = excluded.nome;
+end $$;
+</pre>
+<script>document.getElementById('b').onclick=async()=>{const t=document.getElementById('s').textContent;try{await navigator.clipboard.writeText(t)}catch(e){const r=document.createRange();r.selectNodeContents(document.getElementById('s'));const s=getSelection();s.removeAllRanges();s.addRange(r);document.execCommand('copy')}document.getElementById('b').textContent='✅ Copiado! Agora cole no SQL Editor'}</script></body></html>

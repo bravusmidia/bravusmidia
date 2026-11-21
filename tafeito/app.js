@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '2.2.0';
+const VERSAO = '2.2.1';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -1876,8 +1876,8 @@ function formFilho(f) {
     <button class="btn pri" style="margin-top:6px">Salvar</button>
   </form>
   ${!novo && S.modo === 'online' ? `<div class="card" style="margin-top:14px"><h3>🔑 Acesso de ${esc(f.nome)}</h3>
-    <p class="mut peq">${tem ? 'Acesso criado. Você pode trocar o PIN.' : 'Crie um PIN de 6 números para ele entrar no app.'}</p>
-    <form data-form="${tem ? 'trocarPin' : 'criarAcesso'}" data-id="${esc(f.id)}"><input name="pin" class="inp pin" inputmode="numeric" pattern="[0-9]{6,}" minlength="6" maxlength="12" placeholder="••••••" required>
+    <p class="mut peq">${tem ? 'Acesso criado. Você pode trocar o PIN.' : 'Crie um PIN de 4 números para ele entrar no app.'}</p>
+    <form data-form="${tem ? 'trocarPin' : 'criarAcesso'}" data-id="${esc(f.id)}"><input name="pin" class="inp pin" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" placeholder="••••" required>
     <button class="btn pri" style="margin-top:8px">${tem ? 'Trocar PIN' : 'Criar acesso'}</button></form></div>` : ''}`);
 }
 
@@ -2061,10 +2061,10 @@ const acoes = {
   },
   senhaFilho: d => { const f = S.dados.filhos.find(x => x.id === d.id); if (!f) return; const tem = S.dados.perfis.some(p => p.filho_id === f.id);
     modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>🔑 ${tem ? 'Nova senha' : 'Criar senha'} de ${esc(f.nome)}</h2>
-    <p class="mut peq">A senha é um PIN de 6 a 12 números. A senha antiga deixa de funcionar na hora.</p>
+    <p class="mut peq">A senha é um PIN de 4 números. A senha antiga deixa de funcionar na hora.</p>
     <form data-form="senhaFilho" data-id="${esc(f.id)}">
-    <label class="campo"><span>Nova senha (PIN)</span><input name="pin" class="pin" type="password" inputmode="numeric" pattern="[0-9]{6,12}" minlength="6" maxlength="12" required autocomplete="new-password"></label>
-    <label class="campo"><span>Repita a senha</span><input name="pin2" class="pin" type="password" inputmode="numeric" pattern="[0-9]{6,12}" minlength="6" maxlength="12" required autocomplete="new-password"></label>
+    <label class="campo"><span>Nova senha (PIN)</span><input name="pin" class="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" required autocomplete="new-password"></label>
+    <label class="campo"><span>Repita a senha</span><input name="pin2" class="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" required autocomplete="new-password"></label>
     <label class="check"><input type="checkbox" onchange="this.form.pin.type=this.form.pin2.type=this.checked?'text':'password'"> Mostrar senha</label>
     <button class="btn pri">Salvar senha</button></form>`); },
   trocarSenha: () => modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>🔒 Trocar senha do Pai</h2><form data-form="trocarSenha">
@@ -2243,7 +2243,7 @@ const forms = {
   },
   criarAcesso: async f => {
     const filho = f.dataset.id; const pin = f.pin.value.trim();
-    if (!/^\d{6,12}$/.test(pin)) return toast('Use de 6 a 12 números.', 'bad');
+    if (!/^\d{4}$/.test(pin)) return toast('Use 4 números.', 'bad');
     carregando(true, 'Criando acesso…');
     try {
       await DB.rpc('mok_criar_acesso_filho', { p_filho: filho, p_pin: pin });
@@ -2253,7 +2253,7 @@ const forms = {
   },
   senhaFilho: async f => {
     const pin = f.pin.value.trim();
-    if (!/^\d{6,12}$/.test(pin)) return toast('Use de 6 a 12 números.', 'bad');
+    if (!/^\d{4}$/.test(pin)) return toast('Use 4 números.', 'bad');
     if (pin !== f.pin2.value.trim()) return toast('As senhas não são iguais.', 'bad');
     carregando(true, 'Salvando senha…');
     try {
@@ -2263,7 +2263,7 @@ const forms = {
     } catch (e) { carregando(false); toast(msgErro(e), 'bad'); }
   },
   trocarPin: async f => {
-    const pin = f.pin.value.trim(); if (!/^\d{6,}$/.test(pin)) return toast('Use pelo menos 6 números.', 'bad');
+    const pin = f.pin.value.trim(); if (!/^\d{4}$/.test(pin)) return toast('Use 4 números.', 'bad');
     try { await DB.rpc('mok_criar_acesso_filho', { p_filho: f.dataset.id, p_pin: pin }); fecharModais(); toast('PIN trocado ✅', 'ok'); } catch (e) { toast(msgErro(e), 'bad'); }
   },
   reprovar: async f => {
