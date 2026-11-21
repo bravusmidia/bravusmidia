@@ -371,3 +371,7 @@ main{padding-bottom:180px!important}
 .img-item .num{position:absolute;left:5px;top:5px;background:rgba(0,0,0,.72);color:#fff;font-weight:900;font-size:.75rem;padding:2px 7px;border-radius:99px}
 .img-item .nf{position:absolute;right:5px;top:5px;background:rgba(79,124,255,.85);color:#fff;font-weight:800;font-size:.65rem;padding:2px 6px;border-radius:99px}
 .img-acoes{position:absolute;right:4px;bottom:4px;display:flex;gap:4px}.img-acoes .icone-btn{width:30px;height:30px;background:rgba(0,0,0,.6)}
+
+canvas.masc3d{display:block;margin:0 auto;pointer-events:none}
+.flut-masc canvas.masc3d{filter:drop-shadow(0 10px 12px rgba(0,0,0,.45))}
+.flut-masc .balao{left:66px}

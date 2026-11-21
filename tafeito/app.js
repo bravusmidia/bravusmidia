@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '1.9.0';
+const VERSAO = '2.0.0';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -1226,6 +1226,12 @@ function mascoteSVG(m, tam = 80, animar = true) {
     </g></g>
   </svg>`;
 }
+/* boneco 3D (Three.js). Sem 3D no aparelho, usa o desenho. */
+function mascoteVisual(m, tam = 80) {
+  if (window.Masc3D && window.Masc3D.ok === false) return mascoteSVG(m, tam);
+  return `<canvas class="masc3d sem3d" data-m="${esc(JSON.stringify({ ...MASC_PADRAO, ...m }))}" style="width:${tam}px;height:${Math.round(tam * 1.3)}px"></canvas>`;
+}
+import(new URL('lib/three/mascote3d.js?v=1', location.href).href).then(() => { if (!window.Masc3D.ok) render(); }).catch(() => { window.Masc3D = { ok: false }; render(); });
 /* fala do mascote (voz do próprio celular) */
 function falar(txt) {
   try {
@@ -1262,7 +1268,7 @@ function modalMascote(id) {
   const cores = k => MASC_OPC[k].map(v => `<button type="button" class="cor-opc ${MASC_EDIT[k] === v ? 'on' : ''}" style="background:${v}" data-act="mascoteOpc" data-k="${k}" data-v="${v}"></button>`).join('') + `<label class="cor-livre" title="Escolher qualquer cor"><input type="color" value="${esc(MASC_EDIT[k])}" data-change="mascoteCor" data-k="${k}">🎨</label>`;
   const opcs = k => MASC_OPC[k].map(v => `<button type="button" class="opc ${MASC_EDIT[k] === v ? 'on' : ''}" data-act="mascoteOpc" data-k="${k}" data-v="${v}">${MASC_NOMES[v] || v}</button>`).join('');
   modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>🎨 Meu mascote</h2>
-    <div class="masc-preview">${mascoteSVG(MASC_EDIT, 150)}</div>
+    <div class="masc-preview">${mascoteVisual(MASC_EDIT, 190)}</div>
     <label class="campo"><span>Nome do mascote</span><input id="mascNome" value="${esc(MASC_EDIT.nome)}" maxlength="20" placeholder="Dê um nome"></label>
     <label class="check"><input type="checkbox" id="mascVoz" ${MASC_EDIT.voz !== false ? 'checked' : ''}> 🔊 Falar comigo (bom dia e tarefas)</label>
     <button type="button" class="btn ghost sm" style="margin:6px 0 12px" data-act="mascoteTestarVoz">▶️ Ouvir o mascote</button>
@@ -1281,7 +1287,7 @@ function dicaMascote() {
 function modalAssistente() {
   const m = mascoteDe(S.eu); const st = statusDia(); const fut = provasFuturas(); const c = carteira();
   const pend = tarefasDoDia(hojeISO(), ['casa']).filter(t => !ehFeita(regDe(t, hojeISO())));
-  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><div class="centro masc-palco">${mascoteSVG(m, 120)}</div>
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><div class="centro masc-palco">${mascoteVisual(m, 150)}</div>
     <h2 class="centro" style="margin-top:4px">${saudacao()}, ${esc(filhoAtual().nome)}! Eu sou o ${esc(m.nome)} 👋</h2>
     <div class="fala">${esc(textoMascote())}</div><button class="btn ghost sm" style="margin-top:6px" data-act="mascoteFalar">🔊 Ouvir de novo</button>
     <div class="assist">
@@ -1297,7 +1303,7 @@ function flutuantes() {
   const nl = S.papel === 'pai' ? naoLidas() : naoLidas(S.eu);
   const pos = k => { const p = lsGet('mok_pos_' + k); return p ? `style="left:${Math.min(p.x, innerWidth - 60)}px;top:${Math.min(p.y, innerHeight - 70)}px;right:auto;bottom:auto"` : ''; };
   let h = `<button class="flut-chat" data-arrastar="chat" ${pos('chat')} data-act="chatAbrir" title="Chat (arraste para mover)">💬${nl ? `<span class="badge">${nl}</span>` : ''}</button>`;
-  if (S.papel === 'filho') { const m = mascoteDe(S.eu); const d = dicaMascote(); h += `<button class="flut-masc" data-arrastar="masc" ${pos('masc')} data-act="mascote" title="${esc(m.nome)} (arraste para mover)"><span class="balao">${esc(d)}</span>${mascoteSVG(m, 66)}</button>`; }
+  if (S.papel === 'filho') { const m = mascoteDe(S.eu); const d = dicaMascote(); h += `<button class="flut-masc" data-arrastar="masc" ${pos('masc')} data-act="mascote" title="${esc(m.nome)} (arraste para mover)"><span class="balao">${esc(d)}</span>${mascoteVisual(m, 72)}</button>`; }
   if (S.chatAberto) h += `<div class="chat-flut-bg" data-act="chatFechar"></div><div class="chat-flut"><div class="linha" style="margin-bottom:6px"><b class="esp">💬 Chat</b><button class="btn zap sm" style="width:auto" data-act="whats">📲 WhatsApp</button><button class="icone-btn" data-act="chatFechar">✕</button></div>${telaChat()}</div>`;
   return h;
 }
@@ -2027,7 +2033,7 @@ const acoes = {
   trocarFoto: d => escolherFotoPerfil(d.id),
   removerFoto: d => salvarFotoPerfil(d.id, ''),
   mascoteEditar: d => modalMascote(d.id || S.eu),
-  mascoteOpc: (d, b) => { MASC_EDIT[d.k] = d.v; const box = b.closest('.modal'); box.querySelector('.masc-preview').innerHTML = mascoteSVG(MASC_EDIT, 150); box.querySelectorAll(`[data-k="${d.k}"]`).forEach(x => x.classList.toggle('on', x.dataset.v === d.v)); },
+  mascoteOpc: (d, b) => { MASC_EDIT[d.k] = d.v; const box = b.closest('.modal'); box.querySelector('.masc-preview').innerHTML = mascoteVisual(MASC_EDIT, 190); box.querySelectorAll(`[data-k="${d.k}"]`).forEach(x => x.classList.toggle('on', x.dataset.v === d.v)); },
   mascoteSalvar: async d => {
     const nm = $('#mascNome'); MASC_EDIT.nome = (nm && nm.value.trim().slice(0, 20)) || 'Bolt'; const vz = $('#mascVoz'); if (vz) MASC_EDIT.voz = vz.checked;
     try { await salvarPerfil(d.id, { mascote: { ...MASC_EDIT } }); fecharModais(); toast(`🎨 ${MASC_EDIT.nome} está pronto!`, 'ok'); } catch (e) { toast(msgErro(e), 'bad'); }
@@ -2214,7 +2220,7 @@ const forms = {
 
 const mudancas = {
   diaVer: el => { S.diaVer = el.value || hojeISO(); render(); },
-  mascoteCor: el => { MASC_EDIT[el.dataset.k] = el.value; const box = el.closest('.modal'); box.querySelector('.masc-preview').innerHTML = mascoteSVG(MASC_EDIT, 150); },
+  mascoteCor: el => { MASC_EDIT[el.dataset.k] = el.value; const box = el.closest('.modal'); box.querySelector('.masc-preview').innerHTML = mascoteVisual(MASC_EDIT, 190); },
   recorrencia: el => { const u = el.value === 'unica'; $('#boxDias').hidden = u; $('#boxData').hidden = !u; }
 };
 
