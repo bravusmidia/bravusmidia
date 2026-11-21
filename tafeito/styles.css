@@ -555,3 +555,6 @@ body:has(#visorImg) .flut-masc,body:has(#visorImg) .flut-chat{display:none}
 /* balão do mascote sempre ao lado (nunca em cima do pet) */
 .flut-masc .balao{left:calc(var(--tam,72px) + 4px)!important;right:auto;top:6px;z-index:2;max-width:min(220px,60vw)}
 .flut-masc.lado-dir .balao{left:auto!important;right:calc(var(--tam,72px) + 4px);border-radius:12px 12px 2px 12px}
+/* aves de asas abertas: batem as asas enquanto flutuam */
+.masc-animal.toon.mov-voar .bicho{animation:baterAsas .6s ease-in-out infinite alternate}
+@keyframes baterAsas{0%{transform:scaleX(1) scaleY(1) translateY(0)}100%{transform:scaleX(.84) scaleY(1.04) translateY(-4%)}}

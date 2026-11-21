@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '2.7.2';
+const VERSAO = '2.7.3';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -1274,8 +1274,8 @@ const MISTICOS = [['bruxo', '', 'Bruxo'], ['bruxa', '', 'Bruxa'], ['mago', '', '
 MISTICOS.forEach(m => { m[3] = 'mistico'; ANIMAIS.push(m); });
 const REAIS = new Set(['aguia', 'gato', 'cachorro', 'falcao', 'tartaruga', 'peixe', 'leao', 'tigre', 'lobo', 'raposa', 'coruja', 'golfinho', 'cavalo', 'panda', 'coelho', 'dragao']);
 const ehToon = k => (window.TOON || []).includes(k);
-const miniMasc = a => ehToon(a[0]) ? `icons/toon/${a[0]}.webp?v=1` : `icons/anim/mini/${a[0]}.webp?v=1`;
-const imgMasc = a => ehToon(a[0]) ? `icons/toon/${a[0]}.webp?v=1` : `icons/anim/${a[0]}.webp?v=1`;
+const miniMasc = a => ehToon(a[0]) ? `icons/toon/${a[0]}.webp?v=2` : `icons/anim/mini/${a[0]}.webp?v=2`;
+const imgMasc = a => ehToon(a[0]) ? `icons/toon/${a[0]}.webp?v=2` : `icons/anim/${a[0]}.webp?v=2`;
 const ANIMAL_MOV = { fada: 'voar', fado: 'voar', genio: 'flutuar', fantasma: 'flutuar', heroi: 'voar', sereia: 'nadar', tritao: 'nadar', dragao_bebe: 'voar', aguia: 'voar', falcao: 'voar', coruja: 'voar', papagaio: 'voar', passaro: 'voar', borboleta: 'voar', abelha: 'voar', morcego: 'voar', dragao: 'voar', flamingo: 'flutuar', cisne: 'nadar', pato: 'nadar',
   peixe: 'nadar', peixe_tropical: 'nadar', baiacu: 'nadar', tubarao: 'nadar', golfinho: 'nadar', baleia: 'nadar', polvo: 'nadar', lula: 'nadar', foca: 'nadar', lontra: 'nadar', tartaruga: 'nadar', canguru: 'pular', coelho: 'pular', sapo: 'pular' };
 const ACESS_CHAPEU = [['nenhum', ''], ['bone', '🧢'], ['coroa', '👑'], ['cartola', '🎩'], ['formatura', '🎓'], ['capacete', '⛑️'], ['laco', '🎀'], ['fone', '🎧']];
