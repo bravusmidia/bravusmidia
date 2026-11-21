@@ -614,3 +614,15 @@ body:has(#visorImg) .flut-masc,body:has(#visorImg) .flut-chat{display:none}
 .tempo-item .barra i{background:linear-gradient(90deg,#4f7cff,#7b5cff)}
 .tempo-nome{font-weight:700;font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ok-txt{color:#4ade80;font-weight:700}.bad-txt{color:#f87171;font-weight:700}
+
+/* v3.1.2 pet do outro: separado, cada um arrasta o seu */
+.flut-amigo{position:fixed;left:calc(24px + var(--tam,72px));bottom:calc(100px + env(safe-area-inset-bottom));z-index:34;touch-action:none;user-select:none}
+.flut-amigo .masc-amigo{margin:0}
+@media (min-width:1000px){.flut-amigo{left:calc(max(24px,calc(50% - 566px)) + var(--tam,72px) + 16px);bottom:28px}}
+.flut-masc:has(.masc-amigo) .balao{left:calc(var(--tam,72px) + 4px)!important}
+.flut-amigo.brinca-pulo .masc-amigo,.flut-masc.brinca-pulo .masc-toque{animation:puloJunto .5s ease-in-out 4}
+.flut-amigo.brinca-toca .masc-amigo{animation:tocaB 1.2s ease-in-out}
+.flut-amigo.brinca-bola .masc-amigo{animation:chutar 1.5s ease-in-out 2}
+.bola-quica{position:absolute;top:-10px;left:40%;font-size:1.2rem;pointer-events:none;z-index:3;animation:quica 1.5s ease-in-out 2}
+@keyframes quica{0%,100%{transform:translateY(0)}50%{transform:translateY(-30px) rotate(180deg)}}
+.flut-amigo .toca-aqui{left:30%}

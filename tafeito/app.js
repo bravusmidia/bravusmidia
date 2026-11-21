@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '3.1.1';
+const VERSAO = '3.1.2';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -1458,13 +1458,14 @@ async function brincarJuntos() {
 }
 /* de vez em quando eles brincam sozinhos: bola, pulo junto ou "toca aqui" */
 function brincadeira(forcar) {
-  const w = document.querySelector('.flut-masc'); if (!w || !w.querySelector('.masc-amigo') || document.hidden) return;
+  const w = document.querySelector('.flut-masc'), w2 = document.querySelector('.flut-amigo'); if (!w || !w2 || document.hidden) return;
   if (!forcar && (document.querySelector('.modal') || Math.random() < 0.35)) return;
   const tipos = ['bola', 'pulo', 'toca']; const t = tipos[Math.floor(Math.random() * tipos.length)];
-  w.classList.remove('brinca-bola', 'brinca-pulo', 'brinca-toca'); void w.offsetWidth; w.classList.add('brinca-' + t);
-  if (t === 'bola') { const b = document.createElement('span'); b.className = 'bola-brinca'; b.textContent = '⚽'; w.appendChild(b); setTimeout(() => b.remove(), 3200); }
-  if (t === 'toca') { const b = document.createElement('span'); b.className = 'toca-aqui'; b.textContent = '✋'; w.appendChild(b); setTimeout(() => b.remove(), 1600); }
-  setTimeout(() => w.classList.remove('brinca-' + t), 3200);
+  [w, w2].forEach((el, i) => {
+    el.classList.remove('brinca-bola', 'brinca-pulo', 'brinca-toca'); void el.offsetWidth; el.classList.add('brinca-' + t);
+    const e = t === 'bola' ? '⚽' : t === 'toca' ? '✋' : ''; if (e) { const b = document.createElement('span'); b.className = t === 'bola' ? 'bola-quica' : 'toca-aqui'; b.textContent = e; b.style.animationDelay = (i * .3) + 's'; el.appendChild(b); setTimeout(() => b.remove(), 3200); }
+    setTimeout(() => el.classList.remove('brinca-' + t), 3200);
+  });
 }
 setInterval(() => brincadeira(false), 25000);
 setInterval(() => document.querySelectorAll('[data-cron]').forEach(el => { el.textContent = fmtDur((Date.now() - new Date(el.dataset.cron)) / 1000); }), 1000);
@@ -1605,8 +1606,9 @@ function flutuantes() {
   let h = `<button class="flut-chat" data-arrastar="chat" ${pos('chat')} data-act="chatAbrir" title="Chat (arraste para mover)">💬${nl ? `<span class="badge">${nl}</span>` : ''}</button>`;
   if (S.papel === 'filho' || S.papel === 'pai') { const m = { ...mascoteDe(S.eu), _dormindo: statusPet(petDe(S.eu)).dormindo }; const d = dicaMascote(); const tam = tamMasc(), mudo = !!lsGet('mok_masc_mudo');
     h += `<div class="flut-masc${ladoDir('masc') ? ' lado-dir' : ''}" data-arrastar="masc" style="${posCss('masc')}--tam:${tam}px">
-      ${d ? `<span class="balao">${esc(d)}</span>` : ''}<div class="masc-par"><button class="masc-toque" data-act="mascote" title="${esc(m.nome)} — toque para abrir, arraste para mover">${mascoteVisual(m, tam)}</button>${amigoHTML(tam)}</div>
-      <div class="masc-ctrl sem3d"><button data-act="mascMudo" title="${mudo ? 'Ligar a voz' : 'Silenciar'}">${mudo ? '🔇' : '🔊'}</button><button data-act="mascTam" data-v="-1" title="Diminuir">−</button><button data-act="mascTam" data-v="1" title="Aumentar">+</button>${lsGet('mok_amigo_off') ? '<button data-act="mostrarAmigo" title="Mostrar o mascote do outro">👥</button>' : ''}</div></div>`; }
+      ${d ? `<span class="balao">${esc(d)}</span>` : ''}<div class="masc-par"><button class="masc-toque" data-act="mascote" title="${esc(m.nome)} — toque para abrir, arraste para mover">${mascoteVisual(m, tam)}</button></div>
+      <div class="masc-ctrl sem3d"><button data-act="mascMudo" title="${mudo ? 'Ligar a voz' : 'Silenciar'}">${mudo ? '🔇' : '🔊'}</button><button data-act="mascTam" data-v="-1" title="Diminuir">−</button><button data-act="mascTam" data-v="1" title="Aumentar">+</button>${lsGet('mok_amigo_off') ? '<button data-act="mostrarAmigo" title="Mostrar o mascote do outro">👥</button>' : ''}</div></div>`;
+    const am = amigoHTML(tam); if (am) h += `<div class="flut-amigo" data-arrastar="amigo" style="${posCss('amigo')}--tam:${tam}px">${am}</div>`; }
   if (S.chatAberto) h += `<div class="chat-flut-bg" data-act="chatFechar"></div><div class="chat-flut"><div class="linha" style="margin-bottom:6px"><b class="esp">💬 Chat</b><button class="btn zap sm" style="width:auto" data-act="whats">📲 WhatsApp</button><button class="icone-btn" data-act="chatFechar">✕</button></div>${telaChat()}</div>`;
   return h;
 }
