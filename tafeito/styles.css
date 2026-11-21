@@ -657,3 +657,27 @@ body:has(#visorImg) .flut-masc,body:has(#visorImg) .flut-chat{display:none}
 .balao-fala::after{content:'';position:absolute;top:100%;left:50%;margin-left:-7px;border:7px solid transparent;border-top-color:#fff}
 .balao-fala.some{opacity:0;pointer-events:none}
 .masc-ctrl{flex-wrap:wrap;justify-content:center;max-width:170px}
+
+/* v3.4 ciclo de vida do pet */
+.masc-animal .corpo-animal{scale:var(--escala,1);transform-origin:50% 100%;transition:scale .6s}
+.masc-animal.morto .bicho{filter:grayscale(1) brightness(.85) drop-shadow(0 0 10px rgba(255,255,255,.35))!important;animation:alma 3s ease-in-out infinite!important;opacity:.8}
+.masc-animal.morto::after{content:'👼';position:absolute;top:-6%;left:50%;transform:translateX(-50%);font-size:34%}
+@keyframes alma{0%,100%{transform:translateY(0)}50%{transform:translateY(-8%)}}
+.morto-card{text-align:center;border:1px solid rgba(239,68,68,.4)}
+.barra-cresce{display:grid;grid-template-columns:92px 1fr;align-items:center;gap:8px;font-size:.78rem;font-weight:700;margin-top:8px}
+.barra-cresce .barra{height:9px}.barra-cresce .barra i{background:linear-gradient(90deg,#f59e0b,#22c55e)}
+
+/* v3.4.1 sempre flutuando + correr, pular, voar pela tela */
+.flut-masc .masc-par,.flut-amigo .masc-amigo{animation:flutuaSempre 3.2s ease-in-out infinite}
+.flut-amigo .masc-amigo{animation-delay:-1.4s}
+@keyframes flutuaSempre{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+.flut-masc .masc-animal .sombra-animal,.flut-amigo .masc-animal .sombra-animal{animation:sombra 3.2s ease-in-out infinite}
+.correndo .masc-animal .bicho{animation:correr .18s ease-in-out infinite!important}
+@keyframes correr{0%,100%{transform:translateY(0) rotate(-8deg) scale(1.04,.96)}50%{transform:translateY(-12%) rotate(6deg) scale(.97,1.04)}}
+.correndo .masc-animal .corpo-animal{rotate:calc(var(--dir,1) * 8deg)}
+.pulando .masc-par,.pulando .masc-amigo{animation:saltos .55s cubic-bezier(.3,0,.4,1) infinite!important}
+@keyframes saltos{0%,100%{transform:translateY(0) scale(1,1)}15%{transform:translateY(0) scale(1.1,.88)}50%{transform:translateY(-38px) scale(.94,1.08)}}
+.voando .masc-par,.voando .masc-amigo{animation:curvas 1.4s ease-in-out infinite!important}
+@keyframes curvas{0%,100%{transform:translateY(0) rotate(-6deg)}25%{transform:translateY(-26px) rotate(4deg)}75%{transform:translateY(10px) rotate(-3deg)}}
+.poeira{position:absolute;bottom:4px;font-size:1rem;pointer-events:none;animation:poeira .7s ease-out forwards}
+@keyframes poeira{0%{opacity:.9;transform:scale(.6)}100%{opacity:0;transform:scale(1.4) translateY(-10px)}}

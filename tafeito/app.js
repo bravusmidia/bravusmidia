@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '3.3.0';
+const VERSAO = '3.4.1';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -1355,15 +1355,30 @@ function animalVisual(m, tam) {
   const a = ANIMAIS.find(x => x[0] === m.animal) || ANIMAIS[0];
   const mov = (m.movAnimal && m.movAnimal !== 'auto') ? m.movAnimal : (ANIMAL_MOV[a[0]] || 'flutuar');
   const ch = (ACESS_CHAPEU.find(x => x[0] === m.chapeuA) || [])[1], oc = (ACESS_OCULOS.find(x => x[0] === m.oculosA) || [])[1], au = (ACESS_AURA.find(x => x[0] === m.aura) || [])[1];
-  return `<div class="masc-animal sem3d mov-${mov}${ehToon(a[0]) ? ' toon' : ''}${m._dormindo ? ' dormindo' : ''}" style="width:${tam}px;height:${tam}px;--fundo:${esc(m.fundo || '#2f3f86')}">
+  return `<div class="masc-animal sem3d mov-${mov}${ehToon(a[0]) ? ' toon' : ''}${m._dormindo ? ' dormindo' : ''}${m._morto ? ' morto' : ''}" style="--escala:${m._escala || 1};"width:${tam}px;height:${tam}px;--fundo:${esc(m.fundo || '#2f3f86')}">
     ${m.fundo ? '<span class="aura-fundo"></span>' : ''}${au ? `<span class="aura-orbita">${img3d(au)}</span>` : ''}
     <div class="corpo-animal"><img class="bicho" src="${imgMasc(a)}" onerror="this.onerror=null;this.src='${miniMasc(a)}'" alt="${esc(a[2])}" draggable="false">${img3d(ch, 'acc-chapeu')}${img3d(oc, 'acc-oculos')}</div><span class="sombra-animal"></span></div>`;
 }
 /* ---------- BICHINHO VIRTUAL: comer, beber, treinar e dormir ---------- */
 const H = 36e5, clamp = (v, a = 0, b = 100) => Math.max(a, Math.min(b, v));
 const petDe = id => { const p = id === 'pai' ? S.config.pet_pai : (S.dados.filhos.find(f => f.id === id) || {}).pet; return p && typeof p === 'object' ? { ...p } : {}; };
+/* ciclo de vida: nasce filhote, cresce com os dias e o nível; sem comida (48h) ou sem água (36h) ele morre */
+const MORRE_FOME_H = 48, MORRE_SEDE_H = 36, AVISO_H = 20;
+function vidaPet(p, agora = Date.now()) {
+  const base = p.nasceu || agora;
+  const hFome = (agora - (p.comeu || base)) / H, hSede = (agora - (p.bebeu || base)) / H;
+  const morreu = p.morto || hFome >= MORRE_FOME_H || hSede >= MORRE_SEDE_H;
+  const morreuEm = p.morreu_em || (morreu ? Math.min((p.comeu || base) + MORRE_FOME_H * H, (p.bebeu || base) + MORRE_SEDE_H * H) : null);
+  const fim = morreu ? morreuEm : agora;
+  const dias = Math.max(0, (fim - base) / (24 * H));
+  const nivel = Math.floor((p.xp || 0) / 50) + 1;
+  const cresc = Math.min(1, dias / 10 * 0.7 + (nivel - 1) * 0.06);
+  const fase = cresc < .25 ? '🍼 Filhote' : cresc < .6 ? '🐣 Pequeno' : cresc < .9 ? '🌱 Crescendo' : '⭐ Adulto';
+  const perigo = !morreu && (hFome >= AVISO_H || hSede >= AVISO_H) ? Math.round(Math.min(MORRE_FOME_H - hFome, MORRE_SEDE_H - hSede)) : null;
+  return { morreu, morreuEm, dias, escala: +(0.6 + cresc * 0.4).toFixed(2), fase, perigo };
+}
 function statusPet(p, agora = Date.now()) {
-  const desde = k => p[k] ? (agora - p[k]) / H : 6;
+  const desde = k => p[k] ? (agora - p[k]) / H : (p.nasceu ? (agora - p.nasceu) / H : 6);
   const fome = clamp(100 - desde('comeu') * 12), sede = clamp(100 - desde('bebeu') * 16), treino = clamp(100 - desde('treinou') * 8);
   const limpeza = clamp(100 - desde('banho') * 5), diversao = clamp(100 - desde('brincou') * 10);
   let energia;
@@ -1371,9 +1386,12 @@ function statusPet(p, agora = Date.now()) {
   else energia = clamp((p.energia ?? 80) - ((agora - (p.acordou || agora)) / H) * 6);
   const humor = Math.round((fome + sede + treino + energia + limpeza + diversao) / 6);
   const nivel = Math.floor((p.xp || 0) / 50) + 1;
-  return { fome: Math.round(fome), sede: Math.round(sede), treino: Math.round(treino), limpeza: Math.round(limpeza), diversao: Math.round(diversao), energia: Math.round(energia), humor, nivel, xp: p.xp || 0, dormindo: !!p.dormindo };
+  const v = vidaPet(p, agora);
+  return { fome: Math.round(fome), sede: Math.round(sede), treino: Math.round(treino), limpeza: Math.round(limpeza), diversao: Math.round(diversao), energia: Math.round(energia), humor, nivel, xp: p.xp || 0, dormindo: !!p.dormindo && !v.morreu, ...v };
 }
 function pedidoPet(st, nome) {
+  if (st.morreu) return `💔 ${nome} morreu… toque para adotar outro`;
+  if (st.perigo != null) return `😰 ${nome} está fraquinho! Dê ${st.fome < st.sede ? 'comida' : 'água'} (${st.perigo}h)`;
   if (st.dormindo) return `${nome} está dormindo 💤`;
   if (st.fome < 30) return `${nome} está com fome! 🍖`;
   if (st.sede < 30) return `${nome} está com sede! 💧`;
@@ -1387,8 +1405,19 @@ const COMIDA = { gato: '🐟', gatinho: '🐟', cachorro: '🦴', cao: '🦴', c
   urso: '🍯', urso_polar: '🐟', pinguim: '🐟', foca: '🐟', lontra: '🐟', tubarao: '🐟', golfinho: '🐟', baleia: '🦐', abelha: '🌻', borboleta: '🌸', vampiro: '🍅', vampira: '🍅', zumbi: '🧠', robo: '🔋', alien: '🍕', monstro: '🍕', fantasma: '🍬', bruxo: '🍬', bruxa: '🍬', mago: '🍬' };
 const ACOES_PET = { comer: ['🍖', 'Comida', 'comeu', 'Hmm, que delícia! Obrigado!'], beber: ['💧', 'Água', 'bebeu', 'Ahh, refrescante!'], treinar: ['🏋️', 'Treinar', 'treinou', 'Bora! Treinei e fiquei mais forte 💪'], banho: ['🛁', 'Banho', 'banho', 'Que banho gostoso! Estou cheiroso ✨'],
   brincar: ['⚽', 'Brincar', 'brincou', 'Uhuul! Adoro brincar com você! 🎉'], dancar: ['🕺', 'Dançar', 'dancou', 'Olha meu passinho! 🎶'], dormir: ['😴', 'Dormir', '', 'Boa noite… zzz'] };
+function memoriasPet(dono) { const l = (petDe(dono).memorias || []).slice(-6).reverse(); return l.length ? `<div class="mut peq" style="margin-top:10px">🌈 Lembranças: ${l.map(x => `${esc(x.nome)} (${x.dias}d, nv ${x.nivel})`).join(' · ')}</div>` : ''; }
+async function adotarPet() {
+  const dono = S.papel === 'pai' ? 'pai' : S.eu; const p = petDe(dono); const st = statusPet(p); const m = mascoteDe(dono);
+  const memorias = [...(p.memorias || []), { nome: m.nome, animal: m.animal, dias: Math.max(1, Math.round(st.dias)), nivel: st.nivel }].slice(-10);
+  const novo = { nasceu: Date.now(), comeu: Date.now(), bebeu: Date.now(), acordou: Date.now(), energia: 90, xp: 0, memorias };
+  if (dono === 'pai') S.config.pet_pai = novo; else { const f = S.dados.filhos.find(x => x.id === dono); if (f) f.pet = novo; }
+  try { await DB.rpc('mok_pet', { p_pet: novo }); } catch (e) { console.warn(e); }
+  fecharModais(); toast('🐣 Escolha o seu novo filhote e dê um nome!', 'ok'); modalMascote(dono, { ...m, nome: '', animal: m.animal });
+}
 async function cuidarPet(acao) {
   const dono = S.papel === 'pai' ? 'pai' : S.eu; const m = mascoteDe(dono); const p = petDe(dono); const agora = Date.now(); const st = statusPet(p, agora);
+  if (st.morreu) return toast(`💔 ${m.nome} morreu. Adote um novo filhote.`, 'bad');
+  if (!p.nasceu) p.nasceu = agora;
   let fala = '';
   if (acao === 'dormir') {
     if (p.dormindo) { p.energia = st.energia; p.dormindo = false; p.acordou = agora; fala = 'Bom dia! Acordei cheio de energia! ☀️'; }
@@ -1429,7 +1458,12 @@ function barrasPet(st) {
 }
 function cardPet(dono) {
   const m = mascoteDe(dono); const st = statusPet(petDe(dono));
-  return `<div class="card-pet"><div class="linha"><b class="esp">🐾 Cuidar do ${esc(m.nome)}</b>${st.dormindo ? '<span class="tag">💤 dormindo</span>' : ''}</div>${barrasPet(st)}
+  if (st.morreu) return `<div class="card-pet morto-card"><div class="centro" style="font-size:2.2rem">👼</div><b class="centro" style="display:block">${esc(m.nome)} morreu 😢</b>
+    <p class="mut peq centro">Ficou sem ${(petDe(dono).comeu || 0) + MORRE_FOME_H * H <= (petDe(dono).bebeu || 0) + MORRE_SEDE_H * H ? 'comida' : 'água'} por muito tempo. Viveu ${Math.max(1, Math.round(st.dias))} dia(s) e chegou ao nível ${st.nivel}.</p>
+    <button class="btn pri" data-act="adotarPet">🐣 Adotar um novo filhote</button>${memoriasPet(dono)}</div>`;
+  return `<div class="card-pet"><div class="linha"><b class="esp">🐾 Cuidar do ${esc(m.nome)}</b><span class="tag">${st.fase} · ${st.dias < 1 ? Math.max(1, Math.round(st.dias * 24)) + 'h' : Math.floor(st.dias) + ' dia(s)'}</span>${st.dormindo ? '<span class="tag">💤</span>' : ''}</div>
+    ${st.perigo != null ? `<div class="aviso bad" style="margin:8px 0 0">😰 ${esc(m.nome)} está fraquinho! Se ficar mais ~${st.perigo}h sem ${st.fome < st.sede ? 'comida' : 'água'}, ele morre.</div>` : ''}
+    <div class="barra-cresce"><span>Crescimento</span><div class="barra"><i style="width:${Math.round((st.escala - .6) / .4 * 100)}%"></i></div></div>${barrasPet(st)}
     <div class="acoes-pet">${Object.entries(ACOES_PET).map(([k, [e, t]]) => `<button class="btn ghost sm" data-act="petAcao" data-v="${k}" ${st.dormindo && k !== 'dormir' ? 'disabled' : ''}>${k === 'comer' ? (COMIDA[m.animal] || e) : k === 'dormir' && st.dormindo ? '☀️' : e}<br><small>${k === 'dormir' && st.dormindo ? 'Acordar' : t}</small></button>`).join('')}</div>
     <div class="fala-pet mut peq">${esc(pedidoPet(st, m.nome) || 'Cuide dele todo dia para ele subir de nível!')}</div></div>`;
 }
@@ -1438,7 +1472,7 @@ const donoAmigo = () => S.papel === 'pai' ? fid() : 'pai';
 const nomeDonoAmigo = () => S.papel === 'pai' ? filhoAtual().nome : nomePai();
 function amigoHTML(tam) {
   const id = donoAmigo(); if (!id || lsGet('mok_amigo_off')) return '';
-  const m = { ...mascoteDe(id), _dormindo: statusPet(petDe(id)).dormindo };
+  const stA = statusPet(petDe(id)); const m = { ...mascoteDe(id), _dormindo: stA.dormindo, _morto: stA.morreu, _escala: stA.escala };
   return `<button class="masc-amigo" data-act="verAmigo" title="${esc(m.nome)} de ${esc(nomeDonoAmigo())}">${mascoteVisual(m, Math.round(tam * 0.78))}<span class="tag-amigo">${esc(m.nome)}</span></button>`;
 }
 function modalAmigo() {
@@ -1512,32 +1546,46 @@ let ultimoArrasto = 0;
 function vidaPets() {
   if (document.hidden || document.querySelector('.modal, #visorImg') || arrasto || Date.now() - ultimoArrasto < 8000) return;
   document.querySelectorAll('.flut-masc, .flut-amigo').forEach(el => {
-    const bicho = el.querySelector('.masc-animal'); if (!bicho || bicho.classList.contains('dormindo') || el.classList.contains('passeando')) return;
+    const bicho = el.querySelector('.masc-animal'); if (!bicho || bicho.classList.contains('dormindo') || bicho.classList.contains('morto') || el.classList.contains('passeando')) return;
     const r = Math.random();
     if (r < 0.45) {
       const t = TRUQUES[Math.floor(Math.random() * TRUQUES.length)];
       bicho.classList.remove(...TRUQUES.map(x => 'truque-' + x)); void bicho.offsetWidth; bicho.classList.add('truque-' + t);
       setTimeout(() => bicho.classList.remove('truque-' + t), 2400);
-    } else if (r < 0.75 && !lsGet('mok_passeio_off')) passear(el, bicho);
+    } else if (r < 0.85 && !lsGet('mok_passeio_off')) passear(el, bicho);
   });
 }
 function passear(el, bicho) {
   const b = el.getBoundingClientRect(); const w = b.width, h = b.height;
   const topo = 70, baixo = innerHeight - h - (innerWidth >= 1000 ? 20 : 110);
-  const nx = Math.max(6, Math.min(innerWidth - w - 6, b.left + (Math.random() * 360 - 180)));
-  const ny = Math.max(topo, Math.min(baixo, b.top + (Math.random() * 240 - 120)));
   const voa = bicho.classList.contains('mov-voar'), nada = bicho.classList.contains('mov-nadar');
+  // tipos de passeio: andar (perto), correr (atravessa a tela), pular (aos saltos), voar/nadar (curvas)
+  const sorteio = Math.random(); const modo = voa ? 'voando' : nada ? 'nadando' : sorteio < 0.4 ? 'andando' : sorteio < 0.7 ? 'correndo' : 'pulando';
+  const alcance = modo === 'correndo' || voa ? 0.75 : 0.35;
+  const nx = Math.max(6, Math.min(innerWidth - w - 6, b.left + (Math.random() * 2 - 1) * innerWidth * alcance));
+  const ny = Math.max(topo, Math.min(baixo, b.top + (Math.random() * 2 - 1) * innerHeight * (voa ? 0.45 : 0.25)));
   bicho.style.setProperty('--dir', nx < b.left ? -1 : 1);
-  el.classList.add('passeando', voa ? 'voando' : nada ? 'nadando' : 'andando');
-  const dur = Math.max(1.6, Math.hypot(nx - b.left, ny - b.top) / 90);
+  el.classList.add('passeando', modo);
+  const vel = { andando: 90, correndo: 320, pulando: 140, voando: 220, nadando: 120 }[modo];
+  const dur = Math.max(1.2, Math.hypot(nx - b.left, ny - b.top) / vel);
+  if (modo === 'correndo') { const poeira = setInterval(() => { if (!el.classList.contains('correndo')) return clearInterval(poeira); const p = document.createElement('span'); p.className = 'poeira'; p.textContent = '💨'; p.style.left = (Number(bicho.style.getPropertyValue('--dir')) < 0 ? '70%' : '0'); el.appendChild(p); setTimeout(() => p.remove(), 700); }, 180); setTimeout(() => clearInterval(poeira), dur * 1000); }
   Object.assign(el.style, { transition: `left ${dur}s ease-in-out, top ${dur}s ease-in-out`, left: b.left + 'px', top: b.top + 'px', right: 'auto', bottom: 'auto' });
   requestAnimationFrame(() => Object.assign(el.style, { left: nx + 'px', top: ny + 'px' }));
   setTimeout(() => {
-    el.classList.remove('passeando', 'voando', 'nadando', 'andando'); el.style.transition = '';
+    el.classList.remove('passeando', 'voando', 'nadando', 'andando', 'correndo', 'pulando'); el.style.transition = '';
     const k = el.dataset.arrastar; if (k) lsSet('mok_pos_' + k, { x: nx, y: ny }); el.classList.toggle('lado-dir', nx > innerWidth / 2);
   }, dur * 1000 + 80);
 }
-setInterval(vidaPets, 7000);
+setInterval(vidaPets, 5000);
+/* registra a morte (uma vez) e garante data de nascimento para pets antigos */
+async function checarVidaPet() {
+  if (!S.papel) return; const dono = S.papel === 'pai' ? 'pai' : S.eu; const p = petDe(dono);
+  if (!p.nasceu) { p.nasceu = Date.now() - 2 * 24 * H; p.comeu = p.comeu || Date.now(); p.bebeu = p.bebeu || Date.now(); }
+  else { const v = vidaPet(p); if (!v.morreu || p.morto) return; p.morto = true; p.morreu_em = v.morreuEm; const m = mascoteDe(dono); toast(`💔 ${m.nome} morreu de ${v.morreuEm === (p.comeu || p.nasceu) + MORRE_FOME_H * H ? 'fome' : 'sede'}… adote outro filhote`, 'bad'); }
+  if (dono === 'pai') S.config.pet_pai = p; else { const f = S.dados.filhos.find(x => x.id === dono); if (f) f.pet = p; }
+  try { await DB.rpc('mok_pet', { p_pet: p }); } catch (e) { console.warn(e); } render();
+}
+setTimeout(checarVidaPet, 4000); setInterval(checarVidaPet, 10 * 60000);
 setInterval(() => document.querySelectorAll('[data-cron]').forEach(el => { el.textContent = fmtDur((Date.now() - new Date(el.dataset.cron)) / 1000); }), 1000);
 function atualizarPetUI() { const c = document.querySelector('.modal .card-pet'); if (c) c.outerHTML = cardPet(S.papel === 'pai' ? 'pai' : S.eu); }
 setInterval(() => { if (S.papel && !document.querySelector('.modal')) { const fm = document.querySelector('.flut-masc .balao'); if (fm) fm.textContent = dicaMascote(); } }, 60000);
@@ -1619,7 +1667,7 @@ function modalMascote(id, rascunho) {
     <button class="btn ok" style="margin-top:10px" data-act="mascoteSalvar" data-id="${esc(id)}">💾 Salvar mascote</button>`);
 }
 function dicaMascote() {
-  { const dono = S.papel === 'pai' ? 'pai' : S.eu; if (dono) { const ped = pedidoPet(statusPet(petDe(dono)), mascoteDe(dono).nome); if (ped && lsGet('mok_ola_' + hojeISO())) return ped; } }
+  { const dono = S.papel === 'pai' ? 'pai' : S.eu; if (dono) { const st = statusPet(petDe(dono)); const ped = pedidoPet(st, mascoteDe(dono).nome); if (ped && (st.morreu || st.perigo != null || lsGet('mok_ola_' + hojeISO()))) return ped; } }
   if (S.papel === 'pai') {
     const r = resumoPai();
     if (!lsGet('mok_ola_' + hojeISO())) return `${saudacao()}, ${nomePai()}! Toque em mim 👋`;
@@ -1638,7 +1686,7 @@ function dicaMascote() {
 }
 function modalAssistentePai() {
   const m = mascoteDe('pai'); const r = resumoPai();
-  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><div class="centro masc-palco">${mascoteVisual({ ...m, _dormindo: statusPet(petDe(S.papel === 'pai' ? 'pai' : S.eu)).dormindo }, 150)}</div>
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><div class="centro masc-palco">${(st0 => mascoteVisual({ ...m, _dormindo: st0.dormindo, _morto: st0.morreu, _escala: st0.escala }, 150))(statusPet(petDe(S.papel === 'pai' ? 'pai' : S.eu)))}</div>
     <h2 class="centro" style="margin-top:4px">${saudacao()}, ${esc(nomePai())}! Eu sou o ${esc(m.nome)} 👋</h2>
     <div class="fala">${esc(textoMascote())}</div><button class="btn ghost sm" style="margin-top:6px" data-act="mascoteFalar">🔊 Ouvir de novo</button>
     ${cardPet('pai')}
@@ -1656,7 +1704,7 @@ function modalAssistente() {
   if (S.papel === 'pai') return modalAssistentePai();
   const m = mascoteDe(S.eu); const st = statusDia(); const fut = provasFuturas(); const c = carteira();
   const pend = tarefasDoDia(hojeISO(), ['casa']).filter(t => !ehFeita(regDe(t, hojeISO())));
-  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><div class="centro masc-palco">${mascoteVisual({ ...m, _dormindo: statusPet(petDe(S.papel === 'pai' ? 'pai' : S.eu)).dormindo }, 150)}</div>
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><div class="centro masc-palco">${(st0 => mascoteVisual({ ...m, _dormindo: st0.dormindo, _morto: st0.morreu, _escala: st0.escala }, 150))(statusPet(petDe(S.papel === 'pai' ? 'pai' : S.eu)))}</div>
     <h2 class="centro" style="margin-top:4px">${saudacao()}, ${esc(filhoAtual().nome)}! Eu sou o ${esc(m.nome)} 👋</h2>
     <div class="fala">${esc(textoMascote())}</div><button class="btn ghost sm" style="margin-top:6px" data-act="mascoteFalar">🔊 Ouvir de novo</button>
     ${cardPet(S.eu)}
@@ -1675,7 +1723,7 @@ function flutuantes() {
   const pos = k => { const c = posCss(k); return c ? `style="${c}"` : ''; };
   const ladoDir = k => { const p = lsGet('mok_pos_' + k); return p && p.x > innerWidth / 2; };
   let h = `<button class="flut-chat" data-arrastar="chat" ${pos('chat')} data-act="chatAbrir" title="Chat (arraste para mover)">💬${nl ? `<span class="badge">${nl}</span>` : ''}</button>`;
-  if (S.papel === 'filho' || S.papel === 'pai') { const m = { ...mascoteDe(S.eu), _dormindo: statusPet(petDe(S.eu)).dormindo }; const d = dicaMascote(); const tam = tamMasc(), mudo = !!lsGet('mok_masc_mudo');
+  if (S.papel === 'filho' || S.papel === 'pai') { const stM = statusPet(petDe(S.eu)); const m = { ...mascoteDe(S.eu), _dormindo: stM.dormindo, _morto: stM.morreu, _escala: stM.escala }; const d = dicaMascote(); const tam = tamMasc(), mudo = !!lsGet('mok_masc_mudo');
     h += `<div class="flut-masc${ladoDir('masc') ? ' lado-dir' : ''}" data-arrastar="masc" style="${posCss('masc')}--tam:${tam}px">
       ${d && !lsGet('mok_balao_off') ? `<span class="balao">${esc(d)}</span>` : ''}<div class="masc-par"><button class="masc-toque" data-act="mascote" title="${esc(m.nome)} — toque para abrir, arraste para mover">${mascoteVisual(m, tam)}</button></div>
       <div class="masc-ctrl sem3d"><button data-act="mascMudo" title="${mudo ? 'Ligar a voz' : 'Silenciar'}">${mudo ? '🔇' : '🔊'}</button><button data-act="mascTam" data-v="-1" title="Diminuir">−</button><button data-act="mascTam" data-v="1" title="Aumentar">+</button><button data-act="falarPet" title="Fazer o pet falar no app do outro">🗣️</button><button data-act="legendas" title="${lsGet('mok_balao_off') ? 'Mostrar legendas' : 'Esconder legendas'}">${lsGet('mok_balao_off') ? '🙊' : '💬'}</button><button data-act="passeio" title="${lsGet('mok_passeio_off') ? 'Deixar passear pela tela' : 'Ficar parado no lugar'}">${lsGet('mok_passeio_off') ? '📌' : '🚶'}</button>${lsGet('mok_amigo_off') ? '<button data-act="mostrarAmigo" title="Mostrar o mascote do outro">👥</button>' : ''}</div></div>`;
@@ -2402,6 +2450,7 @@ const acoes = {
   novaTarefa: d => formTarefa(null, d.cat, d.area || ''),
   areaWork: d => { S.areaWork = d.v; render(); },
   verAmigo: () => modalAmigo(),
+  adotarPet: () => adotarPet(),
   brincarJuntos: () => brincarJuntos(),
   esconderAmigo: () => { lsSet('mok_amigo_off', 1); fecharTopo(); render(); toast('🙈 Escondido. Toque em 👥 para mostrar de novo.'); },
   mostrarAmigo: () => { lsSet('mok_amigo_off', 0); render(); },
@@ -2780,7 +2829,7 @@ document.addEventListener('pointerdown', e => {
   const r = el.getBoundingClientRect(); arrasto = { el, k: el.dataset.arrastar, dx: e.clientX - r.left, dy: e.clientY - r.top, x0: e.clientX, y0: e.clientY, moveu: false };
 });
 document.addEventListener('pointermove', e => {
-  if (!arrasto) return; const a = arrasto; ultimoArrasto = Date.now(); a.el.style.transition = ''; a.el.classList.remove('passeando', 'voando', 'nadando', 'andando');
+  if (!arrasto) return; const a = arrasto; ultimoArrasto = Date.now(); a.el.style.transition = ''; a.el.classList.remove('passeando', 'voando', 'nadando', 'andando', 'correndo', 'pulando');
   if (!a.moveu && Math.hypot(e.clientX - a.x0, e.clientY - a.y0) < 8) return;
   a.moveu = true; e.preventDefault(); a.el.classList.add('arrastando');
   const w = a.el.offsetWidth, h = a.el.offsetHeight;

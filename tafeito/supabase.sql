@@ -1455,4 +1455,20 @@ end $$;
 drop trigger if exists mok_reg_tempo on public.mok_registros;
 create trigger mok_reg_tempo before insert or update on public.mok_registros for each row execute function public.mok_reg_tempo();
 
+-- =====================================================================
+-- v3.4: CICLO DE VIDA DO PET (nasce filhote, cresce, pode morrer; guarda lembranças)
+-- =====================================================================
+create or replace function public.mok_pet(p_pet jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare f text := mok_meu_filho();
+begin
+  if p_pet is null or jsonb_typeof(p_pet) <> 'object' or octet_length(p_pet::text) > 4000 then raise exception 'Dados do mascote inválidos.'; end if;
+  if mok_is_pai() then update mok_config set pet_pai = p_pet where id = 1;
+  elsif f is not null then update mok_filhos set pet = p_pet where id = f;
+  else raise exception 'Perfil não encontrado.';
+  end if;
+end $$;
+revoke all on function public.mok_pet(jsonb) from public, anon;
+grant execute on function public.mok_pet(jsonb) to authenticated;
+
 -- Pronto! Agora abra o app e crie a conta do Pai.
