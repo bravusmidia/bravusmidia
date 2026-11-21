@@ -1410,6 +1410,54 @@ end $$;
 revoke all on function public.mok_work_areas(jsonb) from public, anon;
 grant execute on function public.mok_work_areas(jsonb) to authenticated;
 
+-- =====================================================================
+-- v3.0: MASCOTES BRINCAM JUNTOS (avisa o outro; no máximo 1 aviso a cada 20 min)
+-- =====================================================================
+create or replace function public.mok_brincar_juntos() returns void
+language plpgsql security definer set search_path = public as $$
+declare f text := mok_meu_filho(); v_alvo text; meu jsonb; dele jsonb; v_nome text;
+begin
+  if mok_is_pai() then
+    select filho_id into v_alvo from mok_perfis where papel = &#x27;filho&#x27; order by entrou_em desc nulls last limit 1;
+    if v_alvo is null then return; end if;
+    select mascote_pai into meu from mok_config where id = 1; select mascote into dele from mok_filhos where id = v_alvo; v_nome := &#x27;pai&#x27;;
+  elsif f is not null then
+    v_alvo := &#x27;pai&#x27;; select x.mascote, x.nome into meu, v_nome from mok_filhos x where x.id = f; select mascote_pai into dele from mok_config where id = 1;
+  else return; end if;
+  if exists (select 1 from mok_avisos where mok_avisos.alvo = v_alvo and mok_avisos.tag = &#x27;brincar&#x27; and criado_em &gt; now() - interval &#x27;20 minutes&#x27;) then return; end if;
+  perform mok_push_enviar(v_alvo, &#x27;🤝 &#x27; || coalesce(meu-&gt;&gt;&#x27;nome&#x27;, &#x27;Mascote&#x27;) || &#x27; brincou com o &#x27; || coalesce(dele-&gt;&gt;&#x27;nome&#x27;, &#x27;seu mascote&#x27;) || &#x27;!&#x27;,
+    case when v_nome = &#x27;pai&#x27; then &#x27;O mascote do pai veio brincar 🎉&#x27; else coalesce(v_nome, &#x27;Seu filho&#x27;) || &#x27; fez os mascotes brincarem juntos 🎉&#x27; end, &#x27;brincar&#x27;);
+end $$;
+revoke all on function public.mok_brincar_juntos() from public, anon;
+grant execute on function public.mok_brincar_juntos() to authenticated;
+
+-- =====================================================================
+-- v3.1: TEMPO DE EXECUÇÃO DAS TAREFAS (início = foto ANTES ou ▶️ Começar; fim = marcar como feita)
+-- =====================================================================
+alter table public.mok_registros add column if not exists iniciado_em timestamptz;
+alter table public.mok_registros add column if not exists duracao_seg int;
+
+create or replace function public.mok_reg_tempo() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare ini timestamptz;
+begin
+  if tg_op = &#x27;UPDATE&#x27; and old.iniciado_em is not null and new.status &lt;&gt; &#x27;pendente&#x27; then new.iniciado_em := old.iniciado_em; end if; -- o início não muda depois de marcado
+  if new.status in (&#x27;feita&#x27;,&#x27;aprovada&#x27;) then
+    if tg_op = &#x27;INSERT&#x27; or old.status not in (&#x27;feita&#x27;,&#x27;aprovada&#x27;) then
+      if not mok_is_pai() then new.feito_em := now(); end if;
+      ini := coalesce(new.iniciado_em, new.foto_antes_em);
+      new.duracao_seg := case when ini is null then null else greatest(0, least(43200, extract(epoch from coalesce(new.feito_em, now()) - ini)))::int end;
+    else
+      new.duracao_seg := old.duracao_seg;
+    end if;
+  elsif new.status = &#x27;pendente&#x27; and new.iniciado_em is null and new.foto_antes_em is null then
+    new.duracao_seg := null;
+  end if;
+  return new;
+end $$;
+drop trigger if exists mok_reg_tempo on public.mok_registros;
+create trigger mok_reg_tempo before insert or update on public.mok_registros for each row execute function public.mok_reg_tempo();
+
 -- Pronto! Agora abra o app e crie a conta do Pai.
 </pre>
 <script>document.getElementById('b').onclick=async()=>{const t=document.getElementById('s').textContent;try{await navigator.clipboard.writeText(t)}catch(e){const r=document.createRange();r.selectNodeContents(document.getElementById('s'));const s=getSelection();s.removeAllRanges();s.addRange(r);document.execCommand('copy')}document.getElementById('b').textContent='✅ Copiado! Agora cole no SQL Editor'}</script></body></html>

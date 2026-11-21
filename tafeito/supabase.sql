@@ -1407,4 +1407,52 @@ end $$;
 revoke all on function public.mok_work_areas(jsonb) from public, anon;
 grant execute on function public.mok_work_areas(jsonb) to authenticated;
 
+-- =====================================================================
+-- v3.0: MASCOTES BRINCAM JUNTOS (avisa o outro; no máximo 1 aviso a cada 20 min)
+-- =====================================================================
+create or replace function public.mok_brincar_juntos() returns void
+language plpgsql security definer set search_path = public as $$
+declare f text := mok_meu_filho(); v_alvo text; meu jsonb; dele jsonb; v_nome text;
+begin
+  if mok_is_pai() then
+    select filho_id into v_alvo from mok_perfis where papel = 'filho' order by entrou_em desc nulls last limit 1;
+    if v_alvo is null then return; end if;
+    select mascote_pai into meu from mok_config where id = 1; select mascote into dele from mok_filhos where id = v_alvo; v_nome := 'pai';
+  elsif f is not null then
+    v_alvo := 'pai'; select x.mascote, x.nome into meu, v_nome from mok_filhos x where x.id = f; select mascote_pai into dele from mok_config where id = 1;
+  else return; end if;
+  if exists (select 1 from mok_avisos where mok_avisos.alvo = v_alvo and mok_avisos.tag = 'brincar' and criado_em > now() - interval '20 minutes') then return; end if;
+  perform mok_push_enviar(v_alvo, '🤝 ' || coalesce(meu->>'nome', 'Mascote') || ' brincou com o ' || coalesce(dele->>'nome', 'seu mascote') || '!',
+    case when v_nome = 'pai' then 'O mascote do pai veio brincar 🎉' else coalesce(v_nome, 'Seu filho') || ' fez os mascotes brincarem juntos 🎉' end, 'brincar');
+end $$;
+revoke all on function public.mok_brincar_juntos() from public, anon;
+grant execute on function public.mok_brincar_juntos() to authenticated;
+
+-- =====================================================================
+-- v3.1: TEMPO DE EXECUÇÃO DAS TAREFAS (início = foto ANTES ou ▶️ Começar; fim = marcar como feita)
+-- =====================================================================
+alter table public.mok_registros add column if not exists iniciado_em timestamptz;
+alter table public.mok_registros add column if not exists duracao_seg int;
+
+create or replace function public.mok_reg_tempo() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare ini timestamptz;
+begin
+  if tg_op = 'UPDATE' and old.iniciado_em is not null and new.status <> 'pendente' then new.iniciado_em := old.iniciado_em; end if; -- o início não muda depois de marcado
+  if new.status in ('feita','aprovada') then
+    if tg_op = 'INSERT' or old.status not in ('feita','aprovada') then
+      if not mok_is_pai() then new.feito_em := now(); end if;
+      ini := coalesce(new.iniciado_em, new.foto_antes_em);
+      new.duracao_seg := case when ini is null then null else greatest(0, least(43200, extract(epoch from coalesce(new.feito_em, now()) - ini)))::int end;
+    else
+      new.duracao_seg := old.duracao_seg;
+    end if;
+  elsif new.status = 'pendente' and new.iniciado_em is null and new.foto_antes_em is null then
+    new.duracao_seg := null;
+  end if;
+  return new;
+end $$;
+drop trigger if exists mok_reg_tempo on public.mok_registros;
+create trigger mok_reg_tempo before insert or update on public.mok_registros for each row execute function public.mok_reg_tempo();
+
 -- Pronto! Agora abra o app e crie a conta do Pai.

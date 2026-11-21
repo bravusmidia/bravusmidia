@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '2.9.0';
+const VERSAO = '3.1.0';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -33,6 +33,10 @@ const agoraISO = () => new Date().toISOString();
 const addDias = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return hojeISO(d); };
 const dow = iso => new Date(iso + 'T12:00:00').getDay();
 const diaLocal = ts => ts ? hojeISO(new Date(ts)) : '';
+const fmtDur = seg => { if (seg == null || isNaN(seg)) return '—'; seg = Math.max(0, Math.round(seg)); const h = Math.floor(seg / 3600), m = Math.floor(seg % 3600 / 60), s = seg % 60; return h ? `${h}h ${String(m).padStart(2, '0')}min` : m ? `${m}min ${String(s).padStart(2, '0')}s` : `${s}s`; };
+const inicioReg = r => r && (r.iniciado_em || r.foto_antes_em) || null;
+const duracaoReg = r => { if (!r || !ehFeitaBase(r)) return null; if (r.duracao_seg != null) return Number(r.duracao_seg); const i = inicioReg(r); return i && r.feito_em ? Math.max(0, (new Date(r.feito_em) - new Date(i)) / 1000) : null; };
+const ehFeitaBase = r => !!r && (r.status === 'feita' || r.status === 'aprovada');
 const hora = ts => ts ? new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
 const dataBR = iso => iso ? iso.slice(0, 10).split('-').reverse().join('/') : '';
 const dataHoraBR = ts => ts ? new Date(ts).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
@@ -98,6 +102,7 @@ class LocalStore {
       else { const c = db.config[0]; if (a.p_foto != null) c.foto_pai = a.p_foto; if (a.p_whatsapp != null) c.whatsapp_pai = a.p_whatsapp.replace(/\D/g, ''); if (a.p_mascote) c.mascote_pai = a.p_mascote; }
       this._save(db); return null;
     }
+    if (n === 'mok_brincar_juntos') return null;
     if (n === 'mok_work_areas') { const db = this._load(); db.config[0].work_areas = a.p_areas; this._save(db); return null; }
     if (n === 'mok_notif_pai') { const db = this._load(); db.config[0].notif_pai_off = a.p_off || []; this._save(db); return null; }
     if (n === 'mok_ciente') { const db = this._load(); db.cientes = db.cientes || []; const pr = (db.provas || []).find(x => x.id === a.p_prova);
@@ -623,7 +628,8 @@ function cardTarefaFilho(t, dia) {
   const lista = its.length ? `<div class="itens">${its.map((nome, i) => { const ok = marcados.includes(i); return `<button class="item ${ok ? 'ok' : ''}" ${feita ? 'disabled' : `data-act="marcarItem" data-id="${esc(t.id)}" data-i="${i}"`}><span class="cx">${ok ? '✓' : ''}</span>${esc(nome)}</button>`; }).join('')}<div class="mut peq">${marcados.length}/${its.length} marcadas</div></div>` : '';
   let botao;
   if (st === 'reprovada') botao = `<div class="aviso bad">❌ O pai pediu para refazer${r.obs ? ': <b>' + esc(r.obs) + '</b>' : ''}</div><button class="btn" data-act="refazer" data-id="${esc(t.id)}">🔁 Refazer tarefa</button>`;
-  else if (feita) botao = `<button class="btn ok" disabled>✅ ${st === 'aprovada' ? 'Aprovada pelo pai' : (f.exigir_aprovacao ? 'Feita · aguardando o pai' : 'Concluída')} <span class="peq">${hora(r.feito_em)}</span></button>`;
+  else if (feita) botao = `<button class="btn ok" disabled>✅ ${st === 'aprovada' ? 'Aprovada pelo pai' : (f.exigir_aprovacao ? 'Feita · aguardando o pai' : 'Concluída')} <span class="peq">${hora(r.feito_em)}${duracaoReg(r) != null ? ' · ⏱️ ' + fmtDur(duracaoReg(r)) : ''}</span></button>`;
+  else if (!t.foto && !inicioReg(r) && !itensDe(t).length) botao = `<button class="btn pri" data-act="iniciarTarefa" data-id="${esc(t.id)}">▶️ Começar (marca o tempo)</button>`;
   else {
     const fotosOk = !t.foto || (r && r.foto_antes && r.foto_depois);
     const itensOk = marcados.length >= its.length;
@@ -636,7 +642,7 @@ function cardTarefaFilho(t, dia) {
       <div style="margin-top:4px">${t.valor > 0 ? `<span class="tag din">💰 ${brl(t.valor)}</span>` : ''}<span class="tag">+${t.xp} XP</span>${!t.obrigatoria ? '<span class="tag">opcional</span>' : ''}</div></div>
     ${pode('tarefas') && S.papel === 'filho' ? `<button class="icone-btn" data-act="editarTarefa" data-id="${esc(t.id)}">✏️</button>` : ''}
     <button class="icone-btn" data-act="agendaTarefa" data-id="${esc(t.id)}" title="Pôr na agenda">📅</button></div>
-    ${t.descricao ? `<p class="mut peq" style="margin:8px 0 0">${esc(t.descricao)}</p>` : ''}${lista}${fotos}${botao}</div>`;
+    ${t.descricao ? `<p class="mut peq" style="margin:8px 0 0">${esc(t.descricao)}</p>` : ''}${!feita && inicioReg(r) ? `<div class="cronometro">⏱️ Fazendo há <b data-cron="${esc(inicioReg(r))}">${fmtDur((Date.now() - new Date(inicioReg(r))) / 1000)}</b></div>` : ''}${lista}${fotos}${botao}</div>`;
 }
 
 function cardTarefaPai(t, dia) {
@@ -671,7 +677,7 @@ function telaHoje() {
   const st = statusDia(dia);
   const casa = tars.filter(t => t.categoria === 'casa');
   const pct = st.total ? Math.round(st.feitas / st.total * 100) : 0;
-  return `${avisoNotificacao()}${bannerPermissoes()}${bannerProvas()}${dashTarefas()}
+  return `${avisoNotificacao()}${bannerPermissoes()}${bannerProvas()}${dashTarefas()}${dashTempo()}
     <div class="card"><div class="linha"><div class="esp"><b>Missões de hoje</b><br><span class="mut peq">${new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</span></div><b style="font-size:1.4rem">${st.feitas}/${st.total}</b></div>
     <div class="barra" style="margin-top:10px"><i style="width:${pct}%"></i></div></div>
     ${!tars.length ? `<div class="vazio"><span class="e">🎉</span>Nenhuma tarefa de casa hoje.</div>` : ''}
@@ -682,13 +688,15 @@ function telaHoje() {
 }
 
 /* ---------- ÁREAS DO WORK (menu: Imagens, Web design, Prospecção…) ---------- */
-const WORK_PADRAO = [{ id: 'imagens', nome: 'Imagens (Feed e Story)', icone: '🖼️' }, { id: 'webdesign', nome: 'Web design', icone: '💻' }, { id: 'prospeccao', nome: 'Prospecção', icone: '📞' }];
-const areasWork = () => Array.isArray(S.config.work_areas) && S.config.work_areas.length ? S.config.work_areas : WORK_PADRAO;
+const WORK_PADRAO = [{ id: 'webdesign', nome: 'Web design', icone: '💻' }, { id: 'prospeccao', nome: 'Prospecção', icone: '📞' }];
+const AREA_IMG = 'webdesign'; // as imagens (Feed e Story) ficam dentro de Web design
+const areasWork = () => (Array.isArray(S.config.work_areas) && S.config.work_areas.length ? S.config.work_areas : WORK_PADRAO).filter(x => x.id !== 'imagens');
+const mostraImagens = a => a === 'todas' || a === AREA_IMG || (a === 'sem' && !areasWork().some(x => x.id === AREA_IMG));
 const areaAtual = () => { const a = S.areaWork || 'todas'; return a === 'todas' || a === 'sem' || areasWork().some(x => x.id === a) ? a : 'todas'; };
 const tarefasArea = (lista, area) => area === 'todas' ? lista : area === 'sem' ? lista.filter(t => !t.area || !areasWork().some(x => x.id === t.area)) : lista.filter(t => t.area === area);
 function menuWork() {
   const a = areaAtual(); const todas = deFilho('tarefas').filter(t => t.categoria === 'trabalho' && (S.papel === 'pai' || t.ativa !== false));
-  const n = id => tarefasArea(todas, id).length + (id === 'imagens' ? deFilho('imagens').length : 0);
+  const n = id => tarefasArea(todas, id).length + (id === AREA_IMG ? deFilho('imagens').length : 0);
   const sem = tarefasArea(todas, 'sem').length;
   return `<div class="menu-work"><div class="menu-work-tit"><b>💼 Áreas do Work</b>${S.papel === 'pai' ? '<button class="btn ghost sm" style="width:auto" data-act="areasWork">⚙️ Editar áreas</button>' : ''}</div>
     <div class="menu-work-lista">${[{ id: 'todas', nome: 'Tudo', icone: '📋' }, ...areasWork(), ...(sem ? [{ id: 'sem', nome: 'Outros', icone: '📦' }] : [])].map(x => `<button class="${a === x.id ? 'on' : ''}" data-act="areaWork" data-v="${esc(x.id)}"><span class="ic">${esc(x.icone || '📁')}</span><span class="nm">${esc(x.nome)}</span><span class="qt">${x.id === 'todas' ? todas.length + deFilho('imagens').length : x.id === 'sem' ? sem : n(x.id)}</span></button>`).join('')}</div></div>`;
@@ -706,7 +714,7 @@ const slugArea = t => semAcento(t).replace(/[^a-z0-9]+/g, '').slice(0, 20) || ('
 function telaWorkFilho() {
   const dia = hojeISO(); const area = areaAtual(); const tars = tarefasArea(tarefasDoDia(dia, ['trabalho']), area); const c = carteira();
   const hist = concluidos().filter(r => num(r.valor) > 0).sort((a, b) => (b.feito_em || '').localeCompare(a.feito_em || '')).slice(0, 15);
-  return `${menuWork()}${area === 'todas' ? dashWork() : ''}${area === 'todas' || area === 'imagens' ? secaoImagens() : ''}<div class="card destaque"><div class="linha"><div class="esp"><span class="mut peq">Seu saldo a receber</span><h1 style="margin:2px 0">${brl(c.saldo)}</h1><span class="mut peq">Ganho total ${brl(c.ganho)} · já recebido ${brl(c.pago)}</span></div><span style="font-size:2.4rem">💰</span></div></div>
+  return `${menuWork()}${area === 'todas' ? dashWork() : ''}${mostraImagens(area) ? secaoImagens() : ''}<div class="card destaque"><div class="linha"><div class="esp"><span class="mut peq">Seu saldo a receber</span><h1 style="margin:2px 0">${brl(c.saldo)}</h1><span class="mut peq">Ganho total ${brl(c.ganho)} · já recebido ${brl(c.pago)}</span></div><span style="font-size:2.4rem">💰</span></div></div>
     <div class="secao">💼 Trabalhos${area !== 'todas' ? ' · ' + esc((areasWork().find(x => x.id === area) || { nome: 'Outros' }).nome) : ''}</div>
     ${tars.length ? tars.map(t => cardTarefaFilho(t, dia)).join('') : `<div class="vazio"><span class="e">💼</span>Nenhum trabalho ${area === 'todas' ? 'agora' : 'nesta área'}. O pai coloca novos trabalhos aqui.</div>`}
     ${hist.length ? `<div class="secao">Histórico</div><div class="card">${hist.map(r => `<div class="lista-item"><div class="tt">${esc((tarefaPorId(r.tarefa_id) || {}).titulo || 'Trabalho')}<small>${dataHoraBR(r.feito_em)}</small></div><b>${brl(r.valor)}</b></div>`).join('')}</div>` : ''}`;
@@ -776,7 +784,7 @@ function telaPainel() {
       <input type="date" class="inp" style="width:auto;padding:7px 9px" value="${dia}" data-change="diaVer"></div></div>
     ${S.modo === 'online' && perfil ? `<div class="aviso ${perfil.notif_estado === 'ativo' ? 'ok' : 'bad'}">${perfil.notif_estado === 'ativo' ? '🔔 Notificações de ' + esc(f.nome) + ' <b>ligadas</b>' : '🔕 Notificações de ' + esc(f.nome) + ' <b>' + (perfil.notif_estado ? 'DESLIGADAS' : 'ainda não ativadas') + '</b>' + (perfil.notif_em ? ' desde ' + dataHoraBR(perfil.notif_em) : '') + ' · o app dele fica bloqueado até religar'}</div>` : ''}
     ${S.modo === 'online' ? cardUso(f.id) : ''}${bannerProvas()}
-    <div class="secao">📊 Resumo de ${esc(f.nome)}</div>${dashTarefas(f.id)}${dashWork(f.id)}${dashEstudo(f.id)}
+    <div class="secao">📊 Resumo de ${esc(f.nome)}</div>${dashTarefas(f.id)}${dashTempo(f.id)}${dashWork(f.id)}${dashEstudo(f.id)}
     ${tars.length ? cardPremio(dia) : ''}
     ${aguard ? `<div class="aviso info" style="margin-top:12px">⭐ ${aguard} tarefa(s) esperando sua aprovação.</div>` : ''}
     <div class="secao">Tarefas de ${dia === hojeISO() ? 'hoje' : dataBR(dia)}</div>
@@ -806,7 +814,7 @@ function telaTarefasPai() {
 function telaWorkPai() {
   const c = carteira(); const pags = deFilho('pagamentos').sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || ''));
   const area = areaAtual(); const nomeA = (areasWork().find(x => x.id === area) || {}).nome;
-  return `${menuWork()}${area === 'todas' ? dashWork() : ''}${area === 'todas' || area === 'imagens' ? secaoImagens() : ''}<div class="card destaque"><span class="mut peq">${esc(filhoAtual().nome)} tem a receber</span><h1 style="margin:2px 0">${brl(c.saldo)}</h1>
+  return `${menuWork()}${area === 'todas' ? dashWork() : ''}${mostraImagens(area) ? secaoImagens() : ''}<div class="card destaque"><span class="mut peq">${esc(filhoAtual().nome)} tem a receber</span><h1 style="margin:2px 0">${brl(c.saldo)}</h1>
     <span class="mut peq">Ganho ${brl(c.ganho)} · pago ${brl(c.pago)}</span>
     <div class="acoes"><button class="btn ok sm" data-act="pagar">💸 Registrar pagamento</button></div></div>
     <div class="linha" style="margin-top:6px"><div class="esp"><h2 style="margin:0">Trabalhos${nomeA ? ' · ' + esc(nomeA) : ''}</h2><span class="mut peq">Tarefas que valem dinheiro</span></div>
@@ -998,6 +1006,25 @@ function telaEstudo() {
 /* ---------- DASHBOARDS simples (números grandes e cores) ---------- */
 function dash(titulo, tiles, extra = '') {
   return `<div class="dash"><div class="dash-tit">${titulo}</div><div class="dash-grid">${tiles.map(t => `<div class="tile ${t.c}${String(t.n).length > 5 ? ' tile-largo' : ''}"><b>${t.n}</b><span>${t.r}</span></div>`).join('')}</div>${extra}</div>`;
+}
+/* ---------- DASHBOARD: TEMPO DE EXECUÇÃO DAS TAREFAS ---------- */
+function dashTempo(id = fid(), dias = 30) {
+  const lim = addDias(hojeISO(), -dias); const hoje = hojeISO();
+  const regs = S.dados.registros.filter(r => r.filho_id === id && r.data > lim && duracaoReg(r) != null);
+  const nomeT = r => { const t = tarefaPorId(r.tarefa_id); return t ? `${t.icone || CATS[t.categoria]?.icone || '✅'} ${t.titulo}` : 'Tarefa'; };
+  if (!regs.length) return dash('⏱️ Tempo das tarefas', [{ n: '—', r: 'hoje', c: 'azul' }, { n: '—', r: 'média por tarefa', c: 'roxo' }], `<div class="dash-st info">O tempo começa a contar na foto ANTES (ou no botão ▶️ Começar) e para quando ${esc(nomeFilho(id))} marca como feita.</div>`);
+  const tot = l => l.reduce((a, r) => a + duracaoReg(r), 0);
+  const hojeL = regs.filter(r => r.data === hoje); const media = tot(regs) / regs.length;
+  const porT = {}; regs.forEach(r => { (porT[r.tarefa_id] = porT[r.tarefa_id] || []).push(r); });
+  const linhas = Object.values(porT).map(l => { l.sort((a, b) => (b.feito_em || '').localeCompare(a.feito_em || '')); const ds = l.map(duracaoReg); return { nome: nomeT(l[0]), n: l.length, media: ds.reduce((a, b) => a + b, 0) / ds.length, melhor: Math.min(...ds), ultima: ds[0], antes: ds[1] }; }).sort((a, b) => b.media - a.media);
+  const max = Math.max(...linhas.map(x => x.media), 1);
+  const rapida = linhas.reduce((a, b) => a.melhor < b.melhor ? a : b), lenta = linhas[0];
+  return dash('⏱️ Tempo das tarefas', [{ n: fmtDur(tot(hojeL)), r: `hoje (${hojeL.length} tarefas)`, c: 'azul' }, { n: fmtDur(media), r: 'média por tarefa', c: 'roxo' },
+      { n: fmtDur(rapida.melhor), r: 'mais rápida', c: 'verde' }, { n: fmtDur(lenta.media), r: 'a mais demorada', c: 'amarelo' }],
+    `<div class="tempo-lista">${linhas.map(x => `<div class="tempo-item"><div class="linha"><span class="esp tempo-nome">${esc(x.nome)}</span><b>${fmtDur(x.media)}</b></div>
+      <div class="barra"><i style="width:${Math.max(6, x.media / max * 100)}%"></i></div>
+      <div class="mut peq">⚡ melhor ${fmtDur(x.melhor)} · última ${fmtDur(x.ultima)}${x.antes != null ? (x.ultima < x.antes ? ' · <span class="ok-txt">↓ mais rápido que a anterior</span>' : x.ultima > x.antes ? ' · <span class="bad-txt">↑ mais devagar</span>' : '') : ''} · ${x.n}×</div></div>`).join('')}</div>
+    <div class="dash-st info">Últimos ${dias} dias · o tempo conta da foto ANTES (ou ▶️ Começar) até marcar como feita.</div>`);
 }
 function dashTarefas(id = fid()) {
   const dia = hojeISO(), hm = new Date().toTimeString().slice(0, 5);
@@ -1332,12 +1359,13 @@ const petDe = id => { const p = id === 'pai' ? S.config.pet_pai : (S.dados.filho
 function statusPet(p, agora = Date.now()) {
   const desde = k => p[k] ? (agora - p[k]) / H : 6;
   const fome = clamp(100 - desde('comeu') * 12), sede = clamp(100 - desde('bebeu') * 16), treino = clamp(100 - desde('treinou') * 8);
+  const limpeza = clamp(100 - desde('banho') * 5), diversao = clamp(100 - desde('brincou') * 10);
   let energia;
   if (p.dormindo) energia = clamp((p.energia ?? 60) + ((agora - (p.dormiu || agora)) / H) * 30);
   else energia = clamp((p.energia ?? 80) - ((agora - (p.acordou || agora)) / H) * 6);
-  const humor = Math.round((fome + sede + treino + energia) / 4);
+  const humor = Math.round((fome + sede + treino + energia + limpeza + diversao) / 6);
   const nivel = Math.floor((p.xp || 0) / 50) + 1;
-  return { fome: Math.round(fome), sede: Math.round(sede), treino: Math.round(treino), energia: Math.round(energia), humor, nivel, xp: p.xp || 0, dormindo: !!p.dormindo };
+  return { fome: Math.round(fome), sede: Math.round(sede), treino: Math.round(treino), limpeza: Math.round(limpeza), diversao: Math.round(diversao), energia: Math.round(energia), humor, nivel, xp: p.xp || 0, dormindo: !!p.dormindo };
 }
 function pedidoPet(st, nome) {
   if (st.dormindo) return `${nome} está dormindo 💤`;
@@ -1345,11 +1373,14 @@ function pedidoPet(st, nome) {
   if (st.sede < 30) return `${nome} está com sede! 💧`;
   if (st.energia < 25) return `${nome} está com sono 😴`;
   if (st.treino < 30) return `${nome} quer treinar 🏋️`;
+  if (st.diversao < 30) return `${nome} quer brincar ⚽`;
+  if (st.limpeza < 30) return `${nome} precisa de um banho 🛁`;
   return '';
 }
 const COMIDA = { gato: '🐟', gatinho: '🐟', cachorro: '🦴', cao: '🦴', coelho: '🥕', hamster: '🥜', esquilo: '🥜', macaco: '🍌', gorila: '🍌', panda: '🎋', coala: '🌿', cavalo: '🥕', unicornio: '🍓', vaca: '🌾', ovelha: '🌾', bode: '🌾',
   urso: '🍯', urso_polar: '🐟', pinguim: '🐟', foca: '🐟', lontra: '🐟', tubarao: '🐟', golfinho: '🐟', baleia: '🦐', abelha: '🌻', borboleta: '🌸', vampiro: '🍅', vampira: '🍅', zumbi: '🧠', robo: '🔋', alien: '🍕', monstro: '🍕', fantasma: '🍬', bruxo: '🍬', bruxa: '🍬', mago: '🍬' };
-const ACOES_PET = { comer: ['🍖', 'Comida', 'comeu', 'Hmm, que delícia! Obrigado!'], beber: ['💧', 'Água', 'bebeu', 'Ahh, refrescante!'], treinar: ['🏋️', 'Treinar', 'treinou', 'Bora! Treinei e fiquei mais forte 💪'], dormir: ['😴', 'Dormir', '', 'Boa noite… zzz'] };
+const ACOES_PET = { comer: ['🍖', 'Comida', 'comeu', 'Hmm, que delícia! Obrigado!'], beber: ['💧', 'Água', 'bebeu', 'Ahh, refrescante!'], treinar: ['🏋️', 'Treinar', 'treinou', 'Bora! Treinei e fiquei mais forte 💪'], banho: ['🛁', 'Banho', 'banho', 'Que banho gostoso! Estou cheiroso ✨'],
+  brincar: ['⚽', 'Brincar', 'brincou', 'Uhuul! Adoro brincar com você! 🎉'], dancar: ['🕺', 'Dançar', 'dancou', 'Olha meu passinho! 🎶'], dormir: ['😴', 'Dormir', '', 'Boa noite… zzz'] };
 async function cuidarPet(acao) {
   const dono = S.papel === 'pai' ? 'pai' : S.eu; const m = mascoteDe(dono); const p = petDe(dono); const agora = Date.now(); const st = statusPet(p, agora);
   let fala = '';
@@ -1359,12 +1390,12 @@ async function cuidarPet(acao) {
   } else {
     if (p.dormindo) return toast(`${m.nome} está dormindo. Acorde primeiro 😴`);
     const [, , campo, f] = ACOES_PET[acao];
-    const antes = st[acao === 'comer' ? 'fome' : acao === 'beber' ? 'sede' : 'treino'];
-    if (acao === 'treinar' && st.energia < 15) { fala = 'Estou sem energia… preciso dormir primeiro 😴'; }
-    else if (antes > 92) { fala = acao === 'comer' ? 'Estou cheio! Mais tarde 😅' : acao === 'beber' ? 'Já bebi bastante! 😄' : 'Já treinei bastante por hoje! Vamos descansar 😅'; }
+    const antes = acao === 'dancar' ? (p.dancou && agora - p.dancou < 6e4 ? 99 : 0) : st[{ comer: 'fome', beber: 'sede', treinar: 'treino', banho: 'limpeza', brincar: 'diversao' }[acao]];
+    if ((acao === 'treinar' || acao === 'brincar') && st.energia < 15) { fala = 'Estou sem energia… preciso dormir primeiro 😴'; }
+    else if (antes > 92) { fala = { comer: 'Estou cheio! Mais tarde 😅', beber: 'Já bebi bastante! 😄', treinar: 'Já treinei bastante por hoje! Vamos descansar 😅', banho: 'Já estou limpinho! 🧼', brincar: 'Ufa, brinquei muito! Daqui a pouco de novo 😄', dancar: 'Deixa eu descansar o passinho 😅' }[acao]; }
     else {
-      p[campo] = agora; p.xp = (p.xp || 0) + (acao === 'treinar' ? 10 : 5); fala = f;
-      if (acao === 'treinar') { p.energia = clamp(st.energia - 12); p.acordou = agora; }
+      p[campo] = agora; p.xp = (p.xp || 0) + ({ treinar: 10, brincar: 8, dancar: 3 }[acao] || 5); fala = f;
+      if (acao === 'treinar' || acao === 'brincar') { p.energia = clamp(st.energia - (acao === 'treinar' ? 12 : 8)); p.acordou = agora; }
     }
     if (!p.acordou) { p.acordou = agora; p.energia = st.energia; }
   }
@@ -1378,7 +1409,7 @@ async function cuidarPet(acao) {
   const fl = document.querySelector('.fala-pet'); if (fl) fl.textContent = fala;
 }
 function reagirPet(acao) {
-  document.querySelectorAll('.masc-animal').forEach(el => { el.classList.remove('reage-comer', 'reage-beber', 'reage-treinar', 'reage-dormir'); void el.offsetWidth; el.classList.add('reage-' + acao); setTimeout(() => el.classList.remove('reage-' + acao), 1600); });
+  document.querySelectorAll('.masc-animal').forEach(el => { el.classList.remove('reage-comer', 'reage-beber', 'reage-treinar', 'reage-dormir', 'reage-banho', 'reage-brincar', 'reage-dancar'); void el.offsetWidth; el.classList.add('reage-' + acao); setTimeout(() => el.classList.remove('reage-' + acao), 1600); });
 }
 function festaPet(e) {
   document.querySelectorAll('.masc-palco, .flut-masc').forEach(alvo => {
@@ -1387,7 +1418,7 @@ function festaPet(e) {
 }
 function barrasPet(st) {
   const b = (e, t, v) => `<div class="barra-pet"><span>${e} ${t}</span><div class="barra"><i style="width:${v}%;background:${v < 30 ? '#ef4444' : v < 60 ? '#f59e0b' : '#22c55e'}"></i></div><b>${v}%</b></div>`;
-  return `<div class="pet-status">${b('🍖', 'Fome', st.fome)}${b('💧', 'Sede', st.sede)}${b('🏋️', 'Treino', st.treino)}${b('⚡', 'Energia', st.energia)}
+  return `<div class="pet-status">${b('🍖', 'Fome', st.fome)}${b('💧', 'Sede', st.sede)}${b('🏋️', 'Treino', st.treino)}${b('⚽', 'Diversão', st.diversao)}${b('🛁', 'Limpeza', st.limpeza)}${b('⚡', 'Energia', st.energia)}
     <div class="linha peq" style="margin-top:4px"><span class="esp">⭐ Nível <b>${st.nivel}</b> · ${st.xp % 50}/50 XP</span><span>${st.humor >= 70 ? '😄 Feliz' : st.humor >= 40 ? '🙂 Ok' : '😢 Precisa de você'}</span></div></div>`;
 }
 function cardPet(dono) {
@@ -1396,6 +1427,42 @@ function cardPet(dono) {
     <div class="acoes-pet">${Object.entries(ACOES_PET).map(([k, [e, t]]) => `<button class="btn ghost sm" data-act="petAcao" data-v="${k}" ${st.dormindo && k !== 'dormir' ? 'disabled' : ''}>${k === 'comer' ? (COMIDA[m.animal] || e) : k === 'dormir' && st.dormindo ? '☀️' : e}<br><small>${k === 'dormir' && st.dormindo ? 'Acordar' : t}</small></button>`).join('')}</div>
     <div class="fala-pet mut peq">${esc(pedidoPet(st, m.nome) || 'Cuide dele todo dia para ele subir de nível!')}</div></div>`;
 }
+/* o mascote do outro (o filho vê o do pai e o pai vê o do filho) flutua junto e eles brincam */
+const donoAmigo = () => S.papel === 'pai' ? fid() : 'pai';
+const nomeDonoAmigo = () => S.papel === 'pai' ? filhoAtual().nome : nomePai();
+function amigoHTML(tam) {
+  const id = donoAmigo(); if (!id || lsGet('mok_amigo_off')) return '';
+  const m = { ...mascoteDe(id), _dormindo: statusPet(petDe(id)).dormindo };
+  return `<button class="masc-amigo" data-act="verAmigo" title="${esc(m.nome)} de ${esc(nomeDonoAmigo())}">${mascoteVisual(m, Math.round(tam * 0.78))}<span class="tag-amigo">${esc(m.nome)}</span></button>`;
+}
+function modalAmigo() {
+  const id = donoAmigo(); const m = mascoteDe(id); const st = statusPet(petDe(id)); const meu = mascoteDe(S.eu);
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><div class="centro masc-palco dupla">${mascoteVisual({ ...meu, _dormindo: statusPet(petDe(S.eu)).dormindo }, 120)}${mascoteVisual({ ...m, _dormindo: st.dormindo }, 120)}</div>
+    <h2 class="centro" style="margin-top:4px">${esc(meu.nome)} e ${esc(m.nome)}</h2><p class="centro mut peq">${esc(m.nome)} é o mascote de ${esc(nomeDonoAmigo())}</p>
+    <div class="card-pet"><b>🐾 Como está o ${esc(m.nome)}</b>${barrasPet(st)}</div>
+    <div class="grid2" style="margin-top:12px"><button class="btn pri" data-act="brincarJuntos">🤝 Brincar juntos</button><button class="btn ghost" data-act="esconderAmigo">🙈 Esconder ${esc(m.nome)}</button></div>`);
+}
+async function brincarJuntos() {
+  const meu = mascoteDe(S.eu), m = mascoteDe(donoAmigo());
+  brincadeira(true); festaPet('⚽');
+  const p = petDe(S.eu); p.brincou = Date.now(); p.xp = (p.xp || 0) + 8;
+  if (S.papel === 'pai') S.config.pet_pai = p; else { const f = S.dados.filhos.find(x => x.id === S.eu); if (f) f.pet = p; }
+  if (meu.voz !== false) falar(`Eba! ${meu.nome} e ${m.nome} estão brincando juntos!`);
+  try { await DB.rpc('mok_pet', { p_pet: p }); await DB.rpc('mok_brincar_juntos'); } catch (e) { console.warn(e); }
+  toast(`🤝 ${meu.nome} brincou com o ${m.nome}! ${nomeDonoAmigo()} vai ver.`, 'ok');
+}
+/* de vez em quando eles brincam sozinhos: bola, pulo junto ou "toca aqui" */
+function brincadeira(forcar) {
+  const w = document.querySelector('.flut-masc'); if (!w || !w.querySelector('.masc-amigo') || document.hidden) return;
+  if (!forcar && (document.querySelector('.modal') || Math.random() < 0.35)) return;
+  const tipos = ['bola', 'pulo', 'toca']; const t = tipos[Math.floor(Math.random() * tipos.length)];
+  w.classList.remove('brinca-bola', 'brinca-pulo', 'brinca-toca'); void w.offsetWidth; w.classList.add('brinca-' + t);
+  if (t === 'bola') { const b = document.createElement('span'); b.className = 'bola-brinca'; b.textContent = '⚽'; w.appendChild(b); setTimeout(() => b.remove(), 3200); }
+  if (t === 'toca') { const b = document.createElement('span'); b.className = 'toca-aqui'; b.textContent = '✋'; w.appendChild(b); setTimeout(() => b.remove(), 1600); }
+  setTimeout(() => w.classList.remove('brinca-' + t), 3200);
+}
+setInterval(() => brincadeira(false), 25000);
+setInterval(() => document.querySelectorAll('[data-cron]').forEach(el => { el.textContent = fmtDur((Date.now() - new Date(el.dataset.cron)) / 1000); }), 1000);
 function atualizarPetUI() { const c = document.querySelector('.modal .card-pet'); if (c) c.outerHTML = cardPet(S.papel === 'pai' ? 'pai' : S.eu); }
 setInterval(() => { if (S.papel && !document.querySelector('.modal')) { const fm = document.querySelector('.flut-masc .balao'); if (fm) fm.textContent = dicaMascote(); } }, 60000);
 
@@ -1506,7 +1573,7 @@ function modalAssistentePai() {
       ${r.provas.length ? r.provas.slice(0, 3).map(({ p, f }) => `<div class="bad">📚 ${esc(f.nome)}: <b>${esc(nomeProva(p))}</b> · ${faltaTxt(p)}</div>`).join('') : '<div>📚 Nenhuma prova nesta semana.</div>'}
     </div>
     <div class="grid2" style="margin-top:12px"><button class="btn pri" data-act="ir" data-tela="work">🖼️ Ver imagens</button><button class="btn ghost" data-act="ir" data-tela="tarefas">✅ Tarefas</button>
-    <button class="btn ghost" data-act="chatAbrir">💬 Chat</button><button class="btn ghost" data-act="mascoteEditar" data-id="pai">🎨 Personalizar</button></div>`);
+    <button class="btn ghost" data-act="chatAbrir">💬 Chat</button><button class="btn ghost" data-act="mascoteEditar" data-id="pai">🎨 Personalizar</button><button class="btn pri" style="grid-column:1/-1" data-act="verAmigo">👀 Ver o pet de ${esc(filhoAtual().nome)}</button></div>`);
 }
 function modalAssistente() {
   if (S.papel === 'pai') return modalAssistentePai();
@@ -1533,8 +1600,8 @@ function flutuantes() {
   let h = `<button class="flut-chat" data-arrastar="chat" ${pos('chat')} data-act="chatAbrir" title="Chat (arraste para mover)">💬${nl ? `<span class="badge">${nl}</span>` : ''}</button>`;
   if (S.papel === 'filho' || S.papel === 'pai') { const m = { ...mascoteDe(S.eu), _dormindo: statusPet(petDe(S.eu)).dormindo }; const d = dicaMascote(); const tam = tamMasc(), mudo = !!lsGet('mok_masc_mudo');
     h += `<div class="flut-masc${ladoDir('masc') ? ' lado-dir' : ''}" data-arrastar="masc" style="${posCss('masc')}--tam:${tam}px">
-      <button class="masc-toque" data-act="mascote" title="${esc(m.nome)} — toque para abrir, arraste para mover">${d ? `<span class="balao">${esc(d)}</span>` : ''}${mascoteVisual(m, tam)}</button>
-      <div class="masc-ctrl sem3d"><button data-act="mascMudo" title="${mudo ? 'Ligar a voz' : 'Silenciar'}">${mudo ? '🔇' : '🔊'}</button><button data-act="mascTam" data-v="-1" title="Diminuir">−</button><button data-act="mascTam" data-v="1" title="Aumentar">+</button></div></div>`; }
+      ${d ? `<span class="balao">${esc(d)}</span>` : ''}<div class="masc-par"><button class="masc-toque" data-act="mascote" title="${esc(m.nome)} — toque para abrir, arraste para mover">${mascoteVisual(m, tam)}</button>${amigoHTML(tam)}</div>
+      <div class="masc-ctrl sem3d"><button data-act="mascMudo" title="${mudo ? 'Ligar a voz' : 'Silenciar'}">${mudo ? '🔇' : '🔊'}</button><button data-act="mascTam" data-v="-1" title="Diminuir">−</button><button data-act="mascTam" data-v="1" title="Aumentar">+</button>${lsGet('mok_amigo_off') ? '<button data-act="mostrarAmigo" title="Mostrar o mascote do outro">👥</button>' : ''}</div></div>`; }
   if (S.chatAberto) h += `<div class="chat-flut-bg" data-act="chatFechar"></div><div class="chat-flut"><div class="linha" style="margin-bottom:6px"><b class="esp">💬 Chat</b><button class="btn zap sm" style="width:auto" data-act="whats">📲 WhatsApp</button><button class="icone-btn" data-act="chatFechar">✕</button></div>${telaChat()}</div>`;
   return h;
 }
@@ -2208,6 +2275,7 @@ const acoes = {
     if (itensMarcados(r0).length < itensDe(t).length) return toast('Marque todos os itens primeiro.', 'bad');
     const antes = statusDia(dia).liberado;
     const r = { ...r0, status: 'feita', feito_em: agoraISO(), obs: '' };
+    if (inicioReg(r0)) r.duracao_seg = Math.round((Date.now() - new Date(inicioReg(r0))) / 1000);
     if (!(await salvarReg(r))) return;
     confete(); toast(`Missão cumprida! +${t.xp} XP${t.valor > 0 ? ' · ' + brl(t.valor) : ''}`, 'ok');
     if (!antes && statusDia(dia).liberado) {
@@ -2220,16 +2288,20 @@ const acoes = {
   },
   refazer: async d => {
     const t = tarefaPorId(d.id); const r = regDe(t, hojeISO()); if (!r) return;
-    const limpo = { ...r, status: 'pendente', foto_antes: null, foto_antes_em: null, foto_depois: null, foto_depois_em: null, feito_em: null };
+    const limpo = { ...r, status: 'pendente', foto_antes: null, foto_antes_em: null, foto_depois: null, foto_depois_em: null, feito_em: null, iniciado_em: null, duracao_seg: null };
     if (itensDe(t).length) limpo.itens_feitos = [];
     await salvarReg(limpo);
+  },
+  iniciarTarefa: async d => {
+    const t = tarefaPorId(d.id); if (!t) return; const dia = hojeISO(); const r0 = regDe(t, dia) || novoReg(t, dia);
+    if (inicioReg(r0)) return; if (await salvarReg({ ...r0, iniciado_em: agoraISO() })) toast('⏱️ Valendo! O tempo está contando.', 'ok');
   },
   marcarItem: async d => {
     const t = tarefaPorId(d.id); if (!t) return; const dia = hojeISO(); const r0 = regDe(t, dia) || novoReg(t, dia);
     if (ehFeita(r0)) return;
     const i = Number(d.i); const m = itensMarcados(r0);
     const novo = m.includes(i) ? m.filter(x => x !== i) : [...m, i].sort((a, b) => a - b);
-    const r = { ...r0, itens_feitos: novo }; if (r.status === 'reprovada') r.status = 'pendente';
+    const r = { ...r0, itens_feitos: novo }; if (r.status === 'reprovada') r.status = 'pendente'; if (!inicioReg(r)) r.iniciado_em = agoraISO();
     if (await salvarReg(r) && !m.includes(i)) { if (novo.length >= itensDe(t).length) toast('Tudo marcado! Agora toque em "Marcar como feita".', 'ok'); }
   },
   aprovar: async d => {
@@ -2251,6 +2323,10 @@ const acoes = {
   refotografar: async d => { fecharModais(); await acoes.refazer(d); },
   novaTarefa: d => formTarefa(null, d.cat, d.area || ''),
   areaWork: d => { S.areaWork = d.v; render(); },
+  verAmigo: () => modalAmigo(),
+  brincarJuntos: () => brincarJuntos(),
+  esconderAmigo: () => { lsSet('mok_amigo_off', 1); fecharTopo(); render(); toast('🙈 Escondido. Toque em 👥 para mostrar de novo.'); },
+  mostrarAmigo: () => { lsSet('mok_amigo_off', 0); render(); },
   areasWork: () => modalAreasWork(),
   addArea: () => { const l = $('#listaAreas'); if (l && l.children.length < 12) l.insertAdjacentHTML('beforeend', linhaArea({ icone: '📁', nome: '' }, l.children.length)); const ins = l.querySelectorAll('input[name=an]'); ins[ins.length - 1].focus(); },
   delArea: (d, b) => { const l = b.closest('.area-linha'); if (l) l.remove(); },
