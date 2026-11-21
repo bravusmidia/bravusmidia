@@ -3,9 +3,9 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '1.7.0';
+const VERSAO = '1.8.0';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
-const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso'];
+const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
 const CATS = { casa: { nome: 'Casa', icone: '🏠' }, trabalho: { nome: 'Work', icone: '💼' } };
 // Estudo saiu do app (o filho já cuida disso sozinho): tarefas e missões antigas de estudo ficam ocultas.
@@ -133,6 +133,7 @@ class SupaStore {
     if (t === 'filhos') q = q.order('ordem');
     if (t === 'cientes') q = q.order('criado_em', { ascending: false }).limit(2000);
     if (t === 'uso') q = q.order('dia', { ascending: false }).limit(400);
+    if (t === 'avisos') q = q.order('criado_em', { ascending: false }).limit(150);
     const { data, error } = await q;
     if (error) throw error;
     return t === 'mensagens' ? data.reverse() : data;
@@ -425,7 +426,7 @@ async function abrirApp() {
   render();
   verificarPedidosPai();
   inscreverPush(false);
-  checarBanco(); cumprimentoDoDia();
+  checarBanco(); cumprimentoDoDia(); concluirLoginNotion();
 }
 
 async function carregarTudo() {
@@ -458,7 +459,13 @@ function aoMudarBanco() {
 function detectarNovidades() {
   const V = S.vistos, D = S.dados, primeira = !V.ok;
   V.msgs = V.msgs || new Set(); V.tars = V.tars || new Set(); V.sig = V.sig || {}; V.prv = V.prv || {}; V.mis = V.mis || new Set(); V.ped = V.ped || {}; V.reg = V.reg || {};
-  const avisar = (t, c, tag) => { if (!primeira) notificar(t, c, tag); };
+  const avisar = (t, c, tag) => { if (!primeira && S.modo !== 'online') notificar(t, c, tag); };
+  // modo online: os avisos vêm do servidor (central de notificações) — iguais aos do celular
+  V.av = V.av || new Set();
+  for (const a of D.avisos || []) {
+    if (V.av.has(a.id)) continue; V.av.add(a.id);
+    if (!primeira && !a.lido) notificar(a.titulo, a.corpo, 'central');
+  }
   for (const m of D.mensagens) {
     if (V.msgs.has(m.id)) continue; V.msgs.add(m.id);
     const deOutro = m.autor !== (S.papel === 'pai' ? 'pai' : S.eu);
@@ -529,6 +536,7 @@ function topo() {
   const sub = S.papel === 'pai' ? '👑 Pai · Administrador' : `🔑 ${esc(filhoAtual().nome)} · logado`;
   return `<header class="topo"><div class="marca">${logoImg()}<div>TáFeito<small>${sub}</small></div></div><div class="esp"></div>
     ${promptInstalar ? `<button class="icone-btn" data-act="instalar" title="Instalar">⬇️</button>` : ''}${pres}
+    ${S.modo === 'online' ? `<button class="icone-btn sino" data-act="avisos" title="Notificações">🔔${avisosNaoLidos() ? `<span class="badge">${avisosNaoLidos() > 99 ? '99+' : avisosNaoLidos()}</span>` : ''}</button>` : ''}
     <button class="avatar-btn" data-act="meuPerfil" title="Meu perfil">${avatar(S.papel === 'pai' ? 'pai' : S.eu, 36)}</button>
     ${S.papel === 'pai' ? `<button class="icone-btn engrenagem" data-act="ir" data-tela="mais" title="Configurações (só admin)">⚙️${pedidosPendentes().length ? '<span class="badge">' + pedidosPendentes().length + '</span>' : ''}</button>` : ''}</header>`;
 }
@@ -1319,6 +1327,17 @@ async function enviarWhats(para) {
   window.open(`https://wa.me/${num}?text=${encodeURIComponent(corpo)}`, '_blank'); fecharModais();
 }
 
+/* ---------- CENTRAL DE NOTIFICAÇÕES ---------- */
+const avisosNaoLidos = () => (S.dados.avisos || []).filter(a => !a.lido).length;
+async function modalAvisos() {
+  const l = S.dados.avisos || [];
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>🔔 Notificações</h2>
+    <p class="mut peq">Tudo que aconteceu no TáFeito. Os mesmos avisos chegam no celular, mesmo com o app fechado.</p>
+    <div class="avisos-lista">${l.length ? l.map(a => `<div class="aviso-item ${a.lido ? '' : 'novo'}"><div class="tt"><b>${esc(a.titulo)}</b>${a.corpo ? `<small>${esc(a.corpo)}</small>` : ''}</div><span class="mut peq">${dataHoraBR(a.criado_em)}</span></div>`).join('') : '<div class="vazio"><span class="e">🔕</span>Nenhuma notificação ainda.</div>'}</div>
+    <button class="btn ghost" style="margin-top:10px" data-act="teste">🧪 Testar aviso com o app fechado</button>`);
+  if (avisosNaoLidos()) { try { await DB.rpc('mok_avisos_lidos'); (S.dados.avisos || []).forEach(a => a.lido = true); render(); } catch { } }
+}
+
 /* ---------- TESTE DE LEMBRETE (prova que o celular recebe com o app fechado) ---------- */
 function paraLocalInput(d) { return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); }
 async function modalTeste() {
@@ -1365,43 +1384,74 @@ async function agendarTeste(quando) {
   } catch (e) { toast(msgErro(e), 'bad'); }
 }
 
-/* ---------- CONECTORES (Notion) ---------- */
-function modalConectores() {
-  const tok = lsGet('mok_notion_token');
+/* ---------- CONECTORES (Notion com login da própria conta · Google Agenda/Outlook por iCal) ---------- */
+const REDIRECT_NOTION = location.origin + location.pathname.replace(/index\.html$/, '');
+async function modalConectores() {
   modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>🔌 Conectores</h2>
-    <p class="mut peq">Traga informações de outros apps para o TáFeito. Tudo cai no formato do app (calendário de provas) e você confere antes de salvar.</p>
-    <div class="card"><h3>📓 Notion</h3>
-    ${tok ? `<p class="mut peq">Conectado neste aparelho. Escolha a base de dados para importar:</p><div id="notionBases" class="mut peq">Buscando…</div>
-      <button class="btn ghost sm" style="margin-top:8px" data-act="notionSair">Desconectar Notion</button>`
-    : `<ol class="peq passos"><li>Abra <a href="https://www.notion.so/profile/integrations" target="_blank" rel="noopener">notion.so → Integrações</a> e crie uma <b>integração interna</b> chamada TáFeito.</li>
-      <li>Copie o <b>token</b> (começa com <code>ntn_</code>).</li><li>No Notion, abra a página/base com suas provas → <b>⋯ → Conexões → TáFeito</b>.</li><li>Cole o token aqui:</li></ol>
-      <input id="notionTok" class="inp" placeholder="ntn_..." autocomplete="off"><button class="btn pri" style="margin-top:8px" data-act="notionSalvarToken">Conectar Notion</button>
-      <p class="mut peq">O token fica só neste aparelho.</p>`}</div>
-    <div class="card"><h3>📥 Arquivo ou foto</h3><p class="mut peq">PDF, Excel, Word, print ou foto de lista de provas.</p><button class="btn ghost" data-act="importar">Importar arquivo</button></div>`);
-  if (tok) notionBases();
+    <p class="mut peq">Conecte as suas contas. O que vier delas entra no formato do app (calendário de provas e datas), e você confere antes de salvar.</p>
+    <div class="card"><h3>📓 Notion</h3><div id="conNotion" class="mut peq">Verificando…</div></div>
+    <div class="card"><h3>📅 Google Agenda / Outlook / iPhone</h3>
+      <p class="mut peq">No Google Agenda: ⚙️ Configurações → clique na sua agenda → <b>Endereço secreto no formato iCal</b> → copie e cole aqui.</p>
+      <input id="icalUrl" class="inp" placeholder="https://calendar.google.com/calendar/ical/....ics" autocomplete="off" value="${esc(lsGet('mok_ical_url', ''))}">
+      <button class="btn pri" style="margin-top:8px" data-act="icalImportar">Importar eventos</button></div>
+    <div class="card"><h3>📥 Arquivo ou foto</h3><p class="mut peq">PDF, Excel, Word, print ou foto de uma lista.</p><button class="btn ghost" data-act="importar">Importar arquivo</button></div>`);
+  if (S.modo !== 'online') { $('#conNotion').innerHTML = 'Disponível no modo online.'; return; }
+  try {
+    const st = await chamarNotion({ acao: 'status' }); const el = $('#conNotion'); if (!el) return;
+    if (st.notion) {
+      el.innerHTML = `✅ Conectado: <b>${esc(st.notion.workspace || 'Notion')}</b>${st.notion.conta ? ' · ' + esc(st.notion.conta) : ''}<div id="notionBases" style="margin-top:8px">Buscando bases…</div>
+        <button class="btn ghost sm" style="margin-top:8px" data-act="notionDesconectar">Desconectar</button>`;
+      notionBases();
+    } else if (st.notion_cliente) {
+      el.innerHTML = `<p>Entre com a <b>sua própria conta</b> do Notion (seu e-mail). Na tela do Notion, escolha as páginas/bases que o TáFeito pode ler.</p>
+        <button class="btn notion" data-act="notionEntrar">Entrar com Notion</button>`;
+    } else el.innerHTML = '⚙️ O login do Notion ainda não foi liberado pelo administrador (falta cadastrar o TáFeito no Notion).';
+    emoji3d(el.closest('.modal'));
+  } catch (e) { const el = $('#conNotion'); if (el) el.innerHTML = '❌ ' + esc(msgErro(e)); }
 }
 async function chamarNotion(corpo) {
-  if (S.modo !== 'online') throw new Error('O Notion só funciona no modo online (Supabase).');
-  const { data, error } = await DB.sb.functions.invoke('tafeito-notion', { body: { token: lsGet('mok_notion_token'), ...corpo } });
-  if (error) { let m = error.message; try { const j = await error.context.json(); m = j.erro || m; } catch { } if (/404|not found|Failed to send/i.test(m)) m = 'Conector ainda não ligado no servidor (falta a função tafeito-notion no Supabase).'; throw new Error(m); }
+  if (S.modo !== 'online') throw new Error('Os conectores só funcionam no modo online.');
+  const { data, error } = await DB.sb.functions.invoke('tafeito-notion', { body: corpo });
+  if (error) { let m = error.message; try { const j = await error.context.json(); m = j.erro || m; } catch { } if (/404|not found|Failed to send/i.test(m)) m = 'Conector ainda não ligado no servidor.'; throw new Error(m); }
   if (data && data.erro) throw new Error(data.erro); return data;
+}
+async function notionEntrar() {
+  try {
+    const st = await chamarNotion({ acao: 'status' }); if (!st.notion_cliente) return toast('Login do Notion ainda não configurado.', 'bad');
+    const estado = uid(); lsSet('mok_notion_estado', estado);
+    location.href = `https://api.notion.com/v1/oauth/authorize?client_id=${encodeURIComponent(st.notion_cliente)}&response_type=code&owner=user&state=${estado}&redirect_uri=${encodeURIComponent(REDIRECT_NOTION)}`;
+  } catch (e) { toast(msgErro(e), 'bad'); }
+}
+async function concluirLoginNotion() {
+  const q = new URLSearchParams(location.search); const code = q.get('code'), st = q.get('state');
+  if (!code || !st || st !== lsGet('mok_notion_estado')) return;
+  history.replaceState(null, '', location.pathname); localStorage.removeItem('mok_notion_estado');
+  carregando(true, 'Conectando o Notion…');
+  try { const r = await chamarNotion({ acao: 'oauth', code, redirect_uri: REDIRECT_NOTION }); carregando(false); toast(`📓 Notion conectado${r.workspace ? ': ' + r.workspace : ''}!`, 'ok'); modalConectores(); }
+  catch (e) { carregando(false); toast(msgErro(e), 'bad'); }
 }
 async function notionBases() {
   const el = $('#notionBases'); if (!el) return;
   try {
     const { bases } = await chamarNotion({ acao: 'bases' });
     el.innerHTML = bases.length ? bases.map(b => `<button class="btn ghost sm" style="margin:4px 0" data-act="notionImportar" data-id="${esc(b.id)}" data-nome="${esc(b.nome)}">📄 ${esc(b.nome)}</button>`).join('')
-      : 'Nenhuma base compartilhada com a integração. No Notion: ⋯ → Conexões → TáFeito.';
+      : 'Nenhuma base liberada. No Notion, abra a base → ⋯ → Conexões → TáFeito.';
+    emoji3d(el);
   } catch (e) { el.innerHTML = '❌ ' + esc(msgErro(e)); }
+}
+function paraImport(itens) {
+  return itens.filter(x => x.titulo).map(x => ({ id: uid(), materia: x.titulo.slice(0, 80), instituicao: (x.instituicao || '').slice(0, 80), data: x.data || '', horario: x.horario || '08:00', site: /^https?:/.test(x.site || '') ? x.site : '', ok: true }));
 }
 async function notionImportar(id, nome) {
   carregando(true, `Lendo "${nome}" no Notion…`);
-  try {
-    const { itens } = await chamarNotion({ acao: 'linhas', base: id }); carregando(false);
-    IMPORT = itens.filter(x => x.titulo).map(x => ({ id: uid(), materia: x.titulo.slice(0, 80), instituicao: (x.instituicao || '').slice(0, 80), data: x.data || '', horario: x.horario || '08:00', site: /^https?:/.test(x.site) ? x.site : '', ok: true }));
-    if (!IMPORT.length) return toast('Essa base não tem linhas com título.', 'bad');
-    fecharModais(); modalRevisao();
-  } catch (e) { carregando(false); toast(msgErro(e), 'bad'); }
+  try { const { itens } = await chamarNotion({ acao: 'linhas', base: id }); carregando(false); IMPORT = paraImport(itens); if (!IMPORT.length) return toast('Essa base não tem linhas com título.', 'bad'); fecharModais(); modalRevisao(); }
+  catch (e) { carregando(false); toast(msgErro(e), 'bad'); }
+}
+async function icalImportar() {
+  const url = ($('#icalUrl').value || '').trim(); if (!url) return toast('Cole o endereço do calendário.', 'bad');
+  lsSet('mok_ical_url', url); carregando(true, 'Lendo o calendário…');
+  try { const { itens } = await chamarNotion({ acao: 'ical', url }); carregando(false); IMPORT = paraImport(itens); if (!IMPORT.length) return toast('Nenhum evento futuro nesse calendário.', 'bad'); fecharModais(); modalRevisao(); }
+  catch (e) { carregando(false); toast(msgErro(e), 'bad'); }
 }
 
 /* ---------- IMPORTAR PROVAS: lê foto, PDF, Excel, Word ou texto ---------- */
@@ -1868,14 +1918,16 @@ const acoes = {
   },
   calMes: d => { const [y, m] = S.calMes.split('-').map(Number); const n = new Date(y, m - 1 + Number(d.n), 1); S.calMes = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`; render(); },
   importar: () => modalImportar(),
+  avisos: () => modalAvisos(),
+  notionEntrar: () => notionEntrar(),
+  notionDesconectar: async () => { try { await chamarNotion({ acao: 'sair' }); } catch { } localStorage.removeItem('mok_notion_token'); fecharModais(); modalConectores(); },
+  icalImportar: () => icalImportar(),
   teste: () => modalTeste(),
   testeAtivar: () => ativarAvisosTeste(),
   testeRapido: () => agendarTeste(new Date(Date.now() + 60000)),
   testeAgendar: () => { const v = $('#testeQuando').value; if (!v) return toast('Escolha a data e a hora.', 'bad'); agendarTeste(new Date(v)); },
   abrirSite: d => window.open(d.url, '_blank', 'noopener'),
   conectores: () => modalConectores(),
-  notionSalvarToken: () => { const t = $('#notionTok').value.trim(); if (!/^(ntn_|secret_)/.test(t)) return toast('O token começa com ntn_ ou secret_.', 'bad'); lsSet('mok_notion_token', t); toast('Token salvo neste aparelho ✅', 'ok'); notionBases(); },
-  notionSair: () => { localStorage.removeItem('mok_notion_token'); fecharModais(); modalConectores(); },
   notionImportar: d => notionImportar(d.id, d.nome),
   meuPerfil: () => modalPerfil(S.papel === 'pai' ? 'pai' : S.eu),
   perfilFilho: d => modalPerfil(d.id),
@@ -2244,7 +2296,7 @@ async function notificar(titulo, corpo, tag) {
   beep(); if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
   if (document.visibilityState === 'visible') { const c = corpo || ''; toast(`${titulo}${c ? ' — ' + (c.length > 70 ? c.slice(0, 70) + '…' : c) : ''}`); }
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  if (lsGet('mok_push_ok') && ['msg', 'ped', 'reg', 'tar', 'lembrete', 'mis', 'pag', 'prova', 'ciente', 'login', 'filho', 'teste'].includes(tag)) return; // o push do servidor já mostra
+  if (lsGet('mok_push_ok') && ['msg', 'ped', 'reg', 'tar', 'lembrete', 'mis', 'pag', 'prova', 'ciente', 'login', 'filho', 'teste', 'central'].includes(tag) && document.visibilityState !== 'visible') return; // o push do servidor já mostra
   const op = { body: corpo || '', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: tag ? tag + '-' + Date.now() : undefined, vibrate: [200, 100, 200], requireInteraction: true };
   try { const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (reg) await reg.showNotification(titulo, op); else new Notification(titulo, op); }
   catch { try { new Notification(titulo, op); } catch { } }

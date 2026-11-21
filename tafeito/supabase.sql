@@ -1041,4 +1041,63 @@ do $$ begin
 end $$;
 
 
+-- v1.8: CONECTORES (login do Notion guardado no servidor, só a função lê)
+create table if not exists public.mok_conectores (
+  perfil uuid not null references auth.users(id) on delete cascade,
+  tipo text not null,
+  token text not null,
+  nome text not null default '',
+  conta text not null default '',
+  criado_em timestamptz not null default now(),
+  primary key (perfil, tipo)
+);
+alter table public.mok_conectores enable row level security;
+revoke all on public.mok_conectores from anon, authenticated;
+grant select, insert, update, delete on public.mok_conectores to service_role;
+
+-- v1.8: CENTRAL DE NOTIFICAÇÕES (todo aviso fica guardado e aparece no sininho do app)
+create table if not exists public.mok_avisos (
+  id bigint generated always as identity primary key,
+  alvo text not null,
+  titulo text not null,
+  corpo text not null default '',
+  tag text not null default '',
+  lido boolean not null default false,
+  criado_em timestamptz not null default now()
+);
+create index if not exists mok_avisos_alvo on public.mok_avisos (alvo, criado_em desc);
+alter table public.mok_avisos enable row level security;
+revoke all on public.mok_avisos from anon, authenticated;
+grant select on public.mok_avisos to authenticated;
+drop policy if exists mok_avisos_ler on public.mok_avisos;
+create policy mok_avisos_ler on public.mok_avisos for select to authenticated using (alvo = mok_meu_alvo());
+create or replace function public.mok_avisos_lidos() returns void
+language sql security definer set search_path = public as $$
+  update mok_avisos set lido = true where alvo = mok_meu_alvo() and not lido;
+$$;
+grant execute on function public.mok_avisos_lidos() to authenticated;
+do $$ begin
+  begin execute 'alter publication supabase_realtime add table public.mok_avisos'; exception when duplicate_object then null; end;
+end $$;
+
+-- todo aviso: guarda na central do app E manda para o celular (mesmo com o app fechado)
+create or replace function public.mok_push_enviar(p_alvo text, p_titulo text, p_corpo text, p_tag text) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare c mok_push_cfg%rowtype;
+begin
+  begin
+    insert into mok_avisos (alvo, titulo, corpo, tag) values (p_alvo, left(coalesce(p_titulo, ''), 200), left(coalesce(p_corpo, ''), 500), coalesce(p_tag, ''));
+    delete from mok_avisos where criado_em < now() - interval '60 days';
+  exception when others then null;
+  end;
+  select * into c from mok_push_cfg where id = 1;
+  if c.base is null or not exists (select 1 from mok_push where alvo = p_alvo) then return; end if;
+  perform net.http_post(
+    url := c.base || '/functions/v1/tafeito-push',
+    body := jsonb_build_object('alvo', p_alvo, 'titulo', p_titulo, 'corpo', coalesce(p_corpo, ''), 'tag', p_tag),
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-tafeito-segredo', c.segredo));
+exception when others then null;
+end $$;
+revoke all on function public.mok_push_enviar(text, text, text, text) from public, anon, authenticated;
+
 -- Pronto! Agora abra o app e crie a conta do Pai.
