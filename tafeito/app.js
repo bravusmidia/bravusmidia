@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '2.1.2';
+const VERSAO = '2.2.0';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -1147,7 +1147,7 @@ const MASC_OPC = {
 const MASC_ROT = { pele: 'Pele', cabelo: 'Cabelo', corCabelo: 'Cor do cabelo', olhos: 'Cor dos olhos', sobrancelha: 'Expressão', roupa: 'Roupa', corRoupa: 'Cor da roupa', corDetalhe: 'Cor dos detalhes', estampa: 'Estampa', calca: 'Calça', tenis: 'Tênis', chapeu: 'Cabeça', oculos: 'Óculos', extra: 'Acessório', boca: 'Boca', movimento: 'Movimento' };
 const MASC_NOMES = { espetado: 'Espetado', topete: 'Topete', cacheado: 'Cacheado', liso: 'Liso', moicano: 'Moicano', 'tranças': 'Tranças', raspado: 'Raspado', confiante: '😏 Confiante', alegre: '😄 Alegre', brava: '😠 Brava', surpresa: '😮 Surpresa', jaqueta: 'Jaqueta', moletom: 'Moletom', camiseta: 'Camiseta', regata: 'Regata', colete: 'Colete', uniforme: 'Uniforme', nenhuma: 'Nenhuma', raio: '⚡ Raio', estrela: '⭐ Estrela', numero: 'Nº 10', listras: 'Listras', nenhum: 'Nenhum', bone: '🧢 Boné', bonetras: '🧢 Boné pra trás', fone: '🎧 Fone', gorro: 'Gorro', bandana: 'Bandana', coroa: '👑 Coroa', redondo: '👓 Redondo', escuro: '🕶️ Escuro', gamer: '🥽 Gamer', mochila: '🎒 Mochila', capa: '🦸 Capa', medalha: '🏅 Medalha', relogio: '⌚ Relógio', skate: '🛹 Skate', sorriso: '🙂 Sorriso', sorrisao: '😁 Sorrisão', debochado: '😏 Debochado', lingua: '😛 Língua', flutuar: '🎈 Flutuar', acenar: '👋 Acenar', pular: '🦘 Pular', dancar: '🕺 Dançar', joinha: '👍 Joinha' };
 const MASC_CORES = ['pele', 'corCabelo', 'olhos', 'corRoupa', 'corDetalhe', 'calca', 'tenis'];
-const MASC_PADRAO = { nome: 'Bolt', voz: true, pele: '#e3a77a', cabelo: 'espetado', corCabelo: '#1e140e', olhos: '#4a2e1d', sobrancelha: 'confiante', roupa: 'jaqueta', corRoupa: '#2f6df0', corDetalhe: '#fbbf24', estampa: 'raio', calca: '#1e293b', tenis: '#ffffff', chapeu: 'nenhum', oculos: 'nenhum', extra: 'nenhum', boca: 'sorriso', movimento: 'acenar' };
+const MASC_PADRAO = { tipo: 'animal', animal: 'gato', movAnimal: 'auto', chapeuA: 'nenhum', oculosA: 'nenhum', aura: 'nenhuma', fundo: '', nome: 'Bolt', voz: true, pele: '#e3a77a', cabelo: 'espetado', corCabelo: '#1e140e', olhos: '#4a2e1d', sobrancelha: 'confiante', roupa: 'jaqueta', corRoupa: '#2f6df0', corDetalhe: '#fbbf24', estampa: 'raio', calca: '#1e293b', tenis: '#ffffff', chapeu: 'nenhum', oculos: 'nenhum', extra: 'nenhum', boca: 'sorriso', movimento: 'acenar' };
 const mascoteDe = id => { const m = { ...MASC_PADRAO, ...(((S.dados.filhos.find(f => f.id === id) || {}).mascote) || {}) }; if (m.rosto && !m.boca) m.boca = 'sorriso'; return m; };
 function tom(h, f) { const n = parseInt(String(h).replace('#', '').padEnd(6, '0').slice(0, 6), 16); const c = x => Math.max(0, Math.min(255, Math.round(f >= 1 ? x + (255 - x) * (f - 1) : x * f))).toString(16).padStart(2, '0'); return '#' + c(n >> 16 & 255) + c(n >> 8 & 255) + c(n & 255); }
 const escurece = (h, f = .75) => tom(h, f);
@@ -1231,8 +1231,28 @@ function mascoteSVG(m, tam = 80, animar = true) {
     </g></g>
   </svg>`;
 }
+/* mascotes animais 3D (Fluent 3D, MIT) */
+const ANIMAIS = [["gato", "1f408", "Gato"], ["gatinho", "1f431", "Gatinho"], ["cachorro", "1f415", "Cachorro"], ["cao", "1f436", "Cãozinho"], ["aguia", "1f985", "Águia"], ["falcao", "1f426-200d-2b1b", "Falcão"], ["coruja", "1f989", "Coruja"], ["papagaio", "1f99c", "Papagaio"], ["pinguim", "1f427", "Pinguim"], ["pato", "1f986", "Pato"], ["flamingo", "1f9a9", "Flamingo"], ["pavao", "1f99a", "Pavão"], ["cisne", "1f9a2", "Cisne"], ["galo", "1f413", "Galo"], ["passaro", "1f426", "Pássaro"], ["peixe", "1f41f", "Peixe"], ["peixe_tropical", "1f420", "Peixe tropical"], ["baiacu", "1f421", "Baiacu"], ["tubarao", "1f988", "Tubarão"], ["golfinho", "1f42c", "Golfinho"], ["baleia", "1f433", "Baleia"], ["polvo", "1f419", "Polvo"], ["lula", "1f991", "Lula"], ["caranguejo", "1f980", "Caranguejo"], ["lagosta", "1f99e", "Lagosta"], ["foca", "1f9ad", "Foca"], ["lontra", "1f9a6", "Lontra"], ["tartaruga", "1f422", "Tartaruga"], ["crocodilo", "1f40a", "Crocodilo"], ["lagarto", "1f98e", "Lagarto"], ["cobra", "1f40d", "Cobra"], ["sapo", "1f438", "Sapo"], ["dragao", "1f409", "Dragão"], ["dino", "1f996", "T-Rex"], ["dino2", "1f995", "Dinossauro"], ["leao", "1f981", "Leão"], ["tigre", "1f405", "Tigre"], ["leopardo", "1f406", "Leopardo"], ["lobo", "1f43a", "Lobo"], ["raposa", "1f98a", "Raposa"], ["urso", "1f43b", "Urso"], ["urso_polar", "1f43b-200d-2744", "Urso polar"], ["panda", "1f43c", "Panda"], ["coala", "1f428", "Coala"], ["macaco", "1f412", "Macaco"], ["gorila", "1f98d", "Gorila"], ["elefante", "1f418", "Elefante"], ["girafa", "1f992", "Girafa"], ["zebra", "1f993", "Zebra"], ["rinoceronte", "1f98f", "Rinoceronte"], ["hipopotamo", "1f99b", "Hipopótamo"], ["cavalo", "1f40e", "Cavalo"], ["unicornio", "1f984", "Unicórnio"], ["canguru", "1f998", "Canguru"], ["preguica", "1f9a5", "Preguiça"], ["coelho", "1f407", "Coelho"], ["hamster", "1f439", "Hamster"], ["esquilo", "1f43f", "Esquilo"], ["ourico", "1f994", "Ouriço"], ["morcego", "1f987", "Morcego"], ["veado", "1f98c", "Veado"], ["camelo", "1f42a", "Camelo"], ["vaca", "1f404", "Vaca"], ["porco", "1f416", "Porco"], ["ovelha", "1f411", "Ovelha"], ["bode", "1f410", "Bode"], ["borboleta", "1f98b", "Borboleta"], ["abelha", "1f41d", "Abelha"], ["joaninha", "1f41e", "Joaninha"], ["caracol", "1f40c", "Caracol"], ["aranha", "1f577", "Aranha"], ["escorpiao", "1f982", "Escorpião"]];
+const ANIMAL_MOV = { aguia: 'voar', falcao: 'voar', coruja: 'voar', papagaio: 'voar', passaro: 'voar', borboleta: 'voar', abelha: 'voar', morcego: 'voar', dragao: 'voar', flamingo: 'flutuar', cisne: 'nadar', pato: 'nadar',
+  peixe: 'nadar', peixe_tropical: 'nadar', baiacu: 'nadar', tubarao: 'nadar', golfinho: 'nadar', baleia: 'nadar', polvo: 'nadar', lula: 'nadar', foca: 'nadar', lontra: 'nadar', tartaruga: 'nadar', canguru: 'pular', coelho: 'pular', sapo: 'pular' };
+const ACESS_CHAPEU = [['nenhum', ''], ['bone', '🧢'], ['coroa', '👑'], ['cartola', '🎩'], ['formatura', '🎓'], ['capacete', '⛑️'], ['laco', '🎀'], ['fone', '🎧']];
+const ACESS_OCULOS = [['nenhum', ''], ['escuro', '🕶️'], ['gamer', '🥽'], ['redondo', '👓']];
+const ACESS_AURA = [['nenhuma', ''], ['estrela', '⭐'], ['fogo', '🔥'], ['raio', '⚡'], ['brilho', '✨'], ['arco', '🌈'], ['diamante', '💎']];
+const MOVS_ANIMAL = [['auto', '🤖 Do animal'], ['flutuar', '🎈 Flutuar'], ['pular', '🦘 Pular'], ['dancar', '🕺 Dançar'], ['voar', '🪽 Voar'], ['nadar', '🌊 Nadar'], ['girar', '🌀 Girar']];
+const CORES_FUNDO = ['#2f3f86', '#7b5cff', '#16a34a', '#e11d48', '#f59e0b', '#0ea5e9', '#111827', '#ec4899'];
+const ehAnimal = m => (m.tipo || 'animal') === 'animal';
+const img3d = (e, cls = '') => e ? `<img class="${cls}" src="icons/3d/${chaveEmoji(e)}.webp" alt="" draggable="false">` : '';
+function animalVisual(m, tam) {
+  const a = ANIMAIS.find(x => x[0] === m.animal) || ANIMAIS[0];
+  const mov = (m.movAnimal && m.movAnimal !== 'auto') ? m.movAnimal : (ANIMAL_MOV[a[0]] || 'flutuar');
+  const ch = (ACESS_CHAPEU.find(x => x[0] === m.chapeuA) || [])[1], oc = (ACESS_OCULOS.find(x => x[0] === m.oculosA) || [])[1], au = (ACESS_AURA.find(x => x[0] === m.aura) || [])[1];
+  return `<div class="masc-animal sem3d mov-${mov}" style="width:${tam}px;height:${tam}px;--fundo:${esc(m.fundo || '#2f3f86')}">
+    ${m.fundo ? '<span class="aura-fundo"></span>' : ''}${au ? `<span class="aura-orbita">${img3d(au)}</span>` : ''}
+    <div class="corpo-animal"><img class="bicho" src="icons/3d/${a[1]}.webp" alt="${esc(a[2])}" draggable="false">${img3d(ch, 'acc-chapeu')}${img3d(oc, 'acc-oculos')}</div><span class="sombra-animal"></span></div>`;
+}
 /* boneco 3D (Three.js). Sem 3D no aparelho, usa o desenho. */
 function mascoteVisual(m, tam = 80) {
+  if (ehAnimal(m)) return animalVisual(m, tam);
   if (window.Masc3D && window.Masc3D.ok === false) return mascoteSVG(m, tam);
   return `<canvas class="masc3d sem3d" data-m="${esc(JSON.stringify({ ...MASC_PADRAO, ...m }))}" style="width:${tam}px;height:${Math.round(tam * 1.3)}px"></canvas>`;
 }
@@ -1267,9 +1287,9 @@ function cumprimentoDoDia() {
   document.addEventListener('pointerdown', vai); // navegadores só liberam a voz depois do primeiro toque
 }
 let MASC_EDIT = {};
-function modalMascote(id) {
+function modalMascote(id, rascunho) {
   if (!podeEditarPerfil(id)) return toast('Você só pode personalizar o seu mascote.', 'bad');
-  MASC_EDIT = mascoteDe(id);
+  MASC_EDIT = rascunho ? { ...rascunho } : mascoteDe(id);
   const cores = k => MASC_OPC[k].map(v => `<button type="button" class="cor-opc ${MASC_EDIT[k] === v ? 'on' : ''}" style="background:${v}" data-act="mascoteOpc" data-k="${k}" data-v="${v}"></button>`).join('') + `<label class="cor-livre" title="Escolher qualquer cor"><input type="color" value="${esc(MASC_EDIT[k])}" data-change="mascoteCor" data-k="${k}">🎨</label>`;
   const opcs = k => MASC_OPC[k].map(v => `<button type="button" class="opc ${MASC_EDIT[k] === v ? 'on' : ''}" data-act="mascoteOpc" data-k="${k}" data-v="${v}">${MASC_NOMES[v] || v}</button>`).join('');
   modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>🎨 Meu mascote</h2>
@@ -1277,7 +1297,15 @@ function modalMascote(id) {
     <label class="campo"><span>Nome do mascote</span><input id="mascNome" value="${esc(MASC_EDIT.nome)}" maxlength="20" placeholder="Dê um nome"></label>
     <label class="check"><input type="checkbox" id="mascVoz" ${MASC_EDIT.voz !== false ? 'checked' : ''}> 🔊 Falar comigo (bom dia e tarefas)</label>
     <button type="button" class="btn ghost sm" style="margin:6px 0 12px" data-act="mascoteTestarVoz">▶️ Ouvir o mascote</button>
-    ${Object.keys(MASC_OPC).map(k => `<div class="masc-grupo"><span>${MASC_ROT[k]}</span><div class="masc-opcs">${MASC_CORES.includes(k) ? cores(k) : opcs(k)}</div></div>`).join('')}
+    <div class="abas-img" style="margin-bottom:12px"><button type="button" class="${ehAnimal(MASC_EDIT) ? 'on' : ''}" data-act="mascoteTipo" data-v="animal">🐾 Animal</button><button type="button" class="${ehAnimal(MASC_EDIT) ? '' : 'on'}" data-act="mascoteTipo" data-v="humano">🧑 Boneco</button></div>
+    ${ehAnimal(MASC_EDIT) ? `
+      <div class="masc-grupo"><span>Escolha o animal (${ANIMAIS.length})</span><div class="grade-animais">${ANIMAIS.map(a => `<button type="button" class="${MASC_EDIT.animal === a[0] ? 'on' : ''}" data-act="mascoteOpc" data-k="animal" data-v="${a[0]}" title="${esc(a[2])}"><img src="icons/3d/${a[1]}.webp" alt="" loading="lazy"><small>${esc(a[2])}</small></button>`).join('')}</div></div>
+      <div class="masc-grupo"><span>Movimento</span><div class="masc-opcs">${MOVS_ANIMAL.map(([v, n]) => `<button type="button" class="opc ${(MASC_EDIT.movAnimal || 'auto') === v ? 'on' : ''}" data-act="mascoteOpc" data-k="movAnimal" data-v="${v}">${n}</button>`).join('')}</div></div>
+      <div class="masc-grupo"><span>Na cabeça</span><div class="masc-opcs">${ACESS_CHAPEU.map(([v, e]) => `<button type="button" class="opc ${(MASC_EDIT.chapeuA || 'nenhum') === v ? 'on' : ''}" data-act="mascoteOpc" data-k="chapeuA" data-v="${v}">${e || 'Nenhum'}</button>`).join('')}</div></div>
+      <div class="masc-grupo"><span>Óculos</span><div class="masc-opcs">${ACESS_OCULOS.map(([v, e]) => `<button type="button" class="opc ${(MASC_EDIT.oculosA || 'nenhum') === v ? 'on' : ''}" data-act="mascoteOpc" data-k="oculosA" data-v="${v}">${e || 'Nenhum'}</button>`).join('')}</div></div>
+      <div class="masc-grupo"><span>Efeito</span><div class="masc-opcs">${ACESS_AURA.map(([v, e]) => `<button type="button" class="opc ${(MASC_EDIT.aura || 'nenhuma') === v ? 'on' : ''}" data-act="mascoteOpc" data-k="aura" data-v="${v}">${e || 'Nenhum'}</button>`).join('')}</div></div>
+      <div class="masc-grupo"><span>Brilho de fundo</span><div class="masc-opcs"><button type="button" class="opc ${!MASC_EDIT.fundo ? 'on' : ''}" data-act="mascoteOpc" data-k="fundo" data-v="">Nenhum</button>${CORES_FUNDO.map(c => `<button type="button" class="cor-opc ${MASC_EDIT.fundo === c ? 'on' : ''}" style="background:${c}" data-act="mascoteOpc" data-k="fundo" data-v="${c}"></button>`).join('')}</div></div>`
+    : Object.keys(MASC_OPC).map(k => `<div class="masc-grupo"><span>${MASC_ROT[k]}</span><div class="masc-opcs">${MASC_CORES.includes(k) ? cores(k) : opcs(k)}</div></div>`).join('')}
     <button class="btn ok" style="margin-top:10px" data-act="mascoteSalvar" data-id="${esc(id)}">💾 Salvar mascote</button>`);
 }
 function dicaMascote() {
@@ -2082,7 +2110,8 @@ const acoes = {
   perfilFilho: d => modalPerfil(d.id),
   trocarFoto: d => escolherFotoPerfil(d.id),
   removerFoto: d => salvarFotoPerfil(d.id, ''),
-  mascoteEditar: d => modalMascote(d.id || S.eu),
+  mascoteEditar: d => modalMascote(d.id || (S.papel === 'pai' ? fid() : S.eu)),
+  mascoteTipo: (d, b) => { const nm = $('#mascNome'); if (nm) MASC_EDIT.nome = nm.value; MASC_EDIT.tipo = d.v; const id = b.closest('.modal').querySelector('[data-act=mascoteSalvar]').dataset.id; const r = { ...MASC_EDIT }; fecharModais(); modalMascote(id, r); },
   mascoteOpc: (d, b) => { MASC_EDIT[d.k] = d.v; const box = b.closest('.modal'); box.querySelector('.masc-preview').innerHTML = mascoteVisual(MASC_EDIT, 190); box.querySelectorAll(`[data-k="${d.k}"]`).forEach(x => x.classList.toggle('on', x.dataset.v === d.v)); },
   mascoteSalvar: async d => {
     const nm = $('#mascNome'); MASC_EDIT.nome = (nm && nm.value.trim().slice(0, 20)) || 'Bolt'; const vz = $('#mascVoz'); if (vz) MASC_EDIT.voz = vz.checked;
