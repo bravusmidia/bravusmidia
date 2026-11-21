@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '2.1.1';
+const VERSAO = '2.1.2';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -725,6 +725,10 @@ function cardConta() {
     <div class="tt"><b>${souPai ? esc((S.dados.perfis.find(p => p.papel === 'pai') || {}).nome || 'Pai') : esc(filhoAtual().nome)}</b><small>${souPai ? esc(email) + ' · controla tudo' : 'Entra com PIN · só o pai altera as regras'}</small></div>
     <span class="tag ${souPai ? 'ok' : ''}">${souPai ? 'ADMIN' : 'filho'}</span></div>
     ${souPai && S.modo === 'online' ? `<button class="btn ghost" style="margin-top:8px" data-act="trocarSenha">🔒 Trocar minha senha</button>` : ''}
+    ${souPai && S.modo === 'online' && S.dados.filhos.length ? `<h3 style="margin-top:16px">🔑 Senhas dos filhos</h3><p class="mut peq">Esqueceram a senha? Crie uma nova aqui quando quiser.</p>
+      ${S.dados.filhos.map(f => { const tem = S.dados.perfis.some(p => p.filho_id === f.id); return `<div class="lista-item"><div class="chip" style="padding:6px 10px;background:${corFilho(f.id)}">${esc((f.nome || '?')[0])}</div>
+        <div class="tt"><b>${esc(f.nome)}</b><small>${tem ? 'Acesso criado' : 'Acesso ainda não criado'}</small></div>
+        <button class="btn pri" style="width:auto;padding:8px 12px" data-act="senhaFilho" data-id="${esc(f.id)}">${tem ? 'Trocar senha' : 'Criar senha'}</button></div>`; }).join('')}` : ''}
     <button class="btn bad" style="margin-top:8px" data-act="sair">🚪 Sair da conta</button></div>`;
 }
 
@@ -2027,6 +2031,14 @@ const acoes = {
     f.icone.value = d.i; f.querySelectorAll('.grade-icones button.on').forEach(x => x.classList.remove('on')); b.classList.add('on');
     const det = b.closest('details'); if (det) det.open = false;
   },
+  senhaFilho: d => { const f = S.dados.filhos.find(x => x.id === d.id); if (!f) return; const tem = S.dados.perfis.some(p => p.filho_id === f.id);
+    modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>🔑 ${tem ? 'Nova senha' : 'Criar senha'} de ${esc(f.nome)}</h2>
+    <p class="mut peq">A senha é um PIN de 6 a 12 números. A senha antiga deixa de funcionar na hora.</p>
+    <form data-form="senhaFilho" data-id="${esc(f.id)}">
+    <label class="campo"><span>Nova senha (PIN)</span><input name="pin" class="pin" type="password" inputmode="numeric" pattern="[0-9]{6,12}" minlength="6" maxlength="12" required autocomplete="new-password"></label>
+    <label class="campo"><span>Repita a senha</span><input name="pin2" class="pin" type="password" inputmode="numeric" pattern="[0-9]{6,12}" minlength="6" maxlength="12" required autocomplete="new-password"></label>
+    <label class="check"><input type="checkbox" onchange="this.form.pin.type=this.form.pin2.type=this.checked?'text':'password'"> Mostrar senha</label>
+    <button class="btn pri">Salvar senha</button></form>`); },
   trocarSenha: () => modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>🔒 Trocar senha do Pai</h2><form data-form="trocarSenha">
     <label class="campo"><span>Nova senha (mín. 6 caracteres)</span><input name="senha" type="password" minlength="6" required autocomplete="new-password"></label>
     <label class="campo"><span>Repita a nova senha</span><input name="senha2" type="password" minlength="6" required autocomplete="new-password"></label>
@@ -2208,6 +2220,17 @@ const forms = {
       await DB.rpc('mok_criar_acesso_filho', { p_filho: filho, p_pin: pin });
       await carregarTudo(); carregando(false); fecharModais(); render();
       modal(`<div class="grande">🔑</div><h2>Acesso criado!</h2><p>${esc(nomeFilho(filho))} entra tocando no nome dele e digitando o PIN <b>${esc(pin)}</b>.</p><button class="btn zap" data-act="compartilhar">Mandar o link pelo WhatsApp</button><div style="height:8px"></div><button class="btn ghost" data-act="fechar">Fechar</button>`, 'alerta');
+    } catch (e) { carregando(false); toast(msgErro(e), 'bad'); }
+  },
+  senhaFilho: async f => {
+    const pin = f.pin.value.trim();
+    if (!/^\d{6,12}$/.test(pin)) return toast('Use de 6 a 12 números.', 'bad');
+    if (pin !== f.pin2.value.trim()) return toast('As senhas não são iguais.', 'bad');
+    carregando(true, 'Salvando senha…');
+    try {
+      await DB.rpc('mok_criar_acesso_filho', { p_filho: f.dataset.id, p_pin: pin });
+      await carregarTudo(); carregando(false); fecharModais(); render();
+      modal(`<div class="grande">🔑</div><h2>Senha salva!</h2><p>${esc(nomeFilho(f.dataset.id))} entra tocando no nome dele e digitando a senha <b>${esc(pin)}</b>.</p><button class="btn ghost" data-act="fechar">Fechar</button>`, 'alerta');
     } catch (e) { carregando(false); toast(msgErro(e), 'bad'); }
   },
   trocarPin: async f => {
