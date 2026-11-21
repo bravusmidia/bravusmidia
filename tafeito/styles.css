@@ -482,3 +482,14 @@ body:has(#visorImg) .flut-masc,body:has(#visorImg) .flut-chat{display:none}
 
 .visor-palco img{transition:transform .28s,opacity .28s}
 .visor-palco.saindo img{transform:translateX(-40px);opacity:0}
+
+/* v2.6 pets realistas: respiram e balançam como bicho de verdade */
+.masc-animal.real .bicho{filter:drop-shadow(0 10px 12px rgba(0,0,0,.5));animation:respirar 2.6s ease-in-out infinite;transform-origin:50% 90%}
+@keyframes respirar{0%,100%{transform:scale(1,1)}50%{transform:scale(1.025,.975) rotate(-1.2deg)}}
+.masc-animal.real.mov-voar .bicho{animation:bater 0.9s ease-in-out infinite}
+@keyframes bater{0%,100%{transform:scaleX(1) scaleY(1)}50%{transform:scaleX(.9) scaleY(1.04) translateY(-3%)}}
+.masc-animal.real.mov-nadar .bicho{animation:nadarReal 2.2s ease-in-out infinite}
+@keyframes nadarReal{0%,100%{transform:rotate(-4deg) translateX(-3%)}50%{transform:rotate(4deg) translateX(3%)}}
+.masc-animal.real.dormindo .bicho{animation:respirar 4s ease-in-out infinite}
+.msg small .visto{color:#7dd3fc;font-weight:800}
+.msg small .enviado{opacity:.75}

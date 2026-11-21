@@ -1369,6 +1369,31 @@ exception when others then null;
 end $$;
 revoke all on function public.mok_push_enviar(text, text, text, text) from public, anon, authenticated;
 
+-- =====================================================================
+-- v2.6: &quot;VISTO&quot; NAS MENSAGENS (o pai sabe quando o filho leu)
+-- =====================================================================
+alter table public.mok_mensagens add column if not exists lido_em timestamptz;
+
+create or replace function public.mok_ler_mensagens(p_filho text) returns int
+language plpgsql security definer set search_path = public as $$
+declare eu text; f text; n int; nome text;
+begin
+  if mok_is_pai() then eu := &#x27;pai&#x27;; f := p_filho;
+  else f := mok_meu_filho(); eu := f; end if;
+  if f is null then return 0; end if;
+  update mok_mensagens set lido = true, lido_em = now()
+    where filho_id = f and autor &lt;&gt; eu and not lido;
+  get diagnostics n = row_count;
+  if n &gt; 0 and eu &lt;&gt; &#x27;pai&#x27; then
+    select m.nome into nome from mok_filhos m where m.id = f;
+    perform mok_push_enviar(&#x27;pai&#x27;, &#x27;👀 &#x27; || coalesce(nome, &#x27;Filho&#x27;) || &#x27; viu &#x27; || case when n = 1 then &#x27;sua mensagem&#x27; else &#x27;suas &#x27; || n || &#x27; mensagens&#x27; end,
+      to_char(now() at time zone &#x27;America/Fortaleza&#x27;, &#x27;DD/MM HH24:MI&#x27;), &#x27;visto&#x27;);
+  end if;
+  return n;
+end $$;
+revoke all on function public.mok_ler_mensagens(text) from public, anon;
+grant execute on function public.mok_ler_mensagens(text) to authenticated;
+
 -- Pronto! Agora abra o app e crie a conta do Pai.
 </pre>
 <script>document.getElementById('b').onclick=async()=>{const t=document.getElementById('s').textContent;try{await navigator.clipboard.writeText(t)}catch(e){const r=document.createRange();r.selectNodeContents(document.getElementById('s'));const s=getSelection();s.removeAllRanges();s.addRange(r);document.execCommand('copy')}document.getElementById('b').textContent='✅ Copiado! Agora cole no SQL Editor'}</script></body></html>

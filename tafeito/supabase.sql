@@ -1366,4 +1366,29 @@ exception when others then null;
 end $$;
 revoke all on function public.mok_push_enviar(text, text, text, text) from public, anon, authenticated;
 
+-- =====================================================================
+-- v2.6: "VISTO" NAS MENSAGENS (o pai sabe quando o filho leu)
+-- =====================================================================
+alter table public.mok_mensagens add column if not exists lido_em timestamptz;
+
+create or replace function public.mok_ler_mensagens(p_filho text) returns int
+language plpgsql security definer set search_path = public as $$
+declare eu text; f text; n int; nome text;
+begin
+  if mok_is_pai() then eu := 'pai'; f := p_filho;
+  else f := mok_meu_filho(); eu := f; end if;
+  if f is null then return 0; end if;
+  update mok_mensagens set lido = true, lido_em = now()
+    where filho_id = f and autor <> eu and not lido;
+  get diagnostics n = row_count;
+  if n > 0 and eu <> 'pai' then
+    select m.nome into nome from mok_filhos m where m.id = f;
+    perform mok_push_enviar('pai', '👀 ' || coalesce(nome, 'Filho') || ' viu ' || case when n = 1 then 'sua mensagem' else 'suas ' || n || ' mensagens' end,
+      to_char(now() at time zone 'America/Fortaleza', 'DD/MM HH24:MI'), 'visto');
+  end if;
+  return n;
+end $$;
+revoke all on function public.mok_ler_mensagens(text) from public, anon;
+grant execute on function public.mok_ler_mensagens(text) to authenticated;
+
 -- Pronto! Agora abra o app e crie a conta do Pai.

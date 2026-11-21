@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '2.5.1';
+const VERSAO = '2.6.0';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -817,7 +817,7 @@ function telaChat() {
   const outroOn = S.online.has(S.papel === 'pai' ? id : 'pai');
   const rapidas = S.papel === 'pai' ? ['Muito bem! 👏', 'Faça suas tarefas agora.', 'Refaça com capricho.', 'Liberado! 🎮'] : ['Terminei! ✅', 'Posso jogar? 🎮', 'Preciso de ajuda 🙋', 'Tô fazendo 💪'];
   return `<div class="chat"><div class="linha" style="margin-bottom:8px">${S.modo === 'online' ? `<span class="dot ${outroOn ? 'on' : ''}"></span>` : ''}<b>${esc(outro)}</b><span class="mut peq">${S.modo === 'online' ? (outroOn ? 'online' : 'offline') : ''}</span></div>
-    <div class="msgs" id="msgs">${msgs.length ? msgs.map(m => `<div class="msg ${m.autor === eu ? 'eu' : ''}">${esc(m.texto)}<small>${dataHoraBR(m.criado_em)}${m.autor === eu && m.lido ? ' ✓✓' : ''}</small></div>`).join('') : `<div class="vazio"><span class="e">💬</span>Mande a primeira mensagem.</div>`}</div>
+    <div class="msgs" id="msgs">${msgs.length ? msgs.map(m => `<div class="msg ${m.autor === eu ? 'eu' : ''}">${esc(m.texto)}<small>${dataHoraBR(m.criado_em)}${m.autor === eu ? (m.lido ? ` <span class="visto">✓✓ Visto${m.lido_em ? ' ' + new Date(m.lido_em).toTimeString().slice(0, 5) : ''}</span>` : ' <span class="enviado">✓ Enviado</span>') : ''}</small></div>`).join('') : `<div class="vazio"><span class="e">💬</span>Mande a primeira mensagem.</div>`}</div>
     <div class="rapidas">${rapidas.map(r => `<button class="btn ghost sm" data-act="rapida" data-txt="${esc(r)}">${esc(r)}</button>`).join('')}</div>
     <form class="chat-in" data-form="chat"><input id="chatTxt" class="inp" placeholder="Escreva uma mensagem…" autocomplete="off" maxlength="1000"><button class="btn pri">➤</button></form></div>`;
 }
@@ -852,7 +852,7 @@ function telaMaisPai() {
 /* ---------- NOTIFICAÇÕES DO PAI: ele escolhe o que quer receber ---------- */
 const NOTIF_PAI = [['login', '🟢', 'Filho entrou no app'], ['reg', '✅', 'Tarefa concluída'], ['atraso', '⚠️', 'Tarefa atrasada'], ['filho', '✏️', 'Filho criou ou mudou algo (tarefa, missão, perfil, prêmio)'],
   ['imagens', '🖼️', 'Imagens enviadas'], ['prova', '📚', 'Provas marcadas, mudadas ou importadas'], ['ciente', '👍', '"Ciente" nas provas'], ['msg', '💬', 'Mensagens do chat'],
-  ['ped', '🔐', 'Pedidos de permissão'], ['notif', '🚨', 'Filho desligou as notificações (recomendado deixar ligado)'], ['copia', '📤', 'Cópia no sininho do que o filho recebeu']];
+  ['ped', '🔐', 'Pedidos de permissão'], ['visto', '👀', 'Filho viu a sua mensagem'], ['notif', '🚨', 'Filho desligou as notificações (recomendado deixar ligado)'], ['copia', '📤', 'Cópia no sininho do que o filho recebeu']];
 const notifPaiOff = () => Array.isArray(S.config.notif_pai_off) ? S.config.notif_pai_off : [];
 function cardNotifPai() {
   const off = notifPaiOff(); const lig = NOTIF_PAI.length - NOTIF_PAI.filter(([k]) => off.includes(k)).length;
@@ -1272,7 +1272,9 @@ const MISTICOS = [['bruxo', '', 'Bruxo'], ['bruxa', '', 'Bruxa'], ['mago', '', '
   ['fantasma', '', 'Fantasma'], ['alien', '', 'Alienígena'], ['monstro', '', 'Monstrinho'], ['robo', '', 'Robô'], ['goblin', '', 'Goblin'], ['ogro', '', 'Ogro'], ['caveira', '', 'Caveira'],
   ['abobora', '', 'Abóbora'], ['bola_cristal', '', 'Bola de cristal'], ['dragao_bebe', '', 'Dragão bebê'], ['mamute', '', 'Mamute'], ['dodo', '', 'Dodô']];
 MISTICOS.forEach(m => { m[3] = 'mistico'; ANIMAIS.push(m); });
-const miniMasc = a => `icons/anim/mini/${a[0]}.webp?v=1`;
+const REAIS = new Set(['aguia', 'gato', 'cachorro', 'falcao', 'tartaruga', 'peixe', 'leao', 'tigre', 'lobo', 'raposa', 'coruja', 'golfinho', 'cavalo', 'panda', 'coelho', 'dragao']);
+const miniMasc = a => REAIS.has(a[0]) ? `icons/real/${a[0]}.webp?v=1` : `icons/anim/mini/${a[0]}.webp?v=1`;
+const imgMasc = a => REAIS.has(a[0]) ? `icons/real/${a[0]}.webp?v=1` : `icons/anim/${a[0]}.webp?v=1`;
 const ANIMAL_MOV = { fada: 'voar', fado: 'voar', genio: 'flutuar', fantasma: 'flutuar', heroi: 'voar', sereia: 'nadar', tritao: 'nadar', dragao_bebe: 'voar', aguia: 'voar', falcao: 'voar', coruja: 'voar', papagaio: 'voar', passaro: 'voar', borboleta: 'voar', abelha: 'voar', morcego: 'voar', dragao: 'voar', flamingo: 'flutuar', cisne: 'nadar', pato: 'nadar',
   peixe: 'nadar', peixe_tropical: 'nadar', baiacu: 'nadar', tubarao: 'nadar', golfinho: 'nadar', baleia: 'nadar', polvo: 'nadar', lula: 'nadar', foca: 'nadar', lontra: 'nadar', tartaruga: 'nadar', canguru: 'pular', coelho: 'pular', sapo: 'pular' };
 const ACESS_CHAPEU = [['nenhum', ''], ['bone', '🧢'], ['coroa', '👑'], ['cartola', '🎩'], ['formatura', '🎓'], ['capacete', '⛑️'], ['laco', '🎀'], ['fone', '🎧']];
@@ -1295,9 +1297,9 @@ function animalVisual(m, tam) {
   const a = ANIMAIS.find(x => x[0] === m.animal) || ANIMAIS[0];
   const mov = (m.movAnimal && m.movAnimal !== 'auto') ? m.movAnimal : (ANIMAL_MOV[a[0]] || 'flutuar');
   const ch = (ACESS_CHAPEU.find(x => x[0] === m.chapeuA) || [])[1], oc = (ACESS_OCULOS.find(x => x[0] === m.oculosA) || [])[1], au = (ACESS_AURA.find(x => x[0] === m.aura) || [])[1];
-  return `<div class="masc-animal sem3d mov-${mov}${m._dormindo ? ' dormindo' : ''}" style="width:${tam}px;height:${tam}px;--fundo:${esc(m.fundo || '#2f3f86')}">
+  return `<div class="masc-animal sem3d mov-${mov}${REAIS.has(a[0]) ? ' real' : ''}${m._dormindo ? ' dormindo' : ''}" style="width:${tam}px;height:${tam}px;--fundo:${esc(m.fundo || '#2f3f86')}">
     ${m.fundo ? '<span class="aura-fundo"></span>' : ''}${au ? `<span class="aura-orbita">${img3d(au)}</span>` : ''}
-    <div class="corpo-animal"><img class="bicho" src="icons/anim/${a[0]}.webp?v=1" onerror="this.onerror=null;this.src='${miniMasc(a)}'" alt="${esc(a[2])}" draggable="false">${img3d(ch, 'acc-chapeu')}${img3d(oc, 'acc-oculos')}</div><span class="sombra-animal"></span></div>`;
+    <div class="corpo-animal"><img class="bicho" src="${imgMasc(a)}" onerror="this.onerror=null;this.src='${miniMasc(a)}'" alt="${esc(a[2])}" draggable="false">${img3d(ch, 'acc-chapeu')}${img3d(oc, 'acc-oculos')}</div><span class="sombra-animal"></span></div>`;
 }
 /* ---------- BICHINHO VIRTUAL: comer, beber, carinho e dormir ---------- */
 const H = 36e5, clamp = (v, a = 0, b = 100) => Math.max(a, Math.min(b, v));
@@ -1428,7 +1430,7 @@ function modalMascote(id, rascunho) {
       <div class="masc-grupo"><span>Escolha o seu mascote (${ANIMAIS.length})</span>
         <div class="busca-masc"><input id="buscaMasc" class="inp" placeholder="🔎 Procurar: gato, dragão, bruxo, fada…" autocomplete="off"></div>
         <div id="semMasc" class="sugerir-masc" hidden></div>
-        ${[['animal', '🐾 Animais'], ['mistico', '✨ Místicos e fantasia']].map(([g, t]) => `<div class="sub-grade" data-g="${g}"><b class="mut peq">${t}</b><div class="grade-animais">${ANIMAIS.filter(a => (a[3] || 'animal') === g).map(a => `<button type="button" class="${MASC_EDIT.animal === a[0] ? 'on' : ''}" data-act="mascoteOpc" data-k="animal" data-v="${a[0]}" data-nome="${esc(semAcento(a[2]))}" title="${esc(a[2])}"><img src="${miniMasc(a)}" alt="" loading="lazy"><small>${esc(a[2])}</small></button>`).join('')}</div></div>`).join('')}</div>
+        ${[['real', '📸 Realistas'], ['animal', '🐾 Animais animados'], ['mistico', '✨ Místicos e fantasia']].map(([g, t]) => `<div class="sub-grade" data-g="${g}"><b class="mut peq">${t}</b><div class="grade-animais">${ANIMAIS.filter(a => g === 'real' ? REAIS.has(a[0]) : (a[3] || 'animal') === g && !REAIS.has(a[0])).map(a => `<button type="button" class="${MASC_EDIT.animal === a[0] ? 'on' : ''}" data-act="mascoteOpc" data-k="animal" data-v="${a[0]}" data-nome="${esc(semAcento(a[2]))}" title="${esc(a[2])}"><img src="${miniMasc(a)}" alt="" loading="lazy"><small>${esc(a[2])}</small></button>`).join('')}</div></div>`).join('')}</div>
       <div class="masc-grupo"><span>Movimento</span><div class="masc-opcs">${MOVS_ANIMAL.map(([v, n]) => `<button type="button" class="opc ${(MASC_EDIT.movAnimal || 'auto') === v ? 'on' : ''}" data-act="mascoteOpc" data-k="movAnimal" data-v="${v}">${n}</button>`).join('')}</div></div>
       <div class="masc-grupo"><span>Na cabeça</span><div class="masc-opcs">${ACESS_CHAPEU.map(([v, e]) => `<button type="button" class="opc ${(MASC_EDIT.chapeuA || 'nenhum') === v ? 'on' : ''}" data-act="mascoteOpc" data-k="chapeuA" data-v="${v}">${e || 'Nenhum'}</button>`).join('')}</div></div>
       <div class="masc-grupo"><span>Óculos</span><div class="masc-opcs">${ACESS_OCULOS.map(([v, e]) => `<button type="button" class="opc ${(MASC_EDIT.oculosA || 'nenhum') === v ? 'on' : ''}" data-act="mascoteOpc" data-k="oculosA" data-v="${v}">${e || 'Nenhum'}</button>`).join('')}</div></div>
@@ -2684,7 +2686,11 @@ async function marcarLidas() {
   if (marcando) return; const eu = S.papel === 'pai' ? 'pai' : S.eu;
   const l = S.dados.mensagens.filter(m => m.filho_id === fid() && !m.lido && m.autor !== eu); if (!l.length) return;
   marcando = true;
-  for (const m of l) { m.lido = true; try { await DB.atualizar('mensagens', m.id, { lido: true }); } catch { } }
+  const agora = agoraISO(); l.forEach(m => { m.lido = true; m.lido_em = agora; });
+  try {
+    if (S.modo === 'online') await DB.rpc('mok_ler_mensagens', { p_filho: fid() });
+    else for (const m of l) await DB.atualizar('mensagens', m.id, { lido: true, lido_em: agora });
+  } catch (e) { console.warn(e); }
   marcando = false;
 }
 
