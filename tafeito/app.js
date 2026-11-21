@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '2.1.0';
+const VERSAO = '2.1.1';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -2511,6 +2511,7 @@ function linkConvite() { const base = location.origin + location.pathname.replac
 
 /* ---------------- PWA ---------------- */
 function registrarSW() { if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(e => console.warn('sw', e)); }
+if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.tipo === 'push-mudou') checarNotif(); });
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); promptInstalar = e; render(); });
 window.addEventListener('appinstalled', () => { promptInstalar = null; toast('App instalado ✅', 'ok'); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.papel) { DB.ping(); aoMudarBanco(); checarLembretes(); checarProvas(); checarNotif(); } });

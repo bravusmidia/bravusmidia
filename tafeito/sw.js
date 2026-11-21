@@ -1,5 +1,5 @@
 // TáFeito — service worker (funciona offline e mostra notificações)
-const CACHE = 'tafeito-v21';
+const CACHE = 'tafeito-v22';
 const ARQUIVOS = ['./', './index.html', './styles.css', './app.js', './config.js', './manifest.webmanifest',
   './lib/supabase.js', './icons/icon-192.png', './icons/icon-512.png', './icons/3d/lista.js'];
 
@@ -45,4 +45,16 @@ self.addEventListener('push', e => {
     body: d.corpo || '', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png',
     tag: (d.tag || 'tafeito') + '-' + Date.now(), vibrate: [200, 100, 200], data: { url: './' }
   }));
+});
+
+// se o navegador trocar/cancelar a inscrição de avisos, recadastra sozinho (o app avisa o servidor ao abrir)
+self.addEventListener('pushsubscriptionchange', e => {
+  e.waitUntil((async () => {
+    try {
+      const chave = e.oldSubscription && e.oldSubscription.options && e.oldSubscription.options.applicationServerKey;
+      if (chave) await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chave });
+    } catch (err) { }
+    const cs = await self.clients.matchAll({ includeUncontrolled: true });
+    cs.forEach(c => c.postMessage({ tipo: 'push-mudou' }));
+  })());
 });
