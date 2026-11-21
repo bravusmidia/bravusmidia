@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '1.6.0';
+const VERSAO = '1.6.2';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -45,7 +45,7 @@ const b64enc = o => btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replac
 const b64dec = s => JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/')))));
 const lsGet = (k, d = null) => { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { console.warn(e); } };
-const msgErro = e => { const m = (e && (e.message || e.error_description || e.msg)) || String(e); if (/Failed to fetch|NetworkError/i.test(m)) return 'Sem internet. Tente de novo.'; if (/Invalid login/i.test(m)) return 'Senha/PIN incorreto.'; if (/Email not confirmed/i.test(m)) return 'E-mail não confirmado: no Supabase, desligue "Confirm email" (veja o guia).'; return m; };
+const msgErro = e => { const m = (e && (e.message || e.error_description || e.msg)) || String(e); if (/Failed to fetch|NetworkError/i.test(m)) return 'Sem internet. Tente de novo.'; if (/Invalid login/i.test(m)) return 'Senha/PIN incorreto.'; if (/schema cache|Could not find the (function|.*column)|column .* does not exist|relation .*mok_.* does not exist/i.test(m)) return '⚠️ O banco ainda não foi atualizado. Abra bravusmidia.com.br/tafeito/sql.html, copie e rode no Supabase (SQL Editor → Run).'; if (/Email not confirmed/i.test(m)) return 'E-mail não confirmado: no Supabase, desligue "Confirm email" (veja o guia).'; return m; };
 
 /* ---------------- estado ---------------- */
 const S = {
@@ -425,6 +425,7 @@ async function abrirApp() {
   render();
   verificarPedidosPai();
   inscreverPush(false);
+  checarBanco();
 }
 
 async function carregarTudo() {
@@ -433,6 +434,17 @@ async function carregarTudo() {
   S.config = S.dados.config.find(c => c.id == 1) || {};
 }
 
+async function checarBanco() {
+  if (S.modo !== 'online' || S.papel !== 'pai') return;
+  try { const { error } = await DB.sb.from('mok_config').select('foto_pai,whatsapp_pai').limit(1); const r = await DB.sb.from('mok_provas').select('site').limit(1);
+    S.bancoVelho = !!(error || r.error); } catch { S.bancoVelho = false; }
+  if (S.bancoVelho) render();
+}
+function avisoBanco() {
+  if (!S.bancoVelho) return '';
+  return `<div class="aviso bad"><b>⚠️ Banco de dados desatualizado.</b> Provas, foto, mascote, WhatsApp e avisos novos só funcionam depois de atualizar (2 min):<br>
+    1) Abra <a href="sql.html" target="_blank" rel="noopener">bravusmidia.com.br/tafeito/sql.html</a> e toque em <b>Copiar tudo</b><br>2) No Supabase do TáFeito: <b>SQL Editor → New query</b> → colar → <b>Run</b><br>3) Volte aqui e aperte Ctrl+F5.</div>`;
+}
 async function recarregarUso() {
   try { const [p, u] = await Promise.all([DB.listar('perfis'), DB.listar('uso')]); S.dados.perfis = p; S.dados.uso = u; if (S.tela === 'painel' || S.tela === 'estudo') render(); } catch { }
 }
@@ -721,7 +733,7 @@ function telaPainel() {
   const pend = S.dados.pedidos.filter(p => p.filho_id === f.id && p.status === 'pendente');
   const aguard = tars.filter(t => (regDe(t, dia) || {}).status === 'feita').length;
   const on = S.online.has(f.id); const perfil = S.dados.perfis.find(p => p.filho_id === f.id);
-  return `${avisoNotificacao()}
+  return `${avisoBanco()}${avisoNotificacao()}
     ${pend.map(p => `<div class="aviso warn linha"><div class="esp">🔐 <b>${esc(f.nome)}</b> pediu para ajustar <b>${esc(AREAS[p.area] || p.area)}</b>${p.mensagem ? `: "${esc(p.mensagem)}"` : ''}</div><button class="btn sm pri" data-act="abrirPedido" data-id="${esc(p.id)}">Ver</button></div>`).join('')}
     <div class="card"><div class="linha">${S.modo === 'online' ? `<span class="dot ${on ? 'on' : ''}"></span>` : ''}<div class="esp"><b>${esc(f.nome)}</b> <span class="mut peq">${S.modo === 'online' ? (on ? 'online agora' : (perfil && perfil.visto_em ? 'visto ' + dataHoraBR(perfil.visto_em) : (perfil ? 'offline' : 'acesso ainda não criado'))) : ''}</span></div>
       <input type="date" class="inp" style="width:auto;padding:7px 9px" value="${dia}" data-change="diaVer"></div></div>
@@ -797,7 +809,7 @@ function telaChat() {
 
 function telaMaisPai() {
   const peds = S.dados.pedidos.slice().sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || '')).slice(0, 25);
-  return `<div class="linha" style="margin-bottom:10px"><h2 style="margin:0">⚙️ Configurações</h2><span class="tag ok">só admin</span></div>${cardConta()}
+  return `<div class="linha" style="margin-bottom:10px"><h2 style="margin:0">⚙️ Configurações</h2><span class="tag ok">só admin</span></div>${avisoBanco()}${cardConta()}
     <button class="btn ghost" style="margin-bottom:12px" data-act="conectores">🔌 Conectores (Notion e arquivos)</button>
     <div class="card"><h3>📲 WhatsApp do Pai</h3><p class="mut peq">Número que aparece no botão de WhatsApp do app dos filhos.</p>
       <form data-form="whatsPai" class="linha"><input class="inp" name="w" inputmode="tel" value="${esc(S.config.whatsapp_pai || '')}" placeholder="85 99999-9999"><button class="btn pri sm" style="width:auto">Salvar</button></form></div>
@@ -1200,8 +1212,9 @@ function modalAssistente() {
 }
 function flutuantes() {
   const nl = S.papel === 'pai' ? naoLidas() : naoLidas(S.eu);
-  let h = `<button class="flut-chat" data-act="chatAbrir" title="Chat">💬${nl ? `<span class="badge">${nl}</span>` : ''}</button>`;
-  if (S.papel === 'filho') { const m = mascoteDe(S.eu); const d = dicaMascote(); h += `<button class="flut-masc" data-act="mascote" title="${esc(m.nome)}"><span class="balao">${esc(d)}</span>${mascoteSVG(m, 62)}</button>`; }
+  const pos = k => { const p = lsGet('mok_pos_' + k); return p ? `style="left:${Math.min(p.x, innerWidth - 60)}px;top:${Math.min(p.y, innerHeight - 70)}px;right:auto;bottom:auto"` : ''; };
+  let h = `<button class="flut-chat" data-arrastar="chat" ${pos('chat')} data-act="chatAbrir" title="Chat (arraste para mover)">💬${nl ? `<span class="badge">${nl}</span>` : ''}</button>`;
+  if (S.papel === 'filho') { const m = mascoteDe(S.eu); const d = dicaMascote(); h += `<button class="flut-masc" data-arrastar="masc" ${pos('masc')} data-act="mascote" title="${esc(m.nome)} (arraste para mover)"><span class="balao">${esc(d)}</span>${mascoteSVG(m, 62)}</button>`; }
   if (S.chatAberto) h += `<div class="chat-flut-bg" data-act="chatFechar"></div><div class="chat-flut"><div class="linha" style="margin-bottom:6px"><b class="esp">💬 Chat</b><button class="btn zap sm" style="width:auto" data-act="whats">📲 WhatsApp</button><button class="icone-btn" data-act="chatFechar">✕</button></div>${telaChat()}</div>`;
   return h;
 }
@@ -1933,7 +1946,26 @@ const mudancas = {
   recorrencia: el => { const u = el.value === 'unica'; $('#boxDias').hidden = u; $('#boxData').hidden = !u; }
 };
 
+/* arrastar o chat e o mascote para qualquer lugar da tela */
+let arrasto = null, ignorarClique = false;
+document.addEventListener('pointerdown', e => {
+  const el = e.target.closest('[data-arrastar]'); if (!el) return;
+  const r = el.getBoundingClientRect(); arrasto = { el, k: el.dataset.arrastar, dx: e.clientX - r.left, dy: e.clientY - r.top, x0: e.clientX, y0: e.clientY, moveu: false };
+});
+document.addEventListener('pointermove', e => {
+  if (!arrasto) return; const a = arrasto;
+  if (!a.moveu && Math.hypot(e.clientX - a.x0, e.clientY - a.y0) < 8) return;
+  a.moveu = true; e.preventDefault(); a.el.classList.add('arrastando');
+  const w = a.el.offsetWidth, h = a.el.offsetHeight;
+  a.x = Math.max(4, Math.min(innerWidth - w - 4, e.clientX - a.dx)); a.y = Math.max(4, Math.min(innerHeight - h - 4, e.clientY - a.dy));
+  Object.assign(a.el.style, { left: a.x + 'px', top: a.y + 'px', right: 'auto', bottom: 'auto' });
+}, { passive: false });
+document.addEventListener('pointerup', () => {
+  if (!arrasto) return; const a = arrasto; arrasto = null;
+  if (a.moveu) { a.el.classList.remove('arrastando'); lsSet('mok_pos_' + a.k, { x: a.x, y: a.y }); ignorarClique = true; setTimeout(() => { ignorarClique = false; }, 50); }
+});
 document.addEventListener('click', e => {
+  if (ignorarClique) { ignorarClique = false; e.preventDefault(); return; }
   const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
   const fn = acoes[b.dataset.act]; if (!fn) return;
   e.preventDefault(); desbloquearAudio(); fn(b.dataset, b);
