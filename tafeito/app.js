@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '2.4.0';
+const VERSAO = '2.5.0';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -95,9 +95,10 @@ class LocalStore {
     if (n === 'mok_meu_perfil') {
       const db = this._load(); const id = S.papel === 'pai' ? null : S.eu;
       if (id) { const f = db.filhos.find(x => x.id === id); if (a.p_foto != null) f.foto = a.p_foto; if (a.p_mascote) f.mascote = a.p_mascote; if (a.p_whatsapp != null) f.whatsapp = a.p_whatsapp.replace(/\D/g, ''); }
-      else { const c = db.config[0]; if (a.p_foto != null) c.foto_pai = a.p_foto; if (a.p_whatsapp != null) c.whatsapp_pai = a.p_whatsapp.replace(/\D/g, ''); }
+      else { const c = db.config[0]; if (a.p_foto != null) c.foto_pai = a.p_foto; if (a.p_whatsapp != null) c.whatsapp_pai = a.p_whatsapp.replace(/\D/g, ''); if (a.p_mascote) c.mascote_pai = a.p_mascote; }
       this._save(db); return null;
     }
+    if (n === 'mok_notif_pai') { const db = this._load(); db.config[0].notif_pai_off = a.p_off || []; this._save(db); return null; }
     if (n === 'mok_ciente') { const db = this._load(); db.cientes = db.cientes || []; const pr = (db.provas || []).find(x => x.id === a.p_prova);
       db.cientes.push({ id: Date.now(), filho_id: pr.filho_id, prova_id: pr.id, materia: pr.materia, etapa: a.p_etapa, criado_em: agoraISO() }); this._save(db);
       return db.cientes.filter(c => c.filho_id === pr.filho_id).length; }
@@ -395,7 +396,7 @@ async function entrarComSessao(user) {
     if (!perfil) {
       return $('#app').innerHTML = `<div class="login"><div class="card"><h2>Conta sem perfil</h2><p class="mut">Esta conta não está cadastrada no TáFeito.</p><button class="btn pri" data-act="sair">Voltar</button></div></div>`;
     }
-    S.papel = perfil.papel; S.eu = perfil.papel === 'pai' ? 'pai' : perfil.filho_id; S.email = user.email || '';
+    S.papel = perfil.papel; S.eu = perfil.papel === 'pai' ? 'pai' : perfil.filho_id; S.email = user.email || ''; S.meuNome = perfil.nome || '';
     await abrirApp();
   } catch (e) { telaErro('Não consegui entrar', msgErro(e)); }
 }
@@ -825,7 +826,9 @@ function telaMaisPai() {
   const peds = S.dados.pedidos.slice().sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || '')).slice(0, 25);
   return `<div class="linha" style="margin-bottom:10px"><h2 style="margin:0">⚙️ Configurações</h2><span class="tag ok">só admin</span></div>${avisoBanco()}${cardConta()}
     <div class="grid2" style="margin-bottom:12px"><button class="btn ghost" data-act="conectores">🔌 Conectores</button><button class="btn ghost" data-act="teste">🧪 Teste de lembrete</button></div>
-    <div class="aviso info">🔔 Você recebe aviso quando seu filho <b>entra no app</b>, conclui tarefa, marca ou muda prova, dá Ciente, cria ou muda algo, resgata prêmio, pede permissão ou manda mensagem. Tudo que você muda avisa o celular dele.</div>
+    <div class="card"><h3>🎨 Meu mascote</h3><div class="linha"><div class="masc-mini">${mascoteVisual(mascoteDe('pai'), 64)}</div><div class="esp"><b>${esc(mascoteDe('pai').nome)}</b><br><span class="mut peq">Fica flutuando no seu app, dá bom dia e conta como os meninos estão.</span></div></div>
+      <div class="grid2" style="margin-top:10px"><button class="btn pri" data-act="mascoteEditar" data-id="pai">🎨 Personalizar</button><button class="btn ghost" data-act="mascote">🔊 Ouvir resumo</button></div></div>
+    ${cardNotifPai()}
     <div class="card"><h3>📲 WhatsApp do Pai</h3><p class="mut peq">Número que aparece no botão de WhatsApp do app dos filhos.</p>
       <form data-form="whatsPai" class="linha"><input class="inp" name="w" inputmode="tel" value="${esc(S.config.whatsapp_pai || '')}" placeholder="85 99999-9999"><button class="btn pri sm" style="width:auto">Salvar</button></form></div>
     <div class="card"><h3>👨‍👦 Filhos e acessos</h3>${S.dados.filhos.map(f => {
@@ -844,6 +847,24 @@ function telaMaisPai() {
     <div class="card"><h3>💾 Backup</h3><p class="mut peq">Tudo fica salvo no banco de dados (Supabase). Para guardar uma cópia no Google Drive, baixe o backup e salve na pasta do TáFeito no Drive.</p>
       <button class="btn ghost" data-act="backup">💾 Baixar backup completo</button></div>
     <p class="rodape">TáFeito v${VERSAO} · Desenvolvido por Andrade</p>`;
+}
+
+/* ---------- NOTIFICAÇÕES DO PAI: ele escolhe o que quer receber ---------- */
+const NOTIF_PAI = [['login', '🟢', 'Filho entrou no app'], ['reg', '✅', 'Tarefa concluída'], ['atraso', '⚠️', 'Tarefa atrasada'], ['filho', '✏️', 'Filho criou ou mudou algo (tarefa, missão, perfil, prêmio)'],
+  ['imagens', '🖼️', 'Imagens enviadas'], ['prova', '📚', 'Provas marcadas, mudadas ou importadas'], ['ciente', '👍', '"Ciente" nas provas'], ['msg', '💬', 'Mensagens do chat'],
+  ['ped', '🔐', 'Pedidos de permissão'], ['notif', '🚨', 'Filho desligou as notificações (recomendado deixar ligado)'], ['copia', '📤', 'Cópia no sininho do que o filho recebeu']];
+const notifPaiOff = () => Array.isArray(S.config.notif_pai_off) ? S.config.notif_pai_off : [];
+function cardNotifPai() {
+  const off = notifPaiOff(); const lig = NOTIF_PAI.length - NOTIF_PAI.filter(([k]) => off.includes(k)).length;
+  return `<div class="card"><div class="linha"><h3 class="esp" style="margin:0">🔔 Minhas notificações</h3><span class="tag ${lig === NOTIF_PAI.length ? 'ok' : ''}">${lig}/${NOTIF_PAI.length} ligadas</span></div>
+    <p class="mut peq">Escolha o que você quer receber no celular e no sininho. Isso vale só para você — as notificações dos filhos continuam travadas.</p>
+    <div class="lista-notif">${NOTIF_PAI.map(([k, e, t]) => `<label class="item-notif"><span class="sem3d-no">${e}</span><span class="esp">${esc(t)}</span><input type="checkbox" class="chave" data-change="notifPai" data-k="${k}" ${off.includes(k) ? '' : 'checked'}></label>`).join('')}</div>
+    <div class="grid2" style="margin-top:8px"><button class="btn ghost sm" data-act="notifPaiTodas" data-v="1">Ligar todas</button><button class="btn ghost sm" data-act="notifPaiTodas" data-v="0">Desligar todas</button></div></div>`;
+}
+async function salvarNotifPai(off) {
+  const antes = notifPaiOff(); S.config.notif_pai_off = off;
+  try { await DB.rpc('mok_notif_pai', { p_off: off }); render(); toast('🔔 Preferências salvas', 'ok'); }
+  catch (e) { S.config.notif_pai_off = antes; render(); toast(msgErro(e), 'bad'); }
 }
 
 /* ---------- ÁREA DE ESTUDO (provas) ---------- */
@@ -952,7 +973,7 @@ function telaEstudo() {
 
 /* ---------- DASHBOARDS simples (números grandes e cores) ---------- */
 function dash(titulo, tiles, extra = '') {
-  return `<div class="dash"><div class="dash-tit">${titulo}</div><div class="dash-grid">${tiles.map(t => `<div class="tile ${t.c}"><b>${t.n}</b><span>${t.r}</span></div>`).join('')}</div>${extra}</div>`;
+  return `<div class="dash"><div class="dash-tit">${titulo}</div><div class="dash-grid">${tiles.map(t => `<div class="tile ${t.c}${String(t.n).length > 5 ? ' tile-largo' : ''}"><b>${t.n}</b><span>${t.r}</span></div>`).join('')}</div>${extra}</div>`;
 }
 function dashTarefas(id = fid()) {
   const dia = hojeISO(), hm = new Date().toTimeString().slice(0, 5);
@@ -1087,7 +1108,7 @@ async function salvarPerfil(id, { foto = null, mascote = null, whatsapp = null }
   } else {
     if (!podeEditarPerfil(id)) throw new Error('Você só pode editar o seu próprio perfil.');
     await DB.rpc('mok_meu_perfil', { p_foto: foto, p_mascote: mascote, p_whatsapp: zap });
-    if (id === 'pai') { if (foto != null) S.config.foto_pai = foto; if (zap != null) S.config.whatsapp_pai = zap; }
+    if (id === 'pai') { if (foto != null) S.config.foto_pai = foto; if (zap != null) S.config.whatsapp_pai = zap; if (mascote) S.config.mascote_pai = mascote; }
     else { const x = S.dados.filhos.find(y => y.id === id); if (foto != null) x.foto = foto; if (mascote) x.mascote = mascote; if (zap != null) x.whatsapp = zap; }
   }
   render();
@@ -1148,7 +1169,20 @@ const MASC_ROT = { pele: 'Pele', cabelo: 'Cabelo', corCabelo: 'Cor do cabelo', o
 const MASC_NOMES = { espetado: 'Espetado', topete: 'Topete', cacheado: 'Cacheado', liso: 'Liso', moicano: 'Moicano', 'tranças': 'Tranças', raspado: 'Raspado', confiante: '😏 Confiante', alegre: '😄 Alegre', brava: '😠 Brava', surpresa: '😮 Surpresa', jaqueta: 'Jaqueta', moletom: 'Moletom', camiseta: 'Camiseta', regata: 'Regata', colete: 'Colete', uniforme: 'Uniforme', nenhuma: 'Nenhuma', raio: '⚡ Raio', estrela: '⭐ Estrela', numero: 'Nº 10', listras: 'Listras', nenhum: 'Nenhum', bone: '🧢 Boné', bonetras: '🧢 Boné pra trás', fone: '🎧 Fone', gorro: 'Gorro', bandana: 'Bandana', coroa: '👑 Coroa', redondo: '👓 Redondo', escuro: '🕶️ Escuro', gamer: '🥽 Gamer', mochila: '🎒 Mochila', capa: '🦸 Capa', medalha: '🏅 Medalha', relogio: '⌚ Relógio', skate: '🛹 Skate', sorriso: '🙂 Sorriso', sorrisao: '😁 Sorrisão', debochado: '😏 Debochado', lingua: '😛 Língua', flutuar: '🎈 Flutuar', acenar: '👋 Acenar', pular: '🦘 Pular', dancar: '🕺 Dançar', joinha: '👍 Joinha' };
 const MASC_CORES = ['pele', 'corCabelo', 'olhos', 'corRoupa', 'corDetalhe', 'calca', 'tenis'];
 const MASC_PADRAO = { tipo: 'animal', animal: 'gato', movAnimal: 'auto', chapeuA: 'nenhum', oculosA: 'nenhum', aura: 'nenhuma', fundo: '', nome: 'Bolt', voz: true, pele: '#e3a77a', cabelo: 'espetado', corCabelo: '#1e140e', olhos: '#4a2e1d', sobrancelha: 'confiante', roupa: 'jaqueta', corRoupa: '#2f6df0', corDetalhe: '#fbbf24', estampa: 'raio', calca: '#1e293b', tenis: '#ffffff', chapeu: 'nenhum', oculos: 'nenhum', extra: 'nenhum', boca: 'sorriso', movimento: 'acenar' };
-const mascoteDe = id => { const m = { ...MASC_PADRAO, ...(((S.dados.filhos.find(f => f.id === id) || {}).mascote) || {}) }; if (m.rosto && !m.boca) m.boca = 'sorriso'; return m; };
+const MASC_PAI = { animal: 'aguia', nome: 'Falcão', chapeuA: 'nenhum', oculosA: 'escuro', fundo: '#2f3f86' };
+const mascoteDe = id => { const m = id === 'pai' ? { ...MASC_PADRAO, ...MASC_PAI, ...(S.config.mascote_pai || {}) } : { ...MASC_PADRAO, ...(((S.dados.filhos.find(f => f.id === id) || {}).mascote) || {}) }; if (m.rosto && !m.boca) m.boca = 'sorriso'; return m; };
+const nomePai = () => ((S.meuNome || (S.dados.perfis || []).find(p => p.papel === 'pai')?.nome || 'Pai').trim().split(/\s+/)[0]) || 'Pai';
+const nomeDono = () => S.papel === 'pai' ? nomePai() : filhoAtual().nome;
+/* resumo do dia para o pai (o mascote dele fala isso) */
+function resumoPai() {
+  const dia = hojeISO();
+  const filhos = S.dados.filhos.map(f => { const t = tarefasDoDia(dia, ['casa'], false, f.id); const feitas = t.filter(x => ehFeita(regDe(x, dia, f.id))).length; return { f, total: t.length, feitas }; });
+  const aprovar = S.dados.registros.filter(r => r.status === 'feita').length;
+  const imgs = S.dados.imagens.filter(i => !i.status || i.status === 'pendente').length;
+  const peds = pedidosPendentes().length;
+  const provas = S.dados.filhos.flatMap(f => provasFuturas(f.id).filter(p => corProva(p) === 'vermelho').map(p => ({ p, f })));
+  return { filhos, aprovar, imgs, peds, provas };
+}
 function tom(h, f) { const n = parseInt(String(h).replace('#', '').padEnd(6, '0').slice(0, 6), 16); const c = x => Math.max(0, Math.min(255, Math.round(f >= 1 ? x + (255 - x) * (f - 1) : x * f))).toString(16).padStart(2, '0'); return '#' + c(n >> 16 & 255) + c(n >> 8 & 255) + c(n & 255); }
 const escurece = (h, f = .75) => tom(h, f);
 function mascoteSVG(m, tam = 80, animar = true) {
@@ -1233,23 +1267,104 @@ function mascoteSVG(m, tam = 80, animar = true) {
 }
 /* mascotes animais 3D (Fluent 3D, MIT) */
 const ANIMAIS = [["gato", "1f408", "Gato"], ["gatinho", "1f431", "Gatinho"], ["cachorro", "1f415", "Cachorro"], ["cao", "1f436", "Cãozinho"], ["aguia", "1f985", "Águia"], ["falcao", "1f426-200d-2b1b", "Falcão"], ["coruja", "1f989", "Coruja"], ["papagaio", "1f99c", "Papagaio"], ["pinguim", "1f427", "Pinguim"], ["pato", "1f986", "Pato"], ["flamingo", "1f9a9", "Flamingo"], ["pavao", "1f99a", "Pavão"], ["cisne", "1f9a2", "Cisne"], ["galo", "1f413", "Galo"], ["passaro", "1f426", "Pássaro"], ["peixe", "1f41f", "Peixe"], ["peixe_tropical", "1f420", "Peixe tropical"], ["baiacu", "1f421", "Baiacu"], ["tubarao", "1f988", "Tubarão"], ["golfinho", "1f42c", "Golfinho"], ["baleia", "1f433", "Baleia"], ["polvo", "1f419", "Polvo"], ["lula", "1f991", "Lula"], ["caranguejo", "1f980", "Caranguejo"], ["lagosta", "1f99e", "Lagosta"], ["foca", "1f9ad", "Foca"], ["lontra", "1f9a6", "Lontra"], ["tartaruga", "1f422", "Tartaruga"], ["crocodilo", "1f40a", "Crocodilo"], ["lagarto", "1f98e", "Lagarto"], ["cobra", "1f40d", "Cobra"], ["sapo", "1f438", "Sapo"], ["dragao", "1f409", "Dragão"], ["dino", "1f996", "T-Rex"], ["dino2", "1f995", "Dinossauro"], ["leao", "1f981", "Leão"], ["tigre", "1f405", "Tigre"], ["leopardo", "1f406", "Leopardo"], ["lobo", "1f43a", "Lobo"], ["raposa", "1f98a", "Raposa"], ["urso", "1f43b", "Urso"], ["urso_polar", "1f43b-200d-2744", "Urso polar"], ["panda", "1f43c", "Panda"], ["coala", "1f428", "Coala"], ["macaco", "1f412", "Macaco"], ["gorila", "1f98d", "Gorila"], ["elefante", "1f418", "Elefante"], ["girafa", "1f992", "Girafa"], ["zebra", "1f993", "Zebra"], ["rinoceronte", "1f98f", "Rinoceronte"], ["hipopotamo", "1f99b", "Hipopótamo"], ["cavalo", "1f40e", "Cavalo"], ["unicornio", "1f984", "Unicórnio"], ["canguru", "1f998", "Canguru"], ["preguica", "1f9a5", "Preguiça"], ["coelho", "1f407", "Coelho"], ["hamster", "1f439", "Hamster"], ["esquilo", "1f43f", "Esquilo"], ["ourico", "1f994", "Ouriço"], ["morcego", "1f987", "Morcego"], ["veado", "1f98c", "Veado"], ["camelo", "1f42a", "Camelo"], ["vaca", "1f404", "Vaca"], ["porco", "1f416", "Porco"], ["ovelha", "1f411", "Ovelha"], ["bode", "1f410", "Bode"], ["borboleta", "1f98b", "Borboleta"], ["abelha", "1f41d", "Abelha"], ["joaninha", "1f41e", "Joaninha"], ["caracol", "1f40c", "Caracol"], ["aranha", "1f577", "Aranha"], ["escorpiao", "1f982", "Escorpião"]];
-const ANIMAL_MOV = { aguia: 'voar', falcao: 'voar', coruja: 'voar', papagaio: 'voar', passaro: 'voar', borboleta: 'voar', abelha: 'voar', morcego: 'voar', dragao: 'voar', flamingo: 'flutuar', cisne: 'nadar', pato: 'nadar',
+const MISTICOS = [['bruxo', '', 'Bruxo'], ['bruxa', '', 'Bruxa'], ['mago', '', 'Mago'], ['fada', '', 'Fada'], ['fado', '', 'Fado'], ['genio', '', 'Gênio'], ['vampiro', '', 'Vampiro'], ['vampira', '', 'Vampira'],
+  ['zumbi', '', 'Zumbi'], ['elfo', '', 'Elfo'], ['elfa', '', 'Elfa'], ['sereia', '', 'Sereia'], ['tritao', '', 'Tritão'], ['ninja', '', 'Ninja'], ['heroi', '', 'Super-herói'], ['vilao', '', 'Vilão'],
+  ['fantasma', '', 'Fantasma'], ['alien', '', 'Alienígena'], ['monstro', '', 'Monstrinho'], ['robo', '', 'Robô'], ['goblin', '', 'Goblin'], ['ogro', '', 'Ogro'], ['caveira', '', 'Caveira'],
+  ['abobora', '', 'Abóbora'], ['bola_cristal', '', 'Bola de cristal'], ['dragao_bebe', '', 'Dragão bebê'], ['mamute', '', 'Mamute'], ['dodo', '', 'Dodô']];
+MISTICOS.forEach(m => { m[3] = 'mistico'; ANIMAIS.push(m); });
+const miniMasc = a => `icons/anim/mini/${a[0]}.webp?v=1`;
+const ANIMAL_MOV = { fada: 'voar', fado: 'voar', genio: 'flutuar', fantasma: 'flutuar', heroi: 'voar', sereia: 'nadar', tritao: 'nadar', dragao_bebe: 'voar', aguia: 'voar', falcao: 'voar', coruja: 'voar', papagaio: 'voar', passaro: 'voar', borboleta: 'voar', abelha: 'voar', morcego: 'voar', dragao: 'voar', flamingo: 'flutuar', cisne: 'nadar', pato: 'nadar',
   peixe: 'nadar', peixe_tropical: 'nadar', baiacu: 'nadar', tubarao: 'nadar', golfinho: 'nadar', baleia: 'nadar', polvo: 'nadar', lula: 'nadar', foca: 'nadar', lontra: 'nadar', tartaruga: 'nadar', canguru: 'pular', coelho: 'pular', sapo: 'pular' };
 const ACESS_CHAPEU = [['nenhum', ''], ['bone', '🧢'], ['coroa', '👑'], ['cartola', '🎩'], ['formatura', '🎓'], ['capacete', '⛑️'], ['laco', '🎀'], ['fone', '🎧']];
 const ACESS_OCULOS = [['nenhum', ''], ['escuro', '🕶️'], ['gamer', '🥽'], ['redondo', '👓']];
-const ACESS_AURA = [['nenhuma', ''], ['estrela', '⭐'], ['fogo', '🔥'], ['raio', '⚡'], ['brilho', '✨'], ['arco', '🌈'], ['diamante', '💎']];
+const ACESS_AURA = [['nenhuma', ''], ['estrela', '⭐'], ['fogo', '🔥'], ['raio', '⚡'], ['brilho', '✨'], ['arco', '🌈'], ['diamante', '💎'], ['varinha', '🪄'], ['cristal', '🔮']];
 const MOVS_ANIMAL = [['auto', '🤖 Do animal'], ['flutuar', '🎈 Flutuar'], ['pular', '🦘 Pular'], ['dancar', '🕺 Dançar'], ['voar', '🪽 Voar'], ['nadar', '🌊 Nadar'], ['girar', '🌀 Girar']];
 const CORES_FUNDO = ['#2f3f86', '#7b5cff', '#16a34a', '#e11d48', '#f59e0b', '#0ea5e9', '#111827', '#ec4899'];
 const ehAnimal = m => (m.tipo || 'animal') === 'animal';
 const img3d = (e, cls = '') => e ? `<img class="${cls}" src="icons/3d/${chaveEmoji(e)}.webp" alt="" draggable="false">` : '';
+const semAcento = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+function filtrarMascotes(q) {
+  const box = document.querySelector('.modal .masc-grupo'); if (!box) return; const t = semAcento(q).trim(); let n = 0;
+  box.querySelectorAll('.grade-animais button').forEach(b => { const ok = !t || b.dataset.nome.includes(t) || b.dataset.v.includes(t); b.hidden = !ok; if (ok) n++; });
+  box.querySelectorAll('.sub-grade').forEach(g => { g.hidden = ![...g.querySelectorAll('button')].some(b => !b.hidden); });
+  const sem = $('#semMasc'); if (!sem) return;
+  sem.hidden = !t || n > 0;
+  if (t && !n) sem.innerHTML = `Ainda não tenho <b>"${esc(q.trim())}"</b>. ${S.papel === 'filho' ? `<button type="button" class="btn pri sm" style="width:auto;margin-top:6px" data-act="sugerirMascote" data-v="${esc(q.trim().slice(0, 40))}">💡 Sugerir para o pai</button>` : '<br><span class="mut peq">Peça para adicionar esse personagem na próxima versão.</span>'}`;
+}
 function animalVisual(m, tam) {
   const a = ANIMAIS.find(x => x[0] === m.animal) || ANIMAIS[0];
   const mov = (m.movAnimal && m.movAnimal !== 'auto') ? m.movAnimal : (ANIMAL_MOV[a[0]] || 'flutuar');
   const ch = (ACESS_CHAPEU.find(x => x[0] === m.chapeuA) || [])[1], oc = (ACESS_OCULOS.find(x => x[0] === m.oculosA) || [])[1], au = (ACESS_AURA.find(x => x[0] === m.aura) || [])[1];
-  return `<div class="masc-animal sem3d mov-${mov}" style="width:${tam}px;height:${tam}px;--fundo:${esc(m.fundo || '#2f3f86')}">
+  return `<div class="masc-animal sem3d mov-${mov}${m._dormindo ? ' dormindo' : ''}" style="width:${tam}px;height:${tam}px;--fundo:${esc(m.fundo || '#2f3f86')}">
     ${m.fundo ? '<span class="aura-fundo"></span>' : ''}${au ? `<span class="aura-orbita">${img3d(au)}</span>` : ''}
-    <div class="corpo-animal"><img class="bicho" src="icons/anim/${a[0]}.webp?v=1" onerror="this.onerror=null;this.src='icons/3d/${a[1]}.webp'" alt="${esc(a[2])}" draggable="false">${img3d(ch, 'acc-chapeu')}${img3d(oc, 'acc-oculos')}</div><span class="sombra-animal"></span></div>`;
+    <div class="corpo-animal"><img class="bicho" src="icons/anim/${a[0]}.webp?v=1" onerror="this.onerror=null;this.src='${miniMasc(a)}'" alt="${esc(a[2])}" draggable="false">${img3d(ch, 'acc-chapeu')}${img3d(oc, 'acc-oculos')}</div><span class="sombra-animal"></span></div>`;
 }
+/* ---------- BICHINHO VIRTUAL: comer, beber, carinho e dormir ---------- */
+const H = 36e5, clamp = (v, a = 0, b = 100) => Math.max(a, Math.min(b, v));
+const petDe = id => { const p = id === 'pai' ? S.config.pet_pai : (S.dados.filhos.find(f => f.id === id) || {}).pet; return p && typeof p === 'object' ? { ...p } : {}; };
+function statusPet(p, agora = Date.now()) {
+  const desde = k => p[k] ? (agora - p[k]) / H : 6;
+  const fome = clamp(100 - desde('comeu') * 12), sede = clamp(100 - desde('bebeu') * 16), carinho = clamp(100 - desde('carinho') * 10);
+  let energia;
+  if (p.dormindo) energia = clamp((p.energia ?? 60) + ((agora - (p.dormiu || agora)) / H) * 30);
+  else energia = clamp((p.energia ?? 80) - ((agora - (p.acordou || agora)) / H) * 6);
+  const humor = Math.round((fome + sede + carinho + energia) / 4);
+  const nivel = Math.floor((p.xp || 0) / 50) + 1;
+  return { fome: Math.round(fome), sede: Math.round(sede), carinho: Math.round(carinho), energia: Math.round(energia), humor, nivel, xp: p.xp || 0, dormindo: !!p.dormindo };
+}
+function pedidoPet(st, nome) {
+  if (st.dormindo) return `${nome} está dormindo 💤`;
+  if (st.fome < 30) return `${nome} está com fome! 🍖`;
+  if (st.sede < 30) return `${nome} está com sede! 💧`;
+  if (st.energia < 25) return `${nome} está com sono 😴`;
+  if (st.carinho < 30) return `${nome} quer carinho 🤚`;
+  return '';
+}
+const COMIDA = { gato: '🐟', gatinho: '🐟', cachorro: '🦴', cao: '🦴', coelho: '🥕', hamster: '🥜', esquilo: '🥜', macaco: '🍌', gorila: '🍌', panda: '🎋', coala: '🌿', cavalo: '🥕', unicornio: '🍓', vaca: '🌾', ovelha: '🌾', bode: '🌾',
+  urso: '🍯', urso_polar: '🐟', pinguim: '🐟', foca: '🐟', lontra: '🐟', tubarao: '🐟', golfinho: '🐟', baleia: '🦐', abelha: '🌻', borboleta: '🌸', vampiro: '🍅', vampira: '🍅', zumbi: '🧠', robo: '🔋', alien: '🍕', monstro: '🍕', fantasma: '🍬', bruxo: '🍬', bruxa: '🍬', mago: '🍬' };
+const ACOES_PET = { comer: ['🍖', 'Comida', 'comeu', 'Hmm, que delícia! Obrigado!'], beber: ['💧', 'Água', 'bebeu', 'Ahh, refrescante!'], carinho: ['🤚', 'Carinho', 'carinho', 'Eu adoro carinho! ❤️'], dormir: ['😴', 'Dormir', '', 'Boa noite… zzz'] };
+async function cuidarPet(acao) {
+  const dono = S.papel === 'pai' ? 'pai' : S.eu; const m = mascoteDe(dono); const p = petDe(dono); const agora = Date.now(); const st = statusPet(p, agora);
+  let fala = '';
+  if (acao === 'dormir') {
+    if (p.dormindo) { p.energia = st.energia; p.dormindo = false; p.acordou = agora; fala = 'Bom dia! Acordei cheio de energia! ☀️'; }
+    else { p.energia = st.energia; p.dormindo = true; p.dormiu = agora; fala = ACOES_PET.dormir[3]; }
+  } else {
+    if (p.dormindo) return toast(`${m.nome} está dormindo. Acorde primeiro 😴`);
+    const [, , campo, f] = ACOES_PET[acao];
+    const antes = st[acao === 'comer' ? 'fome' : acao === 'beber' ? 'sede' : 'carinho'];
+    if (antes > 92) { fala = acao === 'comer' ? 'Estou cheio! Mais tarde 😅' : acao === 'beber' ? 'Já bebi bastante! 😄' : 'Hehe, já ganhei muito carinho hoje! 🥰'; }
+    else { p[campo] = agora; p.xp = (p.xp || 0) + 5; fala = f; }
+    if (!p.acordou) { p.acordou = agora; p.energia = st.energia; }
+  }
+  const nivelAntes = st.nivel;
+  if (dono === 'pai') S.config.pet_pai = p; else { const f = S.dados.filhos.find(x => x.id === dono); if (f) f.pet = p; }
+  festaPet(acao === 'comer' ? (COMIDA[m.animal] || '🍖') : ACOES_PET[acao][0]);
+  if (m.voz !== false) falar(fala);
+  const novo = statusPet(p); if (novo.nivel > nivelAntes) setTimeout(() => toast(`🎉 ${m.nome} subiu para o nível ${novo.nivel}!`, 'ok'), 600);
+  atualizarPetUI(); render();
+  try { await DB.rpc('mok_pet', { p_pet: p }); } catch (e) { console.warn(e); }
+  const fl = document.querySelector('.fala-pet'); if (fl) fl.textContent = fala;
+}
+function festaPet(e) {
+  document.querySelectorAll('.masc-palco, .flut-masc').forEach(alvo => {
+    for (let i = 0; i < 6; i++) { const s = document.createElement('span'); s.className = 'particula-pet'; s.textContent = e; s.style.left = (30 + Math.random() * 40) + '%'; s.style.animationDelay = (i * 0.08) + 's'; alvo.appendChild(s); setTimeout(() => s.remove(), 1600); }
+  });
+}
+function barrasPet(st) {
+  const b = (e, t, v) => `<div class="barra-pet"><span>${e} ${t}</span><div class="barra"><i style="width:${v}%;background:${v < 30 ? '#ef4444' : v < 60 ? '#f59e0b' : '#22c55e'}"></i></div><b>${v}%</b></div>`;
+  return `<div class="pet-status">${b('🍖', 'Fome', st.fome)}${b('💧', 'Sede', st.sede)}${b('❤️', 'Carinho', st.carinho)}${b('⚡', 'Energia', st.energia)}
+    <div class="linha peq" style="margin-top:4px"><span class="esp">⭐ Nível <b>${st.nivel}</b> · ${st.xp % 50}/50 XP</span><span>${st.humor >= 70 ? '😄 Feliz' : st.humor >= 40 ? '🙂 Ok' : '😢 Precisa de você'}</span></div></div>`;
+}
+function cardPet(dono) {
+  const m = mascoteDe(dono); const st = statusPet(petDe(dono));
+  return `<div class="card-pet"><div class="linha"><b class="esp">🐾 Cuidar do ${esc(m.nome)}</b>${st.dormindo ? '<span class="tag">💤 dormindo</span>' : ''}</div>${barrasPet(st)}
+    <div class="acoes-pet">${Object.entries(ACOES_PET).map(([k, [e, t]]) => `<button class="btn ghost sm" data-act="petAcao" data-v="${k}" ${st.dormindo && k !== 'dormir' ? 'disabled' : ''}>${k === 'comer' ? (COMIDA[m.animal] || e) : k === 'dormir' && st.dormindo ? '☀️' : e}<br><small>${k === 'dormir' && st.dormindo ? 'Acordar' : t}</small></button>`).join('')}</div>
+    <div class="fala-pet mut peq">${esc(pedidoPet(st, m.nome) || 'Cuide dele todo dia para ele subir de nível!')}</div></div>`;
+}
+function atualizarPetUI() { const c = document.querySelector('.modal .card-pet'); if (c) c.outerHTML = cardPet(S.papel === 'pai' ? 'pai' : S.eu); }
+setInterval(() => { if (S.papel && !document.querySelector('.modal')) { const fm = document.querySelector('.flut-masc .balao'); if (fm) fm.textContent = dicaMascote(); } }, 60000);
+
 /* boneco 3D (Three.js). Sem 3D no aparelho, usa o desenho. */
 function mascoteVisual(m, tam = 80) {
   if (ehAnimal(m)) return animalVisual(m, tam);
@@ -1268,6 +1383,16 @@ function falar(txt) {
 }
 function saudacao() { const h = new Date().getHours(); return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; }
 function textoMascote(curto = false) {
+  if (S.papel === 'pai') {
+    const r = resumoPai(); let t = `${saudacao()}, ${nomePai()}! `;
+    r.filhos.forEach(({ f, total, feitas }) => { if (total) t += feitas >= total ? `${f.nome} já fez todas as tarefas de hoje. ` : `${f.nome} fez ${feitas} de ${total} tarefas. `; });
+    if (r.imgs) t += `Tem ${r.imgs} ${r.imgs === 1 ? 'imagem' : 'imagens'} esperando a sua aprovação. `;
+    if (r.aprovar) t += `${r.aprovar} ${r.aprovar === 1 ? 'tarefa concluída espera' : 'tarefas concluídas esperam'} você conferir. `;
+    if (r.peds) t += `${r.peds} ${r.peds === 1 ? 'pedido de permissão' : 'pedidos de permissão'} para responder. `;
+    r.provas.slice(0, curto ? 1 : 3).forEach(({ p, f }) => { t += `Atenção: prova de ${p.materia} do ${f.nome} ${faltaTxt(p)}. `; });
+    if (!r.imgs && !r.aprovar && !r.peds) t += 'Nada pendente para você agora. ';
+    return t.trim();
+  }
   const f = filhoAtual(); const dia = hojeISO(); const st = statusDia();
   const pend = tarefasDoDia(dia, ['casa', 'trabalho']).filter(t => !ehFeita(regDe(t, dia)));
   let t = `${saudacao()}, ${f.nome}! `;
@@ -1281,25 +1406,29 @@ function textoMascote(curto = false) {
   return t.trim();
 }
 function cumprimentoDoDia() {
-  if (S.papel !== 'filho') return; const m = mascoteDe(S.eu); if (!m.voz) return;
+  const m = mascoteDe(S.eu); if (m.voz === false || (S.papel === 'pai' && !m.voz)) return;
   const k = 'mok_ola_' + hojeISO(); if (lsGet(k)) return;
   const vai = () => { if (lsGet(k)) return; lsSet(k, 1); falar(textoMascote(true)); document.removeEventListener('pointerdown', vai); };
   document.addEventListener('pointerdown', vai); // navegadores só liberam a voz depois do primeiro toque
 }
-let MASC_EDIT = {};
+let MASC_EDIT = {}, MASC_ID = '';
 function modalMascote(id, rascunho) {
+  MASC_ID = id;
   if (!podeEditarPerfil(id)) return toast('Você só pode personalizar o seu mascote.', 'bad');
   MASC_EDIT = rascunho ? { ...rascunho } : mascoteDe(id);
   const cores = k => MASC_OPC[k].map(v => `<button type="button" class="cor-opc ${MASC_EDIT[k] === v ? 'on' : ''}" style="background:${v}" data-act="mascoteOpc" data-k="${k}" data-v="${v}"></button>`).join('') + `<label class="cor-livre" title="Escolher qualquer cor"><input type="color" value="${esc(MASC_EDIT[k])}" data-change="mascoteCor" data-k="${k}">🎨</label>`;
   const opcs = k => MASC_OPC[k].map(v => `<button type="button" class="opc ${MASC_EDIT[k] === v ? 'on' : ''}" data-act="mascoteOpc" data-k="${k}" data-v="${v}">${MASC_NOMES[v] || v}</button>`).join('');
-  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>🎨 Meu mascote</h2>
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>🎨 ${id === 'pai' || id === S.eu ? 'Meu mascote' : 'Mascote de ' + esc(nomeFilho(id))}</h2>
     <div class="masc-preview">${mascoteVisual(MASC_EDIT, 190)}</div>
     <label class="campo"><span>Nome do mascote</span><input id="mascNome" value="${esc(MASC_EDIT.nome)}" maxlength="20" placeholder="Dê um nome"></label>
     <label class="check"><input type="checkbox" id="mascVoz" ${MASC_EDIT.voz !== false ? 'checked' : ''}> 🔊 Falar comigo (bom dia e tarefas)</label>
     <button type="button" class="btn ghost sm" style="margin:6px 0 12px" data-act="mascoteTestarVoz">▶️ Ouvir o mascote</button>
-    <div class="abas-img" style="margin-bottom:12px"><button type="button" class="${ehAnimal(MASC_EDIT) ? 'on' : ''}" data-act="mascoteTipo" data-v="animal">🐾 Animal</button><button type="button" class="${ehAnimal(MASC_EDIT) ? '' : 'on'}" data-act="mascoteTipo" data-v="humano">🧑 Boneco</button></div>
+    <div class="abas-img" style="margin-bottom:12px"><button type="button" class="${ehAnimal(MASC_EDIT) ? 'on' : ''}" data-act="mascoteTipo" data-v="animal">🐾 Animais e místicos</button><button type="button" class="${ehAnimal(MASC_EDIT) ? '' : 'on'}" data-act="mascoteTipo" data-v="humano">🧑 Boneco</button></div>
     ${ehAnimal(MASC_EDIT) ? `
-      <div class="masc-grupo"><span>Escolha o animal (${ANIMAIS.length})</span><div class="grade-animais">${ANIMAIS.map(a => `<button type="button" class="${MASC_EDIT.animal === a[0] ? 'on' : ''}" data-act="mascoteOpc" data-k="animal" data-v="${a[0]}" title="${esc(a[2])}"><img src="icons/3d/${a[1]}.webp" alt="" loading="lazy"><small>${esc(a[2])}</small></button>`).join('')}</div></div>
+      <div class="masc-grupo"><span>Escolha o seu mascote (${ANIMAIS.length})</span>
+        <div class="busca-masc"><input id="buscaMasc" class="inp" placeholder="🔎 Procurar: gato, dragão, bruxo, fada…" autocomplete="off"></div>
+        <div id="semMasc" class="sugerir-masc" hidden></div>
+        ${[['animal', '🐾 Animais'], ['mistico', '✨ Místicos e fantasia']].map(([g, t]) => `<div class="sub-grade" data-g="${g}"><b class="mut peq">${t}</b><div class="grade-animais">${ANIMAIS.filter(a => (a[3] || 'animal') === g).map(a => `<button type="button" class="${MASC_EDIT.animal === a[0] ? 'on' : ''}" data-act="mascoteOpc" data-k="animal" data-v="${a[0]}" data-nome="${esc(semAcento(a[2]))}" title="${esc(a[2])}"><img src="${miniMasc(a)}" alt="" loading="lazy"><small>${esc(a[2])}</small></button>`).join('')}</div></div>`).join('')}</div>
       <div class="masc-grupo"><span>Movimento</span><div class="masc-opcs">${MOVS_ANIMAL.map(([v, n]) => `<button type="button" class="opc ${(MASC_EDIT.movAnimal || 'auto') === v ? 'on' : ''}" data-act="mascoteOpc" data-k="movAnimal" data-v="${v}">${n}</button>`).join('')}</div></div>
       <div class="masc-grupo"><span>Na cabeça</span><div class="masc-opcs">${ACESS_CHAPEU.map(([v, e]) => `<button type="button" class="opc ${(MASC_EDIT.chapeuA || 'nenhum') === v ? 'on' : ''}" data-act="mascoteOpc" data-k="chapeuA" data-v="${v}">${e || 'Nenhum'}</button>`).join('')}</div></div>
       <div class="masc-grupo"><span>Óculos</span><div class="masc-opcs">${ACESS_OCULOS.map(([v, e]) => `<button type="button" class="opc ${(MASC_EDIT.oculosA || 'nenhum') === v ? 'on' : ''}" data-act="mascoteOpc" data-k="oculosA" data-v="${v}">${e || 'Nenhum'}</button>`).join('')}</div></div>
@@ -1309,7 +1438,16 @@ function modalMascote(id, rascunho) {
     <button class="btn ok" style="margin-top:10px" data-act="mascoteSalvar" data-id="${esc(id)}">💾 Salvar mascote</button>`);
 }
 function dicaMascote() {
-  if (S.papel !== 'filho') return '';
+  { const dono = S.papel === 'pai' ? 'pai' : S.eu; if (dono) { const ped = pedidoPet(statusPet(petDe(dono)), mascoteDe(dono).nome); if (ped && lsGet('mok_ola_' + hojeISO())) return ped; } }
+  if (S.papel === 'pai') {
+    const r = resumoPai();
+    if (!lsGet('mok_ola_' + hojeISO())) return `${saudacao()}, ${nomePai()}! Toque em mim 👋`;
+    if (r.imgs) return `${r.imgs} ${r.imgs === 1 ? 'imagem' : 'imagens'} para aprovar 🖼️`;
+    if (r.aprovar) return `${r.aprovar} ${r.aprovar === 1 ? 'tarefa' : 'tarefas'} para conferir ✅`;
+    if (r.peds) return `${r.peds} ${r.peds === 1 ? 'pedido' : 'pedidos'} esperando você 🔐`;
+    if (r.provas[0]) return `Prova do ${r.provas[0].f.nome} ${faltaTxt(r.provas[0].p)} 📚`;
+    return `Tudo em dia, ${nomePai()}! 👍`;
+  }
   const st = statusDia(); const p = provasFuturas()[0];
   if (p && corProva(p) === 'vermelho') return `Prova de ${p.materia} ${faltaTxt(p)}! 📚`;
   if (!lsGet('mok_ola_' + hojeISO())) return `${saudacao()}, ${filhoAtual().nome}! Toque em mim 👋`;
@@ -1317,12 +1455,30 @@ function dicaMascote() {
   if (st.liberado) return 'Tudo feito! Jogo liberado 🎮';
   return `${saudacao()}, ${filhoAtual().nome}! 👋`;
 }
+function modalAssistentePai() {
+  const m = mascoteDe('pai'); const r = resumoPai();
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><div class="centro masc-palco">${mascoteVisual({ ...m, _dormindo: statusPet(petDe(S.papel === 'pai' ? 'pai' : S.eu)).dormindo }, 150)}</div>
+    <h2 class="centro" style="margin-top:4px">${saudacao()}, ${esc(nomePai())}! Eu sou o ${esc(m.nome)} 👋</h2>
+    <div class="fala">${esc(textoMascote())}</div><button class="btn ghost sm" style="margin-top:6px" data-act="mascoteFalar">🔊 Ouvir de novo</button>
+    ${cardPet('pai')}
+    <div class="assist">
+      ${r.filhos.map(({ f, total, feitas }) => `<div class="${!total || feitas >= total ? 'ok' : ''}">${esc(f.nome)}: <b>${feitas}/${total}</b> tarefas hoje${total && feitas >= total ? ' · 🎮 jogo liberado' : ''}</div>`).join('')}
+      <div class="${r.imgs ? 'bad' : ''}">🖼️ Imagens para aprovar: <b>${r.imgs}</b></div>
+      <div class="${r.aprovar ? 'bad' : ''}">✅ Tarefas para conferir: <b>${r.aprovar}</b></div>
+      <div class="${r.peds ? 'bad' : ''}">🔐 Pedidos de permissão: <b>${r.peds}</b></div>
+      ${r.provas.length ? r.provas.slice(0, 3).map(({ p, f }) => `<div class="bad">📚 ${esc(f.nome)}: <b>${esc(nomeProva(p))}</b> · ${faltaTxt(p)}</div>`).join('') : '<div>📚 Nenhuma prova nesta semana.</div>'}
+    </div>
+    <div class="grid2" style="margin-top:12px"><button class="btn pri" data-act="ir" data-tela="work">🖼️ Ver imagens</button><button class="btn ghost" data-act="ir" data-tela="tarefas">✅ Tarefas</button>
+    <button class="btn ghost" data-act="chatAbrir">💬 Chat</button><button class="btn ghost" data-act="mascoteEditar" data-id="pai">🎨 Personalizar</button></div>`);
+}
 function modalAssistente() {
+  if (S.papel === 'pai') return modalAssistentePai();
   const m = mascoteDe(S.eu); const st = statusDia(); const fut = provasFuturas(); const c = carteira();
   const pend = tarefasDoDia(hojeISO(), ['casa']).filter(t => !ehFeita(regDe(t, hojeISO())));
-  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><div class="centro masc-palco">${mascoteVisual(m, 150)}</div>
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><div class="centro masc-palco">${mascoteVisual({ ...m, _dormindo: statusPet(petDe(S.papel === 'pai' ? 'pai' : S.eu)).dormindo }, 150)}</div>
     <h2 class="centro" style="margin-top:4px">${saudacao()}, ${esc(filhoAtual().nome)}! Eu sou o ${esc(m.nome)} 👋</h2>
     <div class="fala">${esc(textoMascote())}</div><button class="btn ghost sm" style="margin-top:6px" data-act="mascoteFalar">🔊 Ouvir de novo</button>
+    ${cardPet(S.eu)}
     <div class="assist">
       <div class="${st.liberado || !st.total ? 'ok' : 'bad'}">${st.total ? (st.liberado ? '🎮 Jogo liberado! Mandou bem.' : `🔒 Faltam <b>${st.total - st.feitas}</b> tarefas para liberar o jogo.`) : '🎮 Sem tarefas obrigatórias hoje.'}</div>
       ${pend.length ? `<div>✅ Próxima tarefa: <b>${esc(pend[0].titulo)}</b>${pend[0].horario ? ' às ' + pend[0].horario : ''}</div>` : ''}
@@ -1336,7 +1492,7 @@ function flutuantes() {
   const nl = S.papel === 'pai' ? naoLidas() : naoLidas(S.eu);
   const pos = k => { const p = lsGet('mok_pos_' + k); return p ? `style="left:${Math.min(p.x, innerWidth - 60)}px;top:${Math.min(p.y, innerHeight - 70)}px;right:auto;bottom:auto"` : ''; };
   let h = `<button class="flut-chat" data-arrastar="chat" ${pos('chat')} data-act="chatAbrir" title="Chat (arraste para mover)">💬${nl ? `<span class="badge">${nl}</span>` : ''}</button>`;
-  if (S.papel === 'filho') { const m = mascoteDe(S.eu); const d = dicaMascote(); h += `<button class="flut-masc" data-arrastar="masc" ${pos('masc')} data-act="mascote" title="${esc(m.nome)} (arraste para mover)"><span class="balao">${esc(d)}</span>${mascoteVisual(m, 72)}</button>`; }
+  if (S.papel === 'filho' || S.papel === 'pai') { const m = { ...mascoteDe(S.eu), _dormindo: statusPet(petDe(S.eu)).dormindo }; const d = dicaMascote(); h += `<button class="flut-masc" data-arrastar="masc" ${pos('masc')} data-act="mascote" title="${esc(m.nome)} (arraste para mover)"><span class="balao">${esc(d)}</span>${mascoteVisual(m, 72)}</button>`; }
   if (S.chatAberto) h += `<div class="chat-flut-bg" data-act="chatFechar"></div><div class="chat-flut"><div class="linha" style="margin-bottom:6px"><b class="esp">💬 Chat</b><button class="btn zap sm" style="width:auto" data-act="whats">📲 WhatsApp</button><button class="icone-btn" data-act="chatFechar">✕</button></div>${telaChat()}</div>`;
   return h;
 }
@@ -1391,7 +1547,7 @@ function secaoImagens() {
       ${S.papel === 'pai' && l.length ? `<button class="btn pri sm" style="margin:10px 0" data-act="baixarPasta" data-aba="${aba}">⬇️ Baixar pasta ${aba === 'feed' ? 'Feed' : 'Story'} (${l.length}) em .zip</button>` : ''}
       <div class="filtro-img">${[['todas', 'Todas', daAba.length], ['pendente', '⏳ Aguardando', cnt('pendente')], ['aprovada', '✅ Aprovadas', cnt('aprovada')], ['reprovada', '❌ Não aprovadas', cnt('reprovada')]]
         .map(([k, t, n]) => `<button class="${filtro === k ? 'on' : ''}" data-act="filtroImg" data-v="${k}">${t} <b>${n}</b></button>`).join('')}</div>
-      ${l.length ? `<div class="galeria ${aba}">${l.map(i => `<div class="img-card st-${st(i)}" data-id="${esc(i.id)}"><div class="img-item"><img data-caminho="${esc(i.caminho)}" alt="#${i.numero}" loading="lazy"><span class="num">#${i.numero}</span><span class="nf">${aba === 'feed' ? 'F' : 'S'}${i.numero_formato}</span>
+      ${l.length ? `<div class="galeria ${aba}">${l.map(i => `<div class="img-card st-${st(i)}" data-id="${esc(i.id)}"><div class="img-item"><img data-caminho="${esc(i.caminho)}" alt="#${i.numero}" loading="lazy" data-act="verImg" data-id="${esc(i.id)}"><span class="num">#${i.numero}</span><span class="nf">${aba === 'feed' ? 'F' : 'S'}${i.numero_formato}</span>
         ${st(i) !== 'pendente' ? `<span class="selo-img sem3d">${st(i) === 'aprovada' ? '✔' : '✖'}</span>` : ''}
         <div class="img-acoes"><button class="icone-btn" data-act="baixarImg" data-id="${esc(i.id)}" title="Baixar">⬇️</button>${S.papel === 'pai' ? `<button class="icone-btn" data-act="apagarImg" data-id="${esc(i.id)}" title="Apagar">🗑️</button>` : ''}</div></div>
         ${S.papel === 'pai' ? `<div class="check-img sem3d"><button class="ck-v ${st(i) === 'aprovada' ? 'on' : ''}" data-act="aprovarImg" data-id="${esc(i.id)}" title="Aprovar">✔</button><button class="ck-x ${st(i) === 'reprovada' ? 'on' : ''}" data-act="reprovarImg" data-id="${esc(i.id)}" title="Não aprovar">✖</button></div>`
@@ -1399,13 +1555,42 @@ function secaoImagens() {
         ${st(i) === 'reprovada' && i.motivo ? `<div class="motivo-img"><b>Por quê:</b> ${esc(i.motivo)}</div>` : ''}</div>`).join('')}</div>`
       : `<div class="vazio"><span class="e">🖼️</span>${filtro === 'todas' ? `Nenhuma imagem de ${aba} ainda.` : 'Nenhuma imagem neste filtro.'}</div>`}</div>`;
 }
+/* abrir a imagem grande para analisar (toque/clique) — setas, arrastar para os lados, zoom com toque duplo */
+let VISOR = null;
+function abrirVisor(id) {
+  const aba = S.abaImg || 'feed', filtro = S.filtroImg || 'todas';
+  const lista = deFilho('imagens').filter(i => i.formato === aba && (filtro === 'todas' || (i.status || 'pendente') === filtro)).sort((a, b) => b.numero - a.numero);
+  VISOR = { lista: lista.map(i => i.id), pos: Math.max(0, lista.findIndex(i => i.id === id)), zoom: false };
+  desenharVisor();
+}
+function desenharVisor() {
+  let v = document.getElementById('visorImg'); if (!VISOR) { v && v.remove(); return; }
+  const i = S.dados.imagens.find(x => x.id === VISOR.lista[VISOR.pos]); if (!i) { VISOR = null; v && v.remove(); return; }
+  const st = i.status || 'pendente'; const u = URLS_IMG[i.caminho];
+  if (!v) { v = document.createElement('div'); v.id = 'visorImg'; v.className = 'visor-img'; document.body.appendChild(v); }
+  v.innerHTML = `<div class="visor-topo"><b>${i.formato === 'feed' ? 'F' : 'S'}${i.numero_formato} · #${i.numero}</b><span class="esp mut peq">${VISOR.pos + 1} de ${VISOR.lista.length}${i.largura ? ` · ${i.largura}×${i.altura}` : ''}</span>
+      <button class="icone-btn" data-act="baixarImg" data-id="${esc(i.id)}" title="Baixar">⬇️</button><button class="icone-btn" data-act="visorFechar" title="Fechar">✕</button></div>
+    <div class="visor-palco ${VISOR.zoom ? 'zoom' : ''}" data-act="visorZoom"><img src="${u ? esc(u.url) : ''}" data-caminho="${esc(i.caminho)}" alt="" draggable="false"></div>
+    ${VISOR.pos > 0 ? '<button class="visor-seta esq" data-act="visorIr" data-v="-1">‹</button>' : ''}${VISOR.pos < VISOR.lista.length - 1 ? '<button class="visor-seta dir" data-act="visorIr" data-v="1">›</button>' : ''}
+    <div class="visor-base sem3d">
+      ${st === 'reprovada' && i.motivo ? `<div class="motivo-img" style="margin-bottom:8px"><b>Por quê:</b> ${esc(i.motivo)}</div>` : ''}
+      ${S.papel === 'pai' ? `<div class="check-img grande"><button class="ck-v ${st === 'aprovada' ? 'on' : ''}" data-act="aprovarImg" data-id="${esc(i.id)}">✔ Aprovar</button><button class="ck-x ${st === 'reprovada' ? 'on' : ''}" data-act="reprovarImg" data-id="${esc(i.id)}">✖ Não aprovar</button></div>`
+        : `<div class="st-txt" style="font-size:.95rem">${st === 'aprovada' ? '✅ Aprovada' : st === 'reprovada' ? '❌ Não aprovada' : '⏳ Aguardando o pai'}</div>`}
+      <div class="mut peq centro" style="margin-top:6px">Toque na imagem para ampliar · arraste para os lados para passar</div></div>`;
+  if (!u) urlsAssinadas([i.caminho]).then(() => { const im = v.querySelector('.visor-palco img'); const x = URLS_IMG[i.caminho]; if (im && x) im.src = x.url; }).catch(() => { });
+}
+document.addEventListener('keydown', e => { if (!VISOR) return; if (e.key === 'Escape') { VISOR = null; desenharVisor(); } else if (e.key === 'ArrowRight') irVisor(1); else if (e.key === 'ArrowLeft') irVisor(-1); });
+function irVisor(d) { if (!VISOR) return; const n = VISOR.pos + d; if (n < 0 || n >= VISOR.lista.length) return; VISOR.pos = n; VISOR.zoom = false; desenharVisor(); }
+{ let x0 = null; document.addEventListener('touchstart', e => { if (VISOR && e.target.closest('.visor-palco') && !VISOR.zoom) x0 = e.touches[0].clientX; }, { passive: true });
+  document.addEventListener('touchend', e => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 50) { ignorarZoomVisor = true; irVisor(dx < 0 ? 1 : -1); } }, { passive: true }); }
+let ignorarZoomVisor = false;
 async function avaliarImagem(id, status, motivo = '') {
   const i = S.dados.imagens.find(x => x.id === id); if (!i) return false;
   try {
     let r = { status, motivo: status === 'reprovada' ? motivo.trim() : '', avaliado_em: status === 'pendente' ? null : new Date().toISOString() };
     if (S.modo === 'online') r = await DB.rpc('mok_avaliar_imagem', { p_id: id, p_status: status, p_motivo: motivo });
     Object.assign(i, { status: r.status, motivo: r.motivo, avaliado_em: r.avaliado_em });
-    render(); toast(status === 'aprovada' ? '✅ Aprovada — ' + (filhoAtual().nome || 'filho') + ' foi avisado' : status === 'reprovada' ? '❌ Não aprovada — motivo enviado' : 'Voltou para "aguardando"');
+    render(); if (VISOR) desenharVisor(); toast(status === 'aprovada' ? '✅ Aprovada — ' + (filhoAtual().nome || 'filho') + ' foi avisado' : status === 'reprovada' ? '❌ Não aprovada — motivo enviado' : 'Voltou para "aguardando"');
     return true;
   } catch (e) { toast(msgErro(e), 'bad'); return false; }
 }
@@ -2127,6 +2312,13 @@ const acoes = {
   baixarImg: d => baixarImg(d.id),
   baixarPasta: d => baixarPasta(d.aba),
   filtroImg: d => { S.filtroImg = d.v; render(); },
+  verImg: d => abrirVisor(d.id),
+  visorFechar: () => { VISOR = null; desenharVisor(); },
+  visorIr: d => irVisor(Number(d.v)),
+  visorZoom: () => { if (ignorarZoomVisor) { ignorarZoomVisor = false; return; } VISOR.zoom = !VISOR.zoom; const p = document.querySelector('.visor-palco'); if (p) p.classList.toggle('zoom', VISOR.zoom); },
+  petAcao: d => cuidarPet(d.v),
+  sugerirMascote: async d => { await enviarMsg(`💡 Sugestão de mascote: "${d.v}" — pode colocar no app?`, S.eu); toast('💡 Sugestão enviada para o pai!', 'ok'); },
+  notifPaiTodas: d => salvarNotifPai(d.v === '1' ? [] : NOTIF_PAI.map(x => x[0]).filter(k => k !== 'notif')),
   aprovarImg: d => { const i = S.dados.imagens.find(x => x.id === d.id); avaliarImagem(d.id, i && i.status === 'aprovada' ? 'pendente' : 'aprovada'); },
   reprovarImg: d => modalReprovar(d.id),
   salvarReprova: async d => { const m = ($('#motivoImg') || {}).value || ''; if (!m.trim()) return toast('Escreva o motivo.', 'bad'); if (await avaliarImagem(d.id, 'reprovada', m)) fecharTopo(); },
@@ -2160,7 +2352,7 @@ const acoes = {
   },
   mascote: () => { modalAssistente(); const m = mascoteDe(S.eu); if (m.voz !== false) falar(textoMascote()); },
   mascoteFalar: () => falar(textoMascote()),
-  mascoteTestarVoz: () => { const n = ($('#mascNome') || {}).value || MASC_EDIT.nome; falar(`${saudacao()}, ${filhoAtual().nome}! Eu sou o ${n}, seu assistente. Vamos fazer as tarefas?`); },
+  mascoteTestarVoz: () => { const n = ($('#mascNome') || {}).value || MASC_EDIT.nome; falar(S.papel === 'pai' && MASC_ID === 'pai' ? `${saudacao()}, ${nomePai()}! Eu sou o ${n}. Vou te contar como os meninos estão.` : `${saudacao()}, ${filhoAtual().nome}! Eu sou o ${n}, seu assistente. Vamos fazer as tarefas?`); },
   chatAbrir: () => { S.chatAberto = true; render(); setTimeout(() => { const i = $('#chatTxt'); if (i && innerWidth > 700) i.focus(); }, 50); },
   chatFechar: () => { S.chatAberto = false; render(); },
   whats: () => modalWhats(),
@@ -2350,10 +2542,13 @@ const forms = {
 };
 
 const mudancas = {
+  notifPai: el => { const off = new Set(notifPaiOff()); if (el.checked) off.delete(el.dataset.k); else off.add(el.dataset.k); salvarNotifPai([...off]); },
   diaVer: el => { S.diaVer = el.value || hojeISO(); render(); },
   mascoteCor: el => { MASC_EDIT[el.dataset.k] = el.value; const box = el.closest('.modal'); box.querySelector('.masc-preview').innerHTML = mascoteVisual(MASC_EDIT, 190); },
   recorrencia: el => { const u = el.value === 'unica'; $('#boxDias').hidden = u; $('#boxData').hidden = !u; }
 };
+
+document.addEventListener('input', e => { if (e.target.id === 'buscaMasc') filtrarMascotes(e.target.value); });
 
 /* arrastar o chat e o mascote para qualquer lugar da tela */
 let arrasto = null, ignorarClique = false;

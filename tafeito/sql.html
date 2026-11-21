@@ -1291,6 +1291,84 @@ insert into public.mok_drive_cfg (id, emails) values (1, &#x27;bravusmidiaoficia
 grant select, update on public.mok_imagens to service_role;
 grant select on public.mok_filhos to service_role;
 
+-- =====================================================================
+-- v2.5: MASCOTE DO PAI · BICHINHO VIRTUAL (comer, beber, carinho, dormir) · PAI ESCOLHE AS NOTIFICAÇÕES DELE
+-- =====================================================================
+alter table public.mok_config add column if not exists mascote_pai jsonb;
+alter table public.mok_config add column if not exists pet_pai jsonb;
+alter table public.mok_config add column if not exists notif_pai_off text[] not null default &#x27;{}&#x27;;
+alter table public.mok_filhos add column if not exists pet jsonb;
+
+-- o pai também salva o mascote dele
+create or replace function public.mok_meu_perfil(p_foto text, p_mascote jsonb, p_whatsapp text) returns void
+language plpgsql security definer set search_path = public as $$
+declare f text := mok_meu_filho();
+begin
+  if p_foto is not null and p_foto &lt;&gt; &#x27;&#x27; and p_foto !~ &#x27;^https://[a-z0-9]+\.supabase\.co/storage/v1/object/public/mok-fotos/&#x27; then
+    raise exception &#x27;Foto inválida.&#x27;;
+  end if;
+  if p_mascote is not null and (jsonb_typeof(p_mascote) &lt;&gt; &#x27;object&#x27; or octet_length(p_mascote::text) &gt; 3000) then raise exception &#x27;Mascote inválido.&#x27;; end if;
+  p_whatsapp := nullif(regexp_replace(coalesce(p_whatsapp, &#x27;&#x27;), &#x27;\D&#x27;, &#x27;&#x27;, &#x27;g&#x27;), &#x27;&#x27;);
+  if mok_is_pai() then
+    update mok_config set foto_pai = coalesce(p_foto, foto_pai), whatsapp_pai = coalesce(p_whatsapp, whatsapp_pai), mascote_pai = coalesce(p_mascote, mascote_pai) where id = 1;
+  elsif f is not null then
+    update mok_filhos set foto = coalesce(p_foto, foto), mascote = coalesce(p_mascote, mascote), whatsapp = coalesce(p_whatsapp, whatsapp) where id = f;
+  else raise exception &#x27;Perfil não encontrado.&#x27;;
+  end if;
+end $$;
+revoke all on function public.mok_meu_perfil(text, jsonb, text) from public, anon;
+grant execute on function public.mok_meu_perfil(text, jsonb, text) to authenticated;
+
+-- bichinho virtual: cada um cuida do seu (não gera aviso)
+create or replace function public.mok_pet(p_pet jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare f text := mok_meu_filho();
+begin
+  if p_pet is null or jsonb_typeof(p_pet) &lt;&gt; &#x27;object&#x27; or octet_length(p_pet::text) &gt; 1500 then raise exception &#x27;Dados do mascote inválidos.&#x27;; end if;
+  if mok_is_pai() then update mok_config set pet_pai = p_pet where id = 1;
+  elsif f is not null then update mok_filhos set pet = p_pet where id = f;
+  else raise exception &#x27;Perfil não encontrado.&#x27;;
+  end if;
+end $$;
+revoke all on function public.mok_pet(jsonb) from public, anon;
+grant execute on function public.mok_pet(jsonb) to authenticated;
+
+-- o pai escolhe quais avisos quer receber (os dos filhos continuam travados)
+create or replace function public.mok_notif_pai(p_off text[]) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not mok_is_pai() then raise exception &#x27;Só o pai muda isso.&#x27;; end if;
+  update mok_config set notif_pai_off = coalesce((select array_agg(distinct x) from unnest(p_off) x where x ~ &#x27;^[a-z_]{1,20}$&#x27;), &#x27;{}&#x27;) where id = 1;
+end $$;
+revoke all on function public.mok_notif_pai(text[]) from public, anon;
+grant execute on function public.mok_notif_pai(text[]) to authenticated;
+
+create or replace function public.mok_push_enviar(p_alvo text, p_titulo text, p_corpo text, p_tag text) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare c mok_push_cfg%rowtype; nome text; off text[];
+begin
+  select coalesce(notif_pai_off, &#x27;{}&#x27;) into off from mok_config where id = 1;
+  off := coalesce(off, &#x27;{}&#x27;);
+  if p_alvo = &#x27;pai&#x27; and coalesce(p_tag, &#x27;&#x27;) = any(off) then return; end if;
+  begin
+    insert into mok_avisos (alvo, titulo, corpo, tag) values (p_alvo, left(coalesce(p_titulo, &#x27;&#x27;), 200), left(coalesce(p_corpo, &#x27;&#x27;), 500), coalesce(p_tag, &#x27;&#x27;));
+    if p_alvo &lt;&gt; &#x27;pai&#x27; and auth.uid() is not null and mok_is_pai() and not (&#x27;copia&#x27; = any(off)) then
+      select f.nome into nome from mok_filhos f where f.id = p_alvo;
+      insert into mok_avisos (alvo, titulo, corpo, tag, lido) values (&#x27;pai&#x27;, left(&#x27;📤 &#x27; || coalesce(nome, p_alvo) || &#x27; foi avisado: &#x27; || coalesce(p_titulo, &#x27;&#x27;), 200), left(coalesce(p_corpo, &#x27;&#x27;), 500), &#x27;copia&#x27;, false);
+    end if;
+    delete from mok_avisos where criado_em &lt; now() - interval &#x27;60 days&#x27;;
+  exception when others then null;
+  end;
+  select * into c from mok_push_cfg where id = 1;
+  if c.base is null or not exists (select 1 from mok_push where alvo = p_alvo) then return; end if;
+  perform net.http_post(
+    url := c.base || &#x27;/functions/v1/tafeito-push&#x27;,
+    body := jsonb_build_object(&#x27;alvo&#x27;, p_alvo, &#x27;titulo&#x27;, p_titulo, &#x27;corpo&#x27;, coalesce(p_corpo, &#x27;&#x27;), &#x27;tag&#x27;, p_tag),
+    headers := jsonb_build_object(&#x27;Content-Type&#x27;, &#x27;application/json&#x27;, &#x27;x-tafeito-segredo&#x27;, c.segredo));
+exception when others then null;
+end $$;
+revoke all on function public.mok_push_enviar(text, text, text, text) from public, anon, authenticated;
+
 -- Pronto! Agora abra o app e crie a conta do Pai.
 </pre>
 <script>document.getElementById('b').onclick=async()=>{const t=document.getElementById('s').textContent;try{await navigator.clipboard.writeText(t)}catch(e){const r=document.createRange();r.selectNodeContents(document.getElementById('s'));const s=getSelection();s.removeAllRanges();s.addRange(r);document.execCommand('copy')}document.getElementById('b').textContent='✅ Copiado! Agora cole no SQL Editor'}</script></body></html>

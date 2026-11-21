@@ -1288,4 +1288,82 @@ insert into public.mok_drive_cfg (id, emails) values (1, 'bravusmidiaoficial@gma
 grant select, update on public.mok_imagens to service_role;
 grant select on public.mok_filhos to service_role;
 
+-- =====================================================================
+-- v2.5: MASCOTE DO PAI · BICHINHO VIRTUAL (comer, beber, carinho, dormir) · PAI ESCOLHE AS NOTIFICAÇÕES DELE
+-- =====================================================================
+alter table public.mok_config add column if not exists mascote_pai jsonb;
+alter table public.mok_config add column if not exists pet_pai jsonb;
+alter table public.mok_config add column if not exists notif_pai_off text[] not null default '{}';
+alter table public.mok_filhos add column if not exists pet jsonb;
+
+-- o pai também salva o mascote dele
+create or replace function public.mok_meu_perfil(p_foto text, p_mascote jsonb, p_whatsapp text) returns void
+language plpgsql security definer set search_path = public as $$
+declare f text := mok_meu_filho();
+begin
+  if p_foto is not null and p_foto <> '' and p_foto !~ '^https://[a-z0-9]+\.supabase\.co/storage/v1/object/public/mok-fotos/' then
+    raise exception 'Foto inválida.';
+  end if;
+  if p_mascote is not null and (jsonb_typeof(p_mascote) <> 'object' or octet_length(p_mascote::text) > 3000) then raise exception 'Mascote inválido.'; end if;
+  p_whatsapp := nullif(regexp_replace(coalesce(p_whatsapp, ''), '\D', '', 'g'), '');
+  if mok_is_pai() then
+    update mok_config set foto_pai = coalesce(p_foto, foto_pai), whatsapp_pai = coalesce(p_whatsapp, whatsapp_pai), mascote_pai = coalesce(p_mascote, mascote_pai) where id = 1;
+  elsif f is not null then
+    update mok_filhos set foto = coalesce(p_foto, foto), mascote = coalesce(p_mascote, mascote), whatsapp = coalesce(p_whatsapp, whatsapp) where id = f;
+  else raise exception 'Perfil não encontrado.';
+  end if;
+end $$;
+revoke all on function public.mok_meu_perfil(text, jsonb, text) from public, anon;
+grant execute on function public.mok_meu_perfil(text, jsonb, text) to authenticated;
+
+-- bichinho virtual: cada um cuida do seu (não gera aviso)
+create or replace function public.mok_pet(p_pet jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare f text := mok_meu_filho();
+begin
+  if p_pet is null or jsonb_typeof(p_pet) <> 'object' or octet_length(p_pet::text) > 1500 then raise exception 'Dados do mascote inválidos.'; end if;
+  if mok_is_pai() then update mok_config set pet_pai = p_pet where id = 1;
+  elsif f is not null then update mok_filhos set pet = p_pet where id = f;
+  else raise exception 'Perfil não encontrado.';
+  end if;
+end $$;
+revoke all on function public.mok_pet(jsonb) from public, anon;
+grant execute on function public.mok_pet(jsonb) to authenticated;
+
+-- o pai escolhe quais avisos quer receber (os dos filhos continuam travados)
+create or replace function public.mok_notif_pai(p_off text[]) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not mok_is_pai() then raise exception 'Só o pai muda isso.'; end if;
+  update mok_config set notif_pai_off = coalesce((select array_agg(distinct x) from unnest(p_off) x where x ~ '^[a-z_]{1,20}$'), '{}') where id = 1;
+end $$;
+revoke all on function public.mok_notif_pai(text[]) from public, anon;
+grant execute on function public.mok_notif_pai(text[]) to authenticated;
+
+create or replace function public.mok_push_enviar(p_alvo text, p_titulo text, p_corpo text, p_tag text) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare c mok_push_cfg%rowtype; nome text; off text[];
+begin
+  select coalesce(notif_pai_off, '{}') into off from mok_config where id = 1;
+  off := coalesce(off, '{}');
+  if p_alvo = 'pai' and coalesce(p_tag, '') = any(off) then return; end if;
+  begin
+    insert into mok_avisos (alvo, titulo, corpo, tag) values (p_alvo, left(coalesce(p_titulo, ''), 200), left(coalesce(p_corpo, ''), 500), coalesce(p_tag, ''));
+    if p_alvo <> 'pai' and auth.uid() is not null and mok_is_pai() and not ('copia' = any(off)) then
+      select f.nome into nome from mok_filhos f where f.id = p_alvo;
+      insert into mok_avisos (alvo, titulo, corpo, tag, lido) values ('pai', left('📤 ' || coalesce(nome, p_alvo) || ' foi avisado: ' || coalesce(p_titulo, ''), 200), left(coalesce(p_corpo, ''), 500), 'copia', false);
+    end if;
+    delete from mok_avisos where criado_em < now() - interval '60 days';
+  exception when others then null;
+  end;
+  select * into c from mok_push_cfg where id = 1;
+  if c.base is null or not exists (select 1 from mok_push where alvo = p_alvo) then return; end if;
+  perform net.http_post(
+    url := c.base || '/functions/v1/tafeito-push',
+    body := jsonb_build_object('alvo', p_alvo, 'titulo', p_titulo, 'corpo', coalesce(p_corpo, ''), 'tag', p_tag),
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-tafeito-segredo', c.segredo));
+exception when others then null;
+end $$;
+revoke all on function public.mok_push_enviar(text, text, text, text) from public, anon, authenticated;
+
 -- Pronto! Agora abra o app e crie a conta do Pai.

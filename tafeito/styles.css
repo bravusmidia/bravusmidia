@@ -429,3 +429,53 @@ canvas.masc3d{display:block;margin:0 auto;pointer-events:none}
 .filtro-img button.on{background:linear-gradient(135deg,#4f7cff,#7b5cff);border-color:transparent;color:#fff}
 .chips-motivo{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .chips-motivo .chip{border:1px solid var(--borda,#334);background:var(--bg2);color:inherit;border-radius:99px;padding:5px 10px;font-size:.74rem;cursor:pointer}
+/* v2.5 quadro com valor (R$) não estoura no celular nem no PC */
+.tile{min-width:0;overflow:hidden}
+.tile b{white-space:nowrap;overflow:hidden;text-overflow:clip}
+.tile.tile-largo{grid-column:span 2}
+.tile.tile-largo b{font-size:clamp(1.05rem,5vw,1.5rem)}
+@media (max-width:360px){.tile.tile-largo b{font-size:1rem}}
+/* notificações do pai */
+.lista-notif{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.item-notif{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:12px;background:var(--card2);cursor:pointer;font-size:.86rem}
+.item-notif .chave{appearance:none;-webkit-appearance:none;width:44px;height:26px;border-radius:99px;background:#3b4256;position:relative;flex:none;cursor:pointer;transition:.2s}
+.item-notif .chave::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.2s}
+.item-notif .chave:checked{background:#22c55e}.item-notif .chave:checked::after{left:21px}
+.masc-mini{width:64px;height:64px;flex:none}
+/* busca de mascote */
+.busca-masc{margin:6px 0}.sub-grade{margin-top:8px}.sub-grade>b{display:block;margin-bottom:4px}
+.masc-grupo .grade-animais{max-height:260px}
+.sugerir-masc{background:rgba(79,124,255,.12);border:1px dashed rgba(79,124,255,.5);border-radius:12px;padding:10px;font-size:.85rem;margin:6px 0}
+/* bichinho virtual */
+.card-pet{background:var(--card2);border-radius:16px;padding:12px;margin-top:12px;text-align:left}
+.pet-status{margin-top:8px;display:flex;flex-direction:column;gap:6px}
+.barra-pet{display:grid;grid-template-columns:92px 1fr 40px;align-items:center;gap:8px;font-size:.78rem;font-weight:700}
+.barra-pet .barra{height:9px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden}
+.barra-pet .barra i{display:block;height:100%;border-radius:99px;transition:width .5s}
+.barra-pet b{text-align:right}
+.acoes-pet{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.acoes-pet .btn{padding:8px 2px;font-size:1.25rem;line-height:1.1}.acoes-pet small{font-size:.66rem;font-weight:800}
+.acoes-pet .btn:disabled{opacity:.4}
+.fala-pet{margin-top:8px;text-align:center;font-weight:700}
+.masc-palco,.flut-masc{position:relative}
+.particula-pet{position:absolute;bottom:30%;font-size:1.5rem;pointer-events:none;animation:subirPet 1.4s ease-out forwards;z-index:3}
+@keyframes subirPet{0%{transform:translateY(0) scale(.6);opacity:0}15%{opacity:1}100%{transform:translateY(-110px) scale(1.2);opacity:0}}
+.masc-animal.dormindo .corpo-animal{animation:none!important;filter:brightness(.7) saturate(.7)}
+.masc-animal.dormindo::after{content:'💤';position:absolute;right:2%;top:0;font-size:32%;animation:zzz 2s ease-in-out infinite}
+@keyframes zzz{0%,100%{transform:translateY(0);opacity:.6}50%{transform:translateY(-8px);opacity:1}}
+/* ver imagem grande */
+.img-item img{cursor:zoom-in}
+.visor-img{position:fixed;inset:0;z-index:95;background:rgba(2,4,12,.96);display:flex;flex-direction:column;animation:fade .15s}
+.visor-topo{display:flex;align-items:center;gap:10px;padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top))}
+.visor-palco{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:zoom-in;touch-action:pan-y}
+.visor-palco img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;user-select:none;-webkit-user-drag:none}
+.visor-palco.zoom{overflow:auto;cursor:zoom-out;display:block;touch-action:auto}
+.visor-palco.zoom img{max-width:none;max-height:none;width:200%;border-radius:0}
+@media (min-width:900px){.visor-palco.zoom img{width:auto;max-width:none}}
+.visor-seta{position:absolute;top:50%;transform:translateY(-50%);width:48px;height:64px;border:0;border-radius:14px;background:rgba(255,255,255,.12);color:#fff;font-size:2.2rem;cursor:pointer;z-index:2}
+.visor-seta.esq{left:10px}.visor-seta.dir{right:10px}
+.visor-base{padding:12px 14px;padding-bottom:max(14px,env(safe-area-inset-bottom));max-width:560px;width:100%;margin:0 auto}
+.check-img.grande button{height:46px;font-size:1rem}
+body:has(#visorImg) .flut-masc,body:has(#visorImg) .flut-chat{display:none}
+.item-notif .esp{flex:1;min-width:0}
+.visor-img{background:#04060d}
