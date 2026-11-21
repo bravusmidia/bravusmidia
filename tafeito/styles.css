@@ -558,3 +558,5 @@ body:has(#visorImg) .flut-masc,body:has(#visorImg) .flut-chat{display:none}
 /* aves de asas abertas: batem as asas enquanto flutuam */
 .masc-animal.toon.mov-voar .bicho{animation:baterAsas .6s ease-in-out infinite alternate}
 @keyframes baterAsas{0%{transform:scaleX(1) scaleY(1) translateY(0)}100%{transform:scaleX(.84) scaleY(1.04) translateY(-4%)}}
+
+.aviso-versao{position:fixed;left:50%;transform:translateX(-50%);top:calc(70px + env(safe-area-inset-top));z-index:200;border:0;border-radius:99px;padding:10px 16px;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;font-weight:800;box-shadow:0 10px 30px rgba(0,0,0,.45);cursor:pointer}

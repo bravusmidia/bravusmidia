@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '2.7.3';
+const VERSAO = '2.8.0';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -2829,6 +2829,26 @@ const emailFilho = id => `${id}.${(S.ini && S.ini.familia) || (S.config && S.con
 function linkConvite() { const base = location.origin + location.pathname.replace(/index\.html$/, ''); return `${base}#c=${b64enc({ u: DB.c.u, k: DB.c.k })}`; }
 
 /* ---------------- PWA ---------------- */
+/* atualização automática: quando sai versão nova, o app recarrega sozinho (no PC e no celular) */
+let ATUALIZANDO = false;
+async function checarVersao() {
+  if (ATUALIZANDO || !location.protocol.startsWith('http')) return;
+  try {
+    const t = await (await fetch('app.js?nv=' + Date.now(), { cache: 'no-store' })).text();
+    const v = (t.match(/const VERSAO = '([^']+)'/) || [])[1];
+    if (!v || v === VERSAO) return;
+    const ocupado = document.querySelector('.modal, #visorImg') || (document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName));
+    try { const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (reg) await reg.update(); } catch { }
+    if (ocupado && document.visibilityState === 'visible') {
+      if (!document.getElementById('avisoVersao')) { const d = document.createElement('button'); d.id = 'avisoVersao'; d.className = 'aviso-versao'; d.textContent = `✨ Nova versão ${v} — toque para atualizar`; d.onclick = () => location.reload(); document.body.appendChild(d); }
+      return;
+    }
+    ATUALIZANDO = true; toast(`✨ Atualizando para a versão ${v}…`, 'ok'); setTimeout(() => location.reload(), 900);
+  } catch { }
+}
+setInterval(checarVersao, 3 * 60 * 1000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checarVersao(); });
+setTimeout(checarVersao, 15000);
 function registrarSW() { if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(e => console.warn('sw', e)); }
 if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.tipo === 'push-mudou') checarNotif(); });
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); promptInstalar = e; render(); });
