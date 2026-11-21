@@ -930,4 +930,115 @@ end $$;
 revoke all on function public.mok_meu_perfil(text, jsonb, text) from public, anon;
 grant execute on function public.mok_meu_perfil(text, jsonb, text) to authenticated;
 
+-- =====================================================================
+-- v1.7: TESTE DE LEMBRETE · AVISO AO PAI (login e alterações do filho) · PERMISSÕES DA FUNÇÃO DE AVISOS
+-- =====================================================================
+grant usage on schema public to service_role;
+grant select, insert, update, delete on public.mok_push_cfg, public.mok_push, public.mok_push_lembrete_log to service_role;
+
+create table if not exists public.mok_testes (
+  id bigint generated always as identity primary key,
+  alvo text not null,
+  quando timestamptz not null,
+  enviado_em timestamptz,
+  criado_em timestamptz not null default now()
+);
+alter table public.mok_testes enable row level security;
+revoke all on public.mok_testes from anon, authenticated;
+
+create or replace function public.mok_meu_alvo() returns text
+language sql stable security definer set search_path = public as $$
+  select case when papel = 'pai' then 'pai' else filho_id end from mok_perfis where id = auth.uid();
+$$;
+
+-- agenda um aviso de teste no celular de quem pediu (chega mesmo com o app fechado)
+create or replace function public.mok_agendar_teste(p_quando timestamptz) returns json
+language plpgsql security definer set search_path = public as $$
+declare a text := mok_meu_alvo(); n int;
+begin
+  if a is null then raise exception 'Perfil não encontrado.'; end if;
+  if p_quando < now() - interval '1 minute' or p_quando > now() + interval '30 days' then raise exception 'Escolha uma hora entre agora e os próximos 30 dias.'; end if;
+  if (select count(*) from mok_testes where alvo = a and enviado_em is null) >= 5 then raise exception 'Já existem 5 testes agendados. Espere chegarem.'; end if;
+  insert into mok_testes (alvo, quando) values (a, p_quando);
+  select count(*) into n from mok_push where alvo = a;
+  return json_build_object('aparelhos', n, 'quando', p_quando);
+end $$;
+revoke all on function public.mok_agendar_teste(timestamptz) from public, anon;
+grant execute on function public.mok_agendar_teste(timestamptz) to authenticated;
+
+-- quantos aparelhos de quem pergunta estão prontos para receber aviso + testes pendentes
+create or replace function public.mok_status_avisos() returns json
+language sql stable security definer set search_path = public as $$
+  select json_build_object(
+    'aparelhos', (select count(*) from mok_push where alvo = mok_meu_alvo()),
+    'servidor', (select base is not null from mok_push_cfg where id = 1),
+    'testes', coalesce((select json_agg(json_build_object('quando', quando, 'enviado_em', enviado_em) order by quando desc)
+       from (select * from mok_testes where alvo = mok_meu_alvo() order by quando desc limit 5) t), '[]'::json));
+$$;
+grant execute on function public.mok_status_avisos() to authenticated;
+
+-- ping: avisa o pai quando o filho ENTRA no app (nova sessão)
+create or replace function public.mok_ping() returns void
+language plpgsql security definer set search_path = public as $$
+declare p mok_perfis%rowtype; seg int := 0; v_dia date := (now() at time zone 'America/Fortaleza')::date; novo boolean;
+begin
+  select * into p from mok_perfis where id = auth.uid();
+  if p.id is null then return; end if;
+  novo := p.visto_em is null or now() - p.visto_em > interval '3 minutes';
+  if not novo then seg := least(90, greatest(0, extract(epoch from now() - p.visto_em)::int)); end if;
+  update mok_perfis set visto_em = now(), tempo_total = tempo_total + seg,
+    entrou_em = case when novo then now() else coalesce(entrou_em, now()) end where id = p.id;
+  insert into mok_uso (perfil, filho_id, dia, segundos) values (p.id, p.filho_id, v_dia, seg)
+  on conflict (perfil, dia) do update set segundos = mok_uso.segundos + excluded.segundos;
+  if novo and p.papel = 'filho' then
+    perform mok_push_enviar('pai', '🟢 ' || p.nome || ' entrou no app', to_char(now() at time zone 'America/Fortaleza', 'HH24:MI'), 'login');
+  end if;
+end $$;
+
+-- o pai é avisado de tudo que o filho adiciona ou muda
+create or replace function public.mok_push_pai_filho() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare nome text; r record; t text;
+begin
+  if current_setting('tafeito.silencio', true) = '1' or mok_is_pai() or auth.uid() is null then return null; end if;
+  if tg_op = 'DELETE' then r := old; else r := new; end if;
+  if tg_table_name = 'mok_filhos' then nome := r.nome; else select f.nome into nome from mok_filhos f where f.id = r.filho_id; end if;
+  nome := coalesce(nome, 'Filho');
+  if tg_table_name = 'mok_filhos' then
+    if (old.foto, old.mascote, old.whatsapp, old.nome) is not distinct from (new.foto, new.mascote, new.whatsapp, new.nome) then return null; end if;
+    t := '👤 ' || nome || ' atualizou o perfil';
+  elsif tg_table_name = 'mok_tarefas' then t := (case tg_op when 'INSERT' then '➕ ' || nome || ' criou a tarefa ' else '✏️ ' || nome || ' alterou a tarefa ' end) || r.titulo;
+  elsif tg_table_name = 'mok_missoes' then t := (case tg_op when 'INSERT' then '➕ ' || nome || ' criou a missão ' else '✏️ ' || nome || ' alterou a missão ' end) || r.titulo;
+  elsif tg_table_name = 'mok_resgates' then t := '🏅 ' || nome || ' resgatou: ' || r.titulo;
+  end if;
+  if t is not null then perform mok_push_enviar('pai', t, 'Abra o TáFeito', 'filho'); end if;
+  return null;
+end $$;
+drop trigger if exists mok_pai_tar on public.mok_tarefas;
+create trigger mok_pai_tar after insert or update on public.mok_tarefas for each row execute function public.mok_push_pai_filho();
+drop trigger if exists mok_pai_mis on public.mok_missoes;
+create trigger mok_pai_mis after insert or update on public.mok_missoes for each row execute function public.mok_push_pai_filho();
+drop trigger if exists mok_pai_res on public.mok_resgates;
+create trigger mok_pai_res after insert on public.mok_resgates for each row execute function public.mok_push_pai_filho();
+drop trigger if exists mok_pai_fil on public.mok_filhos;
+create trigger mok_pai_fil after update on public.mok_filhos for each row execute function public.mok_push_pai_filho();
+
+-- a cada minuto: envia os testes agendados (junto com os lembretes de prova)
+create or replace function public.mok_push_testes() returns void
+language plpgsql security definer set search_path = public as $$
+declare t record;
+begin
+  for t in select * from mok_testes where enviado_em is null and quando <= now() order by quando limit 50 loop
+    update mok_testes set enviado_em = now() where id = t.id;
+    perform mok_push_enviar(t.alvo, '✅ Teste de lembrete funcionou!', 'Seu celular recebe os avisos do TáFeito mesmo com o app fechado. Provas: 2 dias, 1 dia e 2 horas antes.', 'teste');
+  end loop;
+  delete from mok_testes where enviado_em < now() - interval '7 days';
+end $$;
+revoke all on function public.mok_push_testes() from public, anon, authenticated;
+do $$ begin
+  if exists (select 1 from cron.job where jobname = 'tafeito-testes') then perform cron.unschedule('tafeito-testes'); end if;
+  perform cron.schedule('tafeito-testes', '* * * * *', 'select public.mok_push_testes()');
+end $$;
+
+
 -- Pronto! Agora abra o app e crie a conta do Pai.

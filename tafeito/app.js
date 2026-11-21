@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '1.6.2';
+const VERSAO = '1.7.0';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -695,7 +695,7 @@ function telaMaisFilho() {
     <div class="card perfil-topo"><button class="avatar-btn" data-act="meuPerfil">${avatar(S.eu, 84)}</button><div class="esp"><h2 style="margin:0">${esc(f.nome)}</h2><span class="mut peq">Toque na foto para trocar e ajustar</span>
       <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="btn pri sm" style="width:auto" data-act="meuPerfil">✏️ Editar perfil</button><button class="btn ghost sm" style="width:auto" data-act="mascoteEditar">🎨 Mascote ${esc(mc.nome)}</button><button class="btn zap sm" style="width:auto" data-act="whats">📲 WhatsApp</button></div></div></div>
     ${cardConta()}
-    <button class="btn ghost" style="margin-bottom:12px" data-act="conectores">🔌 Conectores (Notion e arquivos)</button>
+    <div class="grid2" style="margin-bottom:12px"><button class="btn ghost" data-act="conectores">🔌 Conectores</button><button class="btn ghost" data-act="teste">🧪 Teste de lembrete</button></div>
     <div class="card"><h3>✋ Pedir permissão ao pai</h3><p class="mut peq">Para mudar algo no app você precisa da autorização do pai.</p>
     <button class="btn pri" data-act="pedir">Fazer um pedido</button></div>
     ${meus.length ? `<div class="card"><h3>Meus pedidos</h3>${meus.map(p => `<div class="lista-item"><div class="tt">${esc(AREAS[p.area] || p.area)}<small>${esc(p.mensagem || '')} · ${dataHoraBR(p.criado_em)}</small></div>${tagPedido(p)}</div>`).join('')}</div>` : ''}
@@ -810,7 +810,8 @@ function telaChat() {
 function telaMaisPai() {
   const peds = S.dados.pedidos.slice().sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || '')).slice(0, 25);
   return `<div class="linha" style="margin-bottom:10px"><h2 style="margin:0">⚙️ Configurações</h2><span class="tag ok">só admin</span></div>${avisoBanco()}${cardConta()}
-    <button class="btn ghost" style="margin-bottom:12px" data-act="conectores">🔌 Conectores (Notion e arquivos)</button>
+    <div class="grid2" style="margin-bottom:12px"><button class="btn ghost" data-act="conectores">🔌 Conectores</button><button class="btn ghost" data-act="teste">🧪 Teste de lembrete</button></div>
+    <div class="aviso info">🔔 Você recebe aviso quando seu filho <b>entra no app</b>, conclui tarefa, marca ou muda prova, dá Ciente, cria ou muda algo, resgata prêmio, pede permissão ou manda mensagem. Tudo que você muda avisa o celular dele.</div>
     <div class="card"><h3>📲 WhatsApp do Pai</h3><p class="mut peq">Número que aparece no botão de WhatsApp do app dos filhos.</p>
       <form data-form="whatsPai" class="linha"><input class="inp" name="w" inputmode="tel" value="${esc(S.config.whatsapp_pai || '')}" placeholder="85 99999-9999"><button class="btn pri sm" style="width:auto">Salvar</button></form></div>
     <div class="card"><h3>👨‍👦 Filhos e acessos</h3>${S.dados.filhos.map(f => {
@@ -931,6 +932,7 @@ function telaEstudo() {
     ${fut.length ? fut.map(itemProva).join('') : `<div class="vazio"><span class="e">📅</span>Nenhuma prova com data marcada.<br>Toque num dia do calendário, em <b>＋ Prova</b> ou importe um arquivo.</div>`}
     <div class="legenda peq"><span>🔴 até 1 semana</span><span>🟡 até 1 mês</span><span>🟢 mais de 1 mês</span><span>📌 sem data</span></div>
     <div class="aviso info">🔔 Lembrete automático no celular: <b>2 dias antes</b>, <b>1 dia antes</b> e <b>2 horas antes</b> de cada prova. Em cada aviso, toque em <b>Ciente</b>.</div>
+    <button class="btn ghost" data-act="teste">🧪 Testar se o celular avisa com o app fechado</button>
     ${pass.length ? `<div class="secao">✅ Provas realizadas (${provasRealizadas().length})</div>${pass.map(itemProva).join('')}` : ''}`;
 }
 
@@ -1315,6 +1317,52 @@ async function enviarWhats(para) {
   if (!num) return toast('Número de WhatsApp não cadastrado.', 'bad');
   if (arq) toast('Neste aparelho não dá para anexar direto: o WhatsApp vai abrir com a nota; anexe o print pelo clipe 📎.', '');
   window.open(`https://wa.me/${num}?text=${encodeURIComponent(corpo)}`, '_blank'); fecharModais();
+}
+
+/* ---------- TESTE DE LEMBRETE (prova que o celular recebe com o app fechado) ---------- */
+function paraLocalInput(d) { return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); }
+async function modalTeste() {
+  const el = modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>🧪 Teste de lembrete</h2>
+    <p class="mut peq">Escolha a data e a hora, toque em <b>Testar</b> e <b>feche o app</b>. Se o aviso chegar sozinho no celular, todas as provas e tarefas também vão chegar.</p>
+    <div id="testeStatus" class="mut peq">Verificando este aparelho…</div>
+    <label class="campo" style="margin-top:10px"><span>Quando avisar</span><input type="datetime-local" id="testeQuando" value="${paraLocalInput(new Date(Date.now() + 2 * 60000))}"></label>
+    <div class="grid2"><button class="btn ghost" data-act="testeRapido">⏱️ Daqui a 1 min</button><button class="btn pri" data-act="testeAgendar">🧪 Testar</button></div>
+    <div id="testeLista" style="margin-top:10px"></div>`);
+  atualizarStatusTeste();
+  return el;
+}
+async function atualizarStatusTeste() {
+  const st = $('#testeStatus'); if (!st) return;
+  if (S.modo !== 'online') { st.innerHTML = '⚠️ O teste com o app fechado só funciona no modo online.'; return; }
+  const perm = 'Notification' in window ? Notification.permission : 'indisponivel';
+  let info = null; try { info = await DB.rpc('mok_status_avisos'); } catch (e) { st.innerHTML = '❌ ' + esc(msgErro(e)); return; }
+  const ok = perm === 'granted' && lsGet('mok_push_ok');
+  st.innerHTML = `<div class="check-lista">
+    <div class="${perm === 'granted' ? 'ok' : 'bad'}">${perm === 'granted' ? '✅' : '❌'} Notificações permitidas neste aparelho</div>
+    <div class="${lsGet('mok_push_ok') ? 'ok' : 'bad'}">${lsGet('mok_push_ok') ? '✅' : '❌'} Este aparelho cadastrado para avisos com o app fechado</div>
+    <div class="${info.servidor ? 'ok' : 'bad'}">${info.servidor ? '✅' : '❌'} Servidor de avisos ligado</div>
+    <div class="${info.aparelhos ? 'ok' : 'bad'}">📱 Aparelhos seus que recebem avisos: <b>${info.aparelhos}</b></div></div>
+    ${ok ? '' : `<button class="btn ok" style="margin-top:8px" data-act="testeAtivar">🔔 Ativar avisos neste celular</button>`}`;
+  const l = $('#testeLista');
+  if (l) l.innerHTML = (info.testes || []).length ? `<div class="secao" style="margin-top:6px">Seus testes</div>` + info.testes.map(t => `<div class="lista-item"><span>${t.enviado_em ? '✅' : '⏳'}</span><div class="tt">${dataHoraBR(t.quando)}<small>${t.enviado_em ? 'enviado às ' + hora(t.enviado_em) + ' — chegou no celular?' : 'aguardando a hora'}</small></div></div>`).join('') : '';
+  emoji3d(st.closest('.modal'));
+}
+async function ativarAvisosTeste() {
+  if (!('Notification' in window)) return toast('Este navegador não tem notificações. Instale o app pelo Chrome.', 'bad');
+  const p = await Notification.requestPermission(); if (p !== 'granted') return toast('Você precisa permitir as notificações.', 'bad');
+  const ok = await inscreverPush(true); toast(ok ? '🔔 Avisos ativados neste celular!' : 'Não consegui cadastrar este aparelho.', ok ? 'ok' : 'bad');
+  atualizarStatusTeste();
+}
+async function agendarTeste(quando) {
+  if (S.modo !== 'online') return toast('Só funciona no modo online.', 'bad');
+  if (!('Notification' in window) || Notification.permission !== 'granted' || !lsGet('mok_push_ok')) { await ativarAvisosTeste(); if (!lsGet('mok_push_ok')) return; }
+  try {
+    const r = await DB.rpc('mok_agendar_teste', { p_quando: quando.toISOString() });
+    modal(`<div class="grande">🧪</div><h2>Teste agendado!</h2><p>Às <b>${quando.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</b> do dia ${quando.toLocaleDateString('pt-BR')} vai chegar:<br><b>"✅ Teste de lembrete funcionou!"</b></p>
+      <div class="aviso warn">Agora <b>feche o app</b> (pode bloquear a tela). Se o aviso chegar sozinho, está tudo certo: provas, tarefas e mensagens também chegam.</div>
+      <p class="mut peq">Aparelhos seus cadastrados: ${r.aparelhos}. Pode atrasar até 1 minuto.</p><button class="btn pri" data-act="fechar">Entendi</button>`, 'alerta');
+    atualizarStatusTeste();
+  } catch (e) { toast(msgErro(e), 'bad'); }
 }
 
 /* ---------- CONECTORES (Notion) ---------- */
@@ -1820,6 +1868,10 @@ const acoes = {
   },
   calMes: d => { const [y, m] = S.calMes.split('-').map(Number); const n = new Date(y, m - 1 + Number(d.n), 1); S.calMes = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`; render(); },
   importar: () => modalImportar(),
+  teste: () => modalTeste(),
+  testeAtivar: () => ativarAvisosTeste(),
+  testeRapido: () => agendarTeste(new Date(Date.now() + 60000)),
+  testeAgendar: () => { const v = $('#testeQuando').value; if (!v) return toast('Escolha a data e a hora.', 'bad'); agendarTeste(new Date(v)); },
   abrirSite: d => window.open(d.url, '_blank', 'noopener'),
   conectores: () => modalConectores(),
   notionSalvarToken: () => { const t = $('#notionTok').value.trim(); if (!/^(ntn_|secret_)/.test(t)) return toast('O token começa com ntn_ ou secret_.', 'bad'); lsSet('mok_notion_token', t); toast('Token salvo neste aparelho ✅', 'ok'); notionBases(); },
@@ -2192,7 +2244,7 @@ async function notificar(titulo, corpo, tag) {
   beep(); if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
   if (document.visibilityState === 'visible') { const c = corpo || ''; toast(`${titulo}${c ? ' — ' + (c.length > 70 ? c.slice(0, 70) + '…' : c) : ''}`); }
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  if (lsGet('mok_push_ok') && ['msg', 'ped', 'reg', 'tar', 'lembrete', 'mis', 'pag', 'prova', 'ciente'].includes(tag)) return; // o push do servidor já mostra
+  if (lsGet('mok_push_ok') && ['msg', 'ped', 'reg', 'tar', 'lembrete', 'mis', 'pag', 'prova', 'ciente', 'login', 'filho', 'teste'].includes(tag)) return; // o push do servidor já mostra
   const op = { body: corpo || '', icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: tag ? tag + '-' + Date.now() : undefined, vibrate: [200, 100, 200], requireInteraction: true };
   try { const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (reg) await reg.showNotification(titulo, op); else new Notification(titulo, op); }
   catch { try { new Notification(titulo, op); } catch { } }
