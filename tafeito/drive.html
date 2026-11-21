@@ -1,0 +1,71 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>TáFeito — função tafeito-drive</title>
+<style>body{background:#0b1020;color:#eef1fb;font-family:system-ui,sans-serif;margin:0;padding:16px}button{background:linear-gradient(135deg,#4f7cff,#7b5cff);color:#fff;border:0;border-radius:12px;padding:14px 22px;font-size:1.1rem;font-weight:700;cursor:pointer;position:sticky;top:10px}pre{background:#151d38;border:1px solid #26315a;border-radius:12px;padding:12px;white-space:pre-wrap;font-size:12px}</style></head>
+<body><h2>TáFeito: ponte com o Google Drive</h2>
+<p>No Supabase: <b>Edge Functions</b> → <b>Deploy a new function</b> → <b>Via Editor</b>. Nome: <b>tafeito-drive</b>. Apague o que vier escrito, cole este código e clique em <b>Deploy</b>. Depois, em Details, deixe <b>Verify JWT</b> DESLIGADO.</p>
+<button id="b">📋 Copiar código</button><pre id="s">// TáFeito — Edge Function &quot;tafeito-drive&quot; (Supabase): ponte com o robô do Google Drive
+// O robô (Google Apps Script, na conta do Drive do pai) chama esta função a cada 5 minutos:
+//   • &quot;pendentes&quot;: imagens novas (com link temporário para baixar) e imagens que mudaram de status/motivo
+//   • &quot;feito&quot;: grava o id do arquivo no Drive e o status que já foi copiado
+//   • &quot;mes&quot;: todas as imagens de um mês (para montar o checklist do mês no Drive)
+// Deixe &quot;Verify JWT&quot; DESLIGADO. O robô manda o token do Google dele; só a conta listada em mok_drive_cfg.emails é aceita.
+import { createClient } from &quot;npm:@supabase/supabase-js@2&quot;;
+
+const json = (o: unknown, status = 200) =&gt;
+  new Response(JSON.stringify(o), { status, headers: { &quot;Content-Type&quot;: &quot;application/json&quot; } });
+const adm = createClient(Deno.env.get(&quot;SUPABASE_URL&quot;)!, Deno.env.get(&quot;SUPABASE_SERVICE_ROLE_KEY&quot;)!, { auth: { persistSession: false } });
+const CAMPOS = &quot;id, filho_id, formato, numero, numero_formato, caminho, nome, status, motivo, criado_em, drive_id, drive_status&quot;;
+const assinatura = (i: any) =&gt; (i.status || &quot;pendente&quot;) + &quot;|&quot; + (i.motivo || &quot;&quot;);
+
+Deno.serve(async (req) =&gt; {
+  if (req.method !== &quot;POST&quot;) return json({ erro: &quot;use POST&quot; }, 405);
+  const tok = (req.headers.get(&quot;x-google-token&quot;) || &quot;&quot;).trim();
+  const { data: cfg } = await adm.from(&quot;mok_drive_cfg&quot;).select(&quot;emails&quot;).eq(&quot;id&quot;, 1).maybeSingle();
+  const permitidos = String(cfg?.emails || &quot;&quot;).toLowerCase().split(/[,\s]+/).filter(Boolean);
+  if (!tok || !permitidos.length) return json({ erro: &quot;robô não autorizado&quot; }, 401);
+  const info = await fetch(&quot;https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=&quot; + encodeURIComponent(tok)).then((r) =&gt; r.ok ? r.json() : null).catch(() =&gt; null);
+  const email = String(info?.email || &quot;&quot;).toLowerCase();
+  if (!email || info?.email_verified === &quot;false&quot; || !permitidos.includes(email)) return json({ erro: &quot;conta do Google não autorizada: &quot; + (email || &quot;?&quot;) }, 401);
+  let b: any = {};
+  try { b = await req.json(); } catch { /* vazio */ }
+  const { data: fs } = await adm.from(&quot;mok_filhos&quot;).select(&quot;id, nome&quot;);
+  const nomes: Record&lt;string, string&gt; = Object.fromEntries((fs || []).map((f: any) =&gt; [f.id, f.nome]));
+  const vestir = (i: any) =&gt; ({ ...i, filho: nomes[i.filho_id] || i.filho_id, assinatura: assinatura(i) });
+
+  if (b.acao === &quot;pendentes&quot;) {
+    const { data: novas, error } = await adm.from(&quot;mok_imagens&quot;).select(CAMPOS).is(&quot;drive_id&quot;, null).order(&quot;numero&quot;).limit(20);
+    if (error) return json({ erro: error.message }, 500);
+    const urls: Record&lt;string, string&gt; = {};
+    if (novas &amp;&amp; novas.length) {
+      const { data: s } = await adm.storage.from(&quot;mok-imagens&quot;).createSignedUrls(novas.map((i: any) =&gt; i.caminho), 900);
+      (s || []).forEach((x: any) =&gt; { if (x.signedUrl) urls[x.path] = x.signedUrl; });
+    }
+    const { data: todas } = await adm.from(&quot;mok_imagens&quot;).select(CAMPOS).not(&quot;drive_id&quot;, &quot;is&quot;, null).limit(5000);
+    const mudaram = (todas || []).filter((i: any) =&gt; i.drive_status !== assinatura(i)).slice(0, 100);
+    return json({ novas: (novas || []).map((i: any) =&gt; ({ ...vestir(i), url: urls[i.caminho] || null })), mudaram: mudaram.map(vestir) });
+  }
+
+  if (b.acao === &quot;feito&quot;) {
+    let ok = 0;
+    for (const it of (b.itens || []).slice(0, 200)) {
+      if (!it.id) continue;
+      const { error } = await adm.from(&quot;mok_imagens&quot;).update({ drive_id: it.drive_id, drive_status: it.assinatura, drive_em: new Date().toISOString() }).eq(&quot;id&quot;, it.id);
+      if (!error) ok++;
+    }
+    return json({ ok });
+  }
+
+  if (b.acao === &quot;mes&quot;) {
+    // início e fim do mês no horário de Fortaleza (UTC-3)
+    const ano = Number(b.ano), mes = Number(b.mes);
+    if (!ano || !mes) return json({ erro: &quot;ano/mes&quot; }, 400);
+    const ini = new Date(Date.UTC(ano, mes - 1, 1, 3)).toISOString();
+    const fim = new Date(Date.UTC(ano, mes, 1, 3)).toISOString();
+    const { data, error } = await adm.from(&quot;mok_imagens&quot;).select(CAMPOS).gte(&quot;criado_em&quot;, ini).lt(&quot;criado_em&quot;, fim).order(&quot;numero&quot;);
+    if (error) return json({ erro: error.message }, 500);
+    return json({ itens: (data || []).map(vestir) });
+  }
+
+  return json({ erro: &quot;ação desconhecida&quot; }, 400);
+});
+</pre>
+<script>document.getElementById('b').onclick=async()=>{const t=document.getElementById('s').textContent;try{await navigator.clipboard.writeText(t)}catch(e){const r=document.createRange();r.selectNodeContents(document.getElementById('s'));const s=getSelection();s.removeAllRanges();s.addRange(r);document.execCommand('copy')}document.getElementById('b').textContent='✅ Copiado! Agora cole no editor do Supabase'}</script></body></html>

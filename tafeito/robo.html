@@ -1,0 +1,124 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>TáFeito — Robô do Google Drive</title>
+<style>body{background:#0b1020;color:#eef1fb;font-family:system-ui,sans-serif;margin:0;padding:16px}button{background:linear-gradient(135deg,#4f7cff,#7b5cff);color:#fff;border:0;border-radius:12px;padding:14px 22px;font-size:1.1rem;font-weight:700;cursor:pointer;position:sticky;top:10px}pre{background:#151d38;border:1px solid #26315a;border-radius:12px;padding:12px;white-space:pre-wrap;font-size:12px}</style></head>
+<body><h2>TáFeito: robô do Google Drive</h2>
+<p>Abra <b>script.google.com</b> com a conta <b>bravusmidiaoficial@gmail.com</b> → <b>Novo projeto</b> → apague o que vier escrito e cole este código → salve. Escolha a função <b>instalar</b> e clique em <b>Executar</b> → autorize. Pronto: a cada 5 minutos as imagens vão para TáFeito/Imagens/ano/mês/feed|story.</p>
+<button id="b">📋 Copiar código</button><pre id="s">/**
+ * TáFeito — ROBÔ DO GOOGLE DRIVE (Google Apps Script, roda na conta do Drive do pai)
+ * Copia as imagens do Work para:  TáFeito / Imagens / &lt;ano&gt; / &lt;mês&gt; / feed | story
+ * Nome do arquivo mostra o status:   F3 · Henrique · ✅ Aprovada.png   (❌ Não aprovada / ⏳ Aguardando)
+ * Imagem não aprovada: o motivo fica na descrição do arquivo e no &quot;Checklist&quot; do mês (Google Docs).
+ *
+ * Como instalar (uma vez só):
+ *   1. script.google.com → Novo projeto → cole este código → salve com o nome &quot;TáFeito Robô Drive&quot;
+ *   2. Escolha a função &quot;instalar&quot; e clique em Executar → autorize com a conta do Drive
+ *   Pronto: ele roda sozinho a cada 5 minutos.
+ */
+const TF = {
+  URL: &#x27;https://xzqupdrzmjsorpzoqvzj.supabase.co/functions/v1/tafeito-drive&#x27;,
+  PASTA_IMAGENS: &#x27;17lFppdAHCEd-T6S2zW3xdnnM44NgHS_5&#x27;, // TáFeito / Imagens
+  FUSO: &#x27;America/Fortaleza&#x27;,
+};
+const MESES = [&#x27;janeiro&#x27;, &#x27;fevereiro&#x27;, &#x27;março&#x27;, &#x27;abril&#x27;, &#x27;maio&#x27;, &#x27;junho&#x27;, &#x27;julho&#x27;, &#x27;agosto&#x27;, &#x27;setembro&#x27;, &#x27;outubro&#x27;, &#x27;novembro&#x27;, &#x27;dezembro&#x27;];
+const ROT = { aprovada: &#x27;✅ Aprovada&#x27;, reprovada: &#x27;❌ Não aprovada&#x27;, pendente: &#x27;⏳ Aguardando&#x27; };
+
+function instalar() {
+  console.log(&#x27;Robô rodando na conta: &#x27; + Session.getEffectiveUser().getEmail()); // também libera o e-mail no login do robô
+  ScriptApp.getProjectTriggers().forEach(t =&gt; ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger(&#x27;sincronizar&#x27;).timeBased().everyMinutes(5).create();
+  sincronizar();
+}
+
+function api_(corpo) {
+  const r = UrlFetchApp.fetch(TF.URL, {
+    method: &#x27;post&#x27;, contentType: &#x27;application/json&#x27;, muteHttpExceptions: true,
+    headers: { &#x27;x-google-token&#x27;: ScriptApp.getOAuthToken() }, payload: JSON.stringify(corpo),
+  });
+  if (r.getResponseCode() !== 200) throw new Error(&#x27;TáFeito respondeu &#x27; + r.getResponseCode() + &#x27;: &#x27; + r.getContentText());
+  return JSON.parse(r.getContentText());
+}
+
+function pasta_(pai, nome) {
+  const it = pai.getFoldersByName(nome);
+  return it.hasNext() ? it.next() : pai.createFolder(nome);
+}
+function anoMes_(iso) {
+  const d = new Date(iso);
+  return { ano: Number(Utilities.formatDate(d, TF.FUSO, &#x27;yyyy&#x27;)), mes: Number(Utilities.formatDate(d, TF.FUSO, &#x27;M&#x27;)) };
+}
+function pastaDoMes_(am) {
+  const raiz = DriveApp.getFolderById(TF.PASTA_IMAGENS);
+  return pasta_(pasta_(raiz, String(am.ano)), MESES[am.mes - 1]);
+}
+function nomeArquivo_(i) {
+  const ext = ((i.nome || i.caminho).match(/\.(png|jpe?g|webp|gif|heic|avif)$/i) || [&#x27;.png&#x27;])[0].toLowerCase();
+  const cod = (i.formato === &#x27;feed&#x27; ? &#x27;F&#x27; : &#x27;S&#x27;) + i.numero_formato;
+  return cod + &#x27; · &#x27; + i.filho + &#x27; · &#x27; + ROT[i.status || &#x27;pendente&#x27;] + ext;
+}
+function descricao_(i) {
+  let t = &#x27;TáFeito · imagem #&#x27; + i.numero + &#x27; (&#x27; + i.formato + &#x27;) de &#x27; + i.filho + &#x27; · &#x27; + ROT[i.status || &#x27;pendente&#x27;];
+  if (i.status === &#x27;reprovada&#x27; &amp;&amp; i.motivo) t += &#x27;\nPor que não foi aprovada: &#x27; + i.motivo;
+  return t;
+}
+
+function sincronizar() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) return;
+  try {
+    const r = api_({ acao: &#x27;pendentes&#x27; });
+    const feitos = [], meses = {};
+    (r.novas || []).forEach(i =&gt; {
+      if (!i.url) return;
+      try {
+        const am = anoMes_(i.criado_em);
+        const destino = pasta_(pastaDoMes_(am), i.formato);
+        const blob = UrlFetchApp.fetch(i.url).getBlob().setName(nomeArquivo_(i));
+        const arq = destino.createFile(blob);
+        arq.setDescription(descricao_(i));
+        feitos.push({ id: i.id, drive_id: arq.getId(), assinatura: i.assinatura });
+        meses[am.ano + &#x27;-&#x27; + am.mes] = am;
+      } catch (e) { console.warn(&#x27;imagem &#x27; + i.id + &#x27;: &#x27; + e); }
+    });
+    (r.mudaram || []).forEach(i =&gt; {
+      try {
+        const arq = DriveApp.getFileById(i.drive_id);
+        arq.setName(nomeArquivo_(i)); arq.setDescription(descricao_(i));
+        feitos.push({ id: i.id, drive_id: i.drive_id, assinatura: i.assinatura });
+      } catch (e) { feitos.push({ id: i.id, drive_id: null, assinatura: null }); } // arquivo apagado no Drive: envia de novo
+      const am = anoMes_(i.criado_em); meses[am.ano + &#x27;-&#x27; + am.mes] = am;
+    });
+    if (feitos.length) api_({ acao: &#x27;feito&#x27;, itens: feitos });
+    Object.keys(meses).forEach(k =&gt; checklist_(meses[k]));
+  } finally { lock.releaseLock(); }
+}
+
+/** Google Docs &quot;Checklist&quot; dentro da pasta do mês: ✅ aprovadas, ❌ não aprovadas (com o porquê) e ⏳ aguardando */
+function checklist_(am) {
+  const itens = api_({ acao: &#x27;mes&#x27;, ano: am.ano, mes: am.mes }).itens || [];
+  const pasta = pastaDoMes_(am);
+  const titulo = &#x27;✅ Checklist das imagens — &#x27; + MESES[am.mes - 1] + &#x27; &#x27; + am.ano;
+  const ex = pasta.getFilesByName(titulo);
+  const doc = ex.hasNext() ? DocumentApp.openById(ex.next().getId()) : (() =&gt; {
+    const d = DocumentApp.create(titulo); const f = DriveApp.getFileById(d.getId()); f.moveTo(pasta); return d;
+  })();
+  const c = doc.getBody(); c.clear();
+  c.appendParagraph(titulo).setHeading(DocumentApp.ParagraphHeading.TITLE);
+  const n = s =&gt; itens.filter(i =&gt; (i.status || &#x27;pendente&#x27;) === s).length;
+  c.appendParagraph(&#x27;✅ &#x27; + n(&#x27;aprovada&#x27;) + &#x27; aprovadas   ·   ❌ &#x27; + n(&#x27;reprovada&#x27;) + &#x27; não aprovadas   ·   ⏳ &#x27; + n(&#x27;pendente&#x27;) + &#x27; aguardando   ·   total &#x27; + itens.length);
+  c.appendParagraph(&#x27;Atualizado em &#x27; + Utilities.formatDate(new Date(), TF.FUSO, &#x27;dd/MM/yyyy HH:mm&#x27;) + &#x27; (o app TáFeito atualiza sozinho)&#x27;).setItalic(true);
+  [&#x27;feed&#x27;, &#x27;story&#x27;].forEach(fmt =&gt; {
+    const l = itens.filter(i =&gt; i.formato === fmt);
+    if (!l.length) return;
+    c.appendParagraph(fmt === &#x27;feed&#x27; ? &#x27;📁 Feed&#x27; : &#x27;📁 Story&#x27;).setHeading(DocumentApp.ParagraphHeading.HEADING1).setItalic(false);
+    l.forEach(i =&gt; {
+      const cod = (fmt === &#x27;feed&#x27; ? &#x27;F&#x27; : &#x27;S&#x27;) + i.numero_formato;
+      const p = c.appendListItem(cod + &#x27; — &#x27; + i.filho + &#x27; — &#x27; + ROT[i.status || &#x27;pendente&#x27;]).setGlyphType(DocumentApp.GlyphType.BULLET).setItalic(false);
+      p.setForegroundColor(i.status === &#x27;aprovada&#x27; ? &#x27;#15803d&#x27; : i.status === &#x27;reprovada&#x27; ? &#x27;#b91c1c&#x27; : &#x27;#92400e&#x27;);
+      if (i.status === &#x27;reprovada&#x27; &amp;&amp; i.motivo) {
+        c.appendParagraph(&#x27;     Por que não foi aprovada: &#x27; + i.motivo).setForegroundColor(&#x27;#374151&#x27;).setItalic(true);
+      }
+    });
+  });
+  doc.saveAndClose();
+}
+</pre>
+<script>document.getElementById('b').onclick=async()=>{const t=document.getElementById('s').textContent;try{await navigator.clipboard.writeText(t)}catch(e){const r=document.createRange();r.selectNodeContents(document.getElementById('s'));const s=getSelection();s.removeAllRanges();s.addRange(r);document.execCommand('copy')}document.getElementById('b').textContent='✅ Copiado! Agora cole no editor do Supabase'}</script></body></html>

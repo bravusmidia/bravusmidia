@@ -1245,4 +1245,47 @@ end $$;
 drop trigger if exists mok_push_sumiu on public.mok_push;
 create trigger mok_push_sumiu after delete on public.mok_push for each row execute function public.mok_push_sumiu();
 
+-- =====================================================================
+-- v2.4: APROVAÇÃO DAS IMAGENS (✅ aprovada / ❌ reprovada + motivo) e cópia no Google Drive
+-- =====================================================================
+alter table public.mok_imagens add column if not exists status text not null default 'pendente';
+alter table public.mok_imagens add column if not exists motivo text not null default '';
+alter table public.mok_imagens add column if not exists avaliado_em timestamptz;
+alter table public.mok_imagens add column if not exists drive_id text;
+alter table public.mok_imagens add column if not exists drive_status text;
+alter table public.mok_imagens add column if not exists drive_em timestamptz;
+do $$ begin
+  alter table public.mok_imagens add constraint mok_imagens_status check (status in ('pendente','aprovada','reprovada'));
+exception when duplicate_object then null; end $$;
+
+-- só o pai avalia; o filho é avisado na hora
+create or replace function public.mok_avaliar_imagem(p_id text, p_status text, p_motivo text default '') returns json
+language plpgsql security definer set search_path = public as $$
+declare i mok_imagens%rowtype; m text := left(trim(coalesce(p_motivo, '')), 500);
+begin
+  if not mok_is_pai() then raise exception 'Só o pai pode aprovar imagens.'; end if;
+  if p_status not in ('pendente','aprovada','reprovada') then raise exception 'Status inválido.'; end if;
+  if p_status = 'reprovada' and m = '' then raise exception 'Escreva o motivo da reprovação.'; end if;
+  update mok_imagens set status = p_status, motivo = case when p_status = 'reprovada' then m else '' end,
+    avaliado_em = case when p_status = 'pendente' then null else now() end
+  where id = p_id returning * into i;
+  if i.id is null then raise exception 'Imagem não encontrada.'; end if;
+  if p_status = 'aprovada' then
+    perform mok_push_enviar(i.filho_id, '✅ Imagem ' || upper(left(i.formato, 1)) || i.numero_formato || ' aprovada!', 'Boa! A imagem #' || i.numero || ' (' || i.formato || ') foi aprovada.', 'imagens');
+  elsif p_status = 'reprovada' then
+    perform mok_push_enviar(i.filho_id, '❌ Imagem ' || upper(left(i.formato, 1)) || i.numero_formato || ' não aprovada', 'Motivo: ' || m, 'imagens');
+  end if;
+  return json_build_object('id', i.id, 'status', i.status, 'motivo', i.motivo, 'avaliado_em', i.avaliado_em);
+end $$;
+grant execute on function public.mok_avaliar_imagem(text, text, text) to authenticated;
+
+-- conta do Google que pode rodar o robô do Drive (o robô prova quem é com o login do próprio Google; só o servidor lê)
+create table if not exists public.mok_drive_cfg (id int primary key default 1, emails text not null default '');
+alter table public.mok_drive_cfg enable row level security;
+revoke all on public.mok_drive_cfg from anon, authenticated;
+grant all on public.mok_drive_cfg to service_role;
+insert into public.mok_drive_cfg (id, emails) values (1, 'bravusmidiaoficial@gmail.com') on conflict (id) do nothing;
+grant select, update on public.mok_imagens to service_role;
+grant select on public.mok_filhos to service_role;
+
 -- Pronto! Agora abra o app e crie a conta do Pai.

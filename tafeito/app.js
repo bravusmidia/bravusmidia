@@ -3,7 +3,7 @@
    MISSÃO OK — tarefas da família com fotos, missões e prêmios
    Desenvolvido por Andrade
    ===================================================================== */
-const VERSAO = '2.3.0';
+const VERSAO = '2.4.0';
 const LIXEIRAS = ['Lixeira da cozinha', 'Lixeira do banheiro', 'Lixeira do quarto'];
 const TABELAS = ['config', 'filhos', 'tarefas', 'registros', 'pedidos', 'missoes', 'resgates', 'pagamentos', 'mensagens', 'perfis', 'provas', 'cientes', 'uso', 'avisos', 'imagens'];
 const AREAS = { tarefas: 'Tarefas e horários', missoes: 'Missões', premios: 'Prêmios e tempo de tela', perfil: 'Meu perfil (nome)', outro: 'Outro assunto' };
@@ -1371,20 +1371,55 @@ async function enviarWhats(para) {
 const URLS_IMG = {};
 function resumoImagens(id = fid()) {
   const l = deFilho('imagens', id); const f = S.dados.filhos.find(x => x.id === id) || {}; const g = Math.max(1, num(f.tamanho_grupo ?? 10));
-  return { total: l.length, feed: l.filter(i => i.formato === 'feed').length, story: l.filter(i => i.formato === 'story').length, grupos: Math.floor(l.length / g), faltam: g - (l.length % g), g, valor: l.reduce((s, i) => s + num(i.valor), 0), vi: num(f.valor_imagem ?? 1) };
+  const ok = l.filter(i => i.status !== 'reprovada');
+  return { total: l.length, feed: l.filter(i => i.formato === 'feed').length, story: l.filter(i => i.formato === 'story').length, grupos: Math.floor(ok.length / g), faltam: g - (ok.length % g), g, valor: ok.reduce((s, i) => s + num(i.valor), 0), vi: num(f.valor_imagem ?? 1),
+    aprovadas: l.filter(i => i.status === 'aprovada').length, reprovadas: l.filter(i => i.status === 'reprovada').length, pendentes: l.filter(i => !i.status || i.status === 'pendente').length, drive: l.filter(i => i.drive_id).length };
 }
 function secaoImagens() {
-  const r = resumoImagens(); const aba = S.abaImg || 'feed'; const l = deFilho('imagens').filter(i => i.formato === aba).sort((a, b) => b.numero - a.numero);
+  const r = resumoImagens(); const aba = S.abaImg || 'feed'; const filtro = S.filtroImg || 'todas';
+  const st = i => i.status || 'pendente';
+  const daAba = deFilho('imagens').filter(i => i.formato === aba);
+  const l = daAba.filter(i => filtro === 'todas' || st(i) === filtro).sort((a, b) => b.numero - a.numero);
+  const cnt = k => daAba.filter(i => st(i) === k).length;
   setTimeout(carregarMiniaturas, 50);
   return `${dash('🖼️ Minhas imagens', [{ n: r.total, r: 'imagens criadas', c: 'azul' }, { n: r.feed, r: 'feed', c: 'verde' }, { n: r.story, r: 'story', c: 'roxo' },
+      { n: r.aprovadas, r: '✅ aprovadas', c: 'verde' }, { n: r.reprovadas, r: '❌ não aprovadas', c: 'vermelho' }, { n: r.pendentes, r: '⏳ aguardando', c: 'amarelo' },
       { n: r.grupos, r: `grupos de ${r.g}`, c: 'amarelo' }, { n: brl(r.valor), r: 'ganho com imagens', c: 'verde' }],
-      `<div class="dash-st info">Cada imagem vale <b>${brl(r.vi)}</b> · cada grupo de ${r.g} = <b>${brl(r.vi * r.g)}</b> · faltam ${r.faltam} para o próximo grupo</div>`)}
+      `<div class="dash-st info">Cada imagem vale <b>${brl(r.vi)}</b> · cada grupo de ${r.g} = <b>${brl(r.vi * r.g)}</b> · faltam ${r.faltam} para o próximo grupo · imagem não aprovada não conta${r.drive ? ` · ☁️ ${r.drive} no Drive` : ''}</div>`)}
     ${S.papel === 'filho' ? `<button class="dropzone" data-act="enviarImagens"><span style="font-size:1.8rem">📤</span><div><b>Enviar imagens</b><br><span class="peq">Uma por vez ou todas de uma vez · Feed e Story vão para pastas separadas</span></div></button>` : ''}
     <div class="card"><div class="abas-img"><button class="${aba === 'feed' ? 'on' : ''}" data-act="abaImg" data-aba="feed">📁 Feed (${r.feed})</button><button class="${aba === 'story' ? 'on' : ''}" data-act="abaImg" data-aba="story">📁 Story (${r.story})</button></div>
       ${S.papel === 'pai' && l.length ? `<button class="btn pri sm" style="margin:10px 0" data-act="baixarPasta" data-aba="${aba}">⬇️ Baixar pasta ${aba === 'feed' ? 'Feed' : 'Story'} (${l.length}) em .zip</button>` : ''}
-      ${l.length ? `<div class="galeria ${aba}">${l.map(i => `<div class="img-item" data-id="${esc(i.id)}"><img data-caminho="${esc(i.caminho)}" alt="#${i.numero}" loading="lazy"><span class="num">#${i.numero}</span><span class="nf">${aba === 'feed' ? 'F' : 'S'}${i.numero_formato}</span>
-        <div class="img-acoes"><button class="icone-btn" data-act="baixarImg" data-id="${esc(i.id)}" title="Baixar">⬇️</button>${S.papel === 'pai' ? `<button class="icone-btn" data-act="apagarImg" data-id="${esc(i.id)}" title="Apagar">🗑️</button>` : ''}</div></div>`).join('')}</div>`
-      : `<div class="vazio"><span class="e">🖼️</span>Nenhuma imagem de ${aba} ainda.</div>`}</div>`;
+      <div class="filtro-img">${[['todas', 'Todas', daAba.length], ['pendente', '⏳ Aguardando', cnt('pendente')], ['aprovada', '✅ Aprovadas', cnt('aprovada')], ['reprovada', '❌ Não aprovadas', cnt('reprovada')]]
+        .map(([k, t, n]) => `<button class="${filtro === k ? 'on' : ''}" data-act="filtroImg" data-v="${k}">${t} <b>${n}</b></button>`).join('')}</div>
+      ${l.length ? `<div class="galeria ${aba}">${l.map(i => `<div class="img-card st-${st(i)}" data-id="${esc(i.id)}"><div class="img-item"><img data-caminho="${esc(i.caminho)}" alt="#${i.numero}" loading="lazy"><span class="num">#${i.numero}</span><span class="nf">${aba === 'feed' ? 'F' : 'S'}${i.numero_formato}</span>
+        ${st(i) !== 'pendente' ? `<span class="selo-img sem3d">${st(i) === 'aprovada' ? '✔' : '✖'}</span>` : ''}
+        <div class="img-acoes"><button class="icone-btn" data-act="baixarImg" data-id="${esc(i.id)}" title="Baixar">⬇️</button>${S.papel === 'pai' ? `<button class="icone-btn" data-act="apagarImg" data-id="${esc(i.id)}" title="Apagar">🗑️</button>` : ''}</div></div>
+        ${S.papel === 'pai' ? `<div class="check-img sem3d"><button class="ck-v ${st(i) === 'aprovada' ? 'on' : ''}" data-act="aprovarImg" data-id="${esc(i.id)}" title="Aprovar">✔</button><button class="ck-x ${st(i) === 'reprovada' ? 'on' : ''}" data-act="reprovarImg" data-id="${esc(i.id)}" title="Não aprovar">✖</button></div>`
+          : `<div class="st-txt">${st(i) === 'aprovada' ? '✅ Aprovada' : st(i) === 'reprovada' ? '❌ Não aprovada' : '⏳ Aguardando'}</div>`}
+        ${st(i) === 'reprovada' && i.motivo ? `<div class="motivo-img"><b>Por quê:</b> ${esc(i.motivo)}</div>` : ''}</div>`).join('')}</div>`
+      : `<div class="vazio"><span class="e">🖼️</span>${filtro === 'todas' ? `Nenhuma imagem de ${aba} ainda.` : 'Nenhuma imagem neste filtro.'}</div>`}</div>`;
+}
+async function avaliarImagem(id, status, motivo = '') {
+  const i = S.dados.imagens.find(x => x.id === id); if (!i) return false;
+  try {
+    let r = { status, motivo: status === 'reprovada' ? motivo.trim() : '', avaliado_em: status === 'pendente' ? null : new Date().toISOString() };
+    if (S.modo === 'online') r = await DB.rpc('mok_avaliar_imagem', { p_id: id, p_status: status, p_motivo: motivo });
+    Object.assign(i, { status: r.status, motivo: r.motivo, avaliado_em: r.avaliado_em });
+    render(); toast(status === 'aprovada' ? '✅ Aprovada — ' + (filhoAtual().nome || 'filho') + ' foi avisado' : status === 'reprovada' ? '❌ Não aprovada — motivo enviado' : 'Voltou para "aguardando"');
+    return true;
+  } catch (e) { toast(msgErro(e), 'bad'); return false; }
+}
+const MOTIVOS_IMG = ['Texto com erro de português', 'Texto pequeno / difícil de ler', 'Logo errada ou cortada', 'Cores fora da identidade', 'Imagem pixelada / baixa qualidade', 'Formato errado (feed × story)', 'Informação errada', 'Faltou chamada para ação'];
+function modalReprovar(id) {
+  const i = S.dados.imagens.find(x => x.id === id); if (!i) return;
+  const u = URLS_IMG[i.caminho];
+  modal(`<button class="icone-btn fechar" data-act="fechar">✕</button><h2>❌ Não aprovar ${i.formato === 'feed' ? 'F' : 'S'}${i.numero_formato}</h2>
+    ${u ? `<img src="${esc(u.url)}" alt="" style="width:100%;max-height:260px;object-fit:contain;border-radius:12px;background:var(--bg2)">` : ''}
+    <label class="campo"><span>Por que não foi aprovada? (o ${esc(filhoAtual().nome || 'filho')} vai ler isso)</span><textarea id="motivoImg" rows="3" maxlength="500" placeholder="Ex.: a logo está cortada e o texto ficou pequeno">${esc(i.status === 'reprovada' ? i.motivo || '' : '')}</textarea></label>
+    <div class="chips-motivo">${MOTIVOS_IMG.map(m => `<button class="chip" data-act="motivoRapido" data-v="${esc(m)}">${esc(m)}</button>`).join('')}</div>
+    <button class="btn pri" style="margin-top:12px;background:linear-gradient(135deg,#ef4444,#b91c1c)" data-act="salvarReprova" data-id="${esc(id)}">❌ Marcar como não aprovada</button>
+    ${i.status === 'reprovada' ? `<button class="btn ghost" style="margin-top:8px" data-act="desfazerReprova" data-id="${esc(id)}">↩️ Voltar para "aguardando"</button>` : ''}`);
+  setTimeout(() => { const t = $('#motivoImg'); t && t.focus(); }, 80);
 }
 async function urlsAssinadas(caminhos) {
   const falta = caminhos.filter(c => !URLS_IMG[c] || URLS_IMG[c].exp < Date.now());
@@ -2091,6 +2126,12 @@ const acoes = {
   abaImg: d => { S.abaImg = d.aba; render(); },
   baixarImg: d => baixarImg(d.id),
   baixarPasta: d => baixarPasta(d.aba),
+  filtroImg: d => { S.filtroImg = d.v; render(); },
+  aprovarImg: d => { const i = S.dados.imagens.find(x => x.id === d.id); avaliarImagem(d.id, i && i.status === 'aprovada' ? 'pendente' : 'aprovada'); },
+  reprovarImg: d => modalReprovar(d.id),
+  salvarReprova: async d => { const m = ($('#motivoImg') || {}).value || ''; if (!m.trim()) return toast('Escreva o motivo.', 'bad'); if (await avaliarImagem(d.id, 'reprovada', m)) fecharTopo(); },
+  motivoRapido: d => { const t = $('#motivoImg'); if (t) { t.value = (t.value.trim() ? t.value.trim() + '; ' : '') + d.v; t.focus(); } },
+  desfazerReprova: async d => { if (await avaliarImagem(d.id, 'pendente')) fecharTopo(); },
   apagarImg: async d => {
     if (!confirm('Apagar esta imagem? O valor dela sai do saldo.')) return;
     const i = S.dados.imagens.find(x => x.id === d.id);
