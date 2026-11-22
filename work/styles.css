@@ -459,3 +459,9 @@ html,body{overscroll-behavior-y:none}
 .lost-obs{margin:8px 0 0;font-size:13px;color:var(--tx2,var(--tx));background:rgba(255,255,255,.03);border-radius:8px;padding:8px 10px;white-space:pre-wrap}
 .tabs .tab-lost.on{background:var(--bad);border-color:var(--bad);color:#fff}
 @media (max-width:560px){.deal-act .btn.lostbtn{flex:1;justify-content:center}}
+/* v3.1.1 — passo a passo do funil só abre ao tocar no nome do cliente */
+.deal:not(.open) .deal-h{margin-bottom:0}
+.deal-h[data-act="pipeOpen"]:hover .deal-nm{color:var(--blue2)}
+.deal-nm{display:flex!important;align-items:center;gap:6px}
+.deal-nm .chev{width:16px;height:16px;flex:none;opacity:.7;transition:transform .2s}
+.deal.open .deal-nm .chev{transform:rotate(180deg)}

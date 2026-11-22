@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '3.1.0';
+const VERSION = '3.1.1';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings','reminders'];
@@ -1274,16 +1274,17 @@ function pipeCard() {
   const all = deals(); const fin = S.pipeTab === 'fin'; const list = all.filter(d => fin ? d.next < 0 : d.next >= 0);
   const can = isAdmin();
   const row = d => { const nk = d.next >= 0 ? PIPE[d.next][0] : null;
-    return `<div class="deal"><div class="deal-h"><div class="t" data-act="editMeet" data-id="${d.last.id}" style="cursor:pointer"><b>${esc(d.who)}</b><small>${d.next < 0 ? '<span style="color:var(--ok)">Na carteira</span>' : d.outcome === 'fechou' ? '<span style="color:var(--ok)">Fechou</span>' : d.outcome === 'negociando' ? 'Em negociação' : 'Reunião realizada'} · última reunião ${fdate(d.past.date)}${d.last.ticket ? ' · ticket ' + esc(lbl(TICKETS.map(x => [x[0], x[1]]), d.last.ticket)) : ''}</small>${d.up ? `<small class="deal-up">${ic('cal')}Próxima reunião: ${d.up.date === today() ? 'hoje' : fdate(d.up.date)} às ${esc(d.up.time || '--:--')}</small>` : ''}</div><span class="deal-n">${d.n}/${PIPE.length}</span></div>
-    <div class="pipe">${PIPE.map(([k, nm, full], i) => { const ok = d.done[i], au = !d.p[k] && d.auto[k], nx = i === d.next; const dt = d.p[k] && d.p[k] !== true ? fdate(String(d.p[k]).slice(0, 10)) : au ? 'automático' : nx ? 'próximo' : ''; return `<button class="pst ${ok ? 'ok' : ''} ${nx ? 'nx' : ''}" ${can && !au ? `data-act="pipeStep" data-id="${d.last.id}" data-s="${k}"` : 'disabled'} title="${esc(full)}${au ? ' (marcado automaticamente)' : ''}"><i>${ok ? ic('check') : i + 1}</i><b>${nm}</b><small>${dt}</small></button>`; }).join('')}</div>
-    <div class="deal-act">${nk && can ? `<button class="btn ${nk === 'carteira' ? 'ok' : 'pri'}" data-act="pipeStep" data-id="${d.last.id}" data-s="${nk}">${ic(nk === 'carteira' ? 'plus' : 'check')}${PIPE_BTN[nk]}</button>` : nk ? `<span class="muted small">Próximo passo: <b style="color:var(--tx)">${esc(PIPE[d.next][2])}</b></span>` : d.cid ? `<button class="btn" data-act="openClient" data-id="${d.cid}">${ic('users')}Ver cliente</button>` : ''}<span class="sp"></span>${can && nk ? `<button class="btn lostbtn" data-act="dealLost" data-id="${d.last.id}">${ic('x')}Não fechou</button>` : ''}<button class="btn" data-act="dealMeet" data-id="${d.last.id}">${ic('plus')}Reunião</button></div></div>`; };
+    const open = S.pipeOpen === d.last.id;
+    return `<div class="deal ${open ? 'open' : ''}"><div class="deal-h" data-act="pipeOpen" data-id="${d.last.id}" style="cursor:pointer" title="${open ? 'Fechar' : 'Ver'} o passo a passo"><div class="t"><b class="deal-nm">${esc(d.who)}${ic('down', 'i chev')}</b><small>${d.next < 0 ? '<span style="color:var(--ok)">Na carteira</span>' : d.outcome === 'fechou' ? '<span style="color:var(--ok)">Fechou</span>' : d.outcome === 'negociando' ? 'Em negociação' : 'Reunião realizada'} · última reunião ${fdate(d.past.date)}${d.last.ticket ? ' · ticket ' + esc(lbl(TICKETS.map(x => [x[0], x[1]]), d.last.ticket)) : ''}</small>${d.up ? `<small class="deal-up">${ic('cal')}Próxima reunião: ${d.up.date === today() ? 'hoje' : fdate(d.up.date)} às ${esc(d.up.time || '--:--')}</small>` : ''}</div><span class="deal-n">${d.n}/${PIPE.length}</span></div>
+    ${open ? `<div class="pipe">${PIPE.map(([k, nm, full], i) => { const ok = d.done[i], au = !d.p[k] && d.auto[k], nx = i === d.next; const dt = d.p[k] && d.p[k] !== true ? fdate(String(d.p[k]).slice(0, 10)) : au ? 'automático' : nx ? 'próximo' : ''; return `<button class="pst ${ok ? 'ok' : ''} ${nx ? 'nx' : ''}" ${can && !au ? `data-act="pipeStep" data-id="${d.last.id}" data-s="${k}"` : 'disabled'} title="${esc(full)}${au ? ' (marcado automaticamente)' : ''}"><i>${ok ? ic('check') : i + 1}</i><b>${nm}</b><small>${dt}</small></button>`; }).join('')}</div>
+    <div class="deal-act">${nk && can ? `<button class="btn ${nk === 'carteira' ? 'ok' : 'pri'}" data-act="pipeStep" data-id="${d.last.id}" data-s="${nk}">${ic(nk === 'carteira' ? 'plus' : 'check')}${PIPE_BTN[nk]}</button>` : nk ? `<span class="muted small">Próximo passo: <b style="color:var(--tx)">${esc(PIPE[d.next][2])}</b></span>` : d.cid ? `<button class="btn" data-act="openClient" data-id="${d.cid}">${ic('users')}Ver cliente</button>` : ''}<span class="sp"></span>${can && nk ? `<button class="btn lostbtn" data-act="dealLost" data-id="${d.last.id}">${ic('x')}Não fechou</button>` : ''}<button class="btn" data-act="editMeet" data-id="${d.last.id}">${ic('cal')}Ver reunião</button><button class="btn" data-act="dealMeet" data-id="${d.last.id}">${ic('plus')}Reunião</button></div>` : ''}</div>`; };
   const lost = lostDeals();
   if (S.pipeTab === 'lost') return `<div class="card" style="margin-bottom:14px">${pipeHead(all, lost)}
     ${lost.length ? `<div class="deals">${lost.map(d => lostRow(d, can)).join('')}</div>` : empty('Nenhuma proposta recusada. Quando um cliente não fechar, toque em “Não fechou” no card dele.')}
     <p class="note" style="margin:10px 0 0">Aqui ficam os clientes que receberam a proposta e não fecharam, com o motivo. ${can ? '“Retomar” devolve o cliente para o funil como Em negociação.' : ''}</p></div>`;
   return `<div class="card" style="margin-bottom:14px"><h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${ic('target')}Andamento pós-reunião <span class="sp"></span>${pipeTabs(all, lost)}</h3>
     ${list.length ? `<div class="deals">${list.map(row).join('')}</div>` : empty(fin ? 'Nenhum cliente entrou na carteira pelo funil ainda.' : 'Assim que uma reunião comercial for realizada, o passo a passo do cliente aparece aqui.')}
-    <p class="note" style="margin:10px 0 0">${can ? 'Use o botão de cada cliente para avançar a etapa. “Colocar na carteira” cadastra o cliente e ele vai para Clientes. Reunião marca sozinha quando a reunião é realizada (e Proposta/Onboarding, se a reunião for desse tipo). Para desmarcar, toque na etapa.' : 'Só o administrador avança as etapas. Você pode marcar novas reuniões em qualquer horário pelo botão “+ Reunião”.'}</p></div>`;
+    <p class="note" style="margin:10px 0 0">Toque no nome do cliente para abrir o passo a passo. ${can ? 'Use o botão de cada cliente para avançar a etapa. “Colocar na carteira” cadastra o cliente e ele vai para Clientes. Reunião marca sozinha quando a reunião é realizada (e Proposta/Onboarding, se a reunião for desse tipo). Para desmarcar, toque na etapa.' : 'Só o administrador avança as etapas. Você pode marcar novas reuniões em qualquer horário pelo botão “+ Reunião”.'}</p></div>`;
 }
 V.reunioes = () => {
   const k = S.meetMonth || curYM(); const mine = S.meetWho || '';
@@ -1420,7 +1421,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '3.1.0', notes: [
+const RELEASE = { version: '3.1.1', notes: [
+  'Reuniões → Andamento pós-reunião: o passo a passo de cada cliente agora fica fechado. Toque no nome do cliente para abrir (e de novo para fechar). “Ver reunião” fica dentro do card aberto.',
   'Novo botão “Não fechou” em cada cliente do funil (Reuniões → Andamento pós-reunião). Você escolhe o motivo (preço, sem orçamento, concorrente, adiou, parou de responder…), escreve uma observação e, se quiser, uma data para retomar o contato.',
   'O cliente sai do funil e vai para a nova aba “Não fecharam”, com motivo, data, em que etapa parou e botões de WhatsApp, + Reunião e “Retomar negociação”.',
   'Painel: novo card “Propostas não fechadas” com quantos não fecharam no mês, taxa de fechamento e o motivo mais comum. Quando chega o dia de retomar, aparece nas Prioridades de hoje e vira um follow-up na agenda.',
@@ -1837,7 +1839,7 @@ const A = {
   pickReason: (d, el) => { const f = el.closest('form'); if (!f) return; f.end_reason.value = d.v; f.querySelectorAll('[data-act="pickReason"]').forEach(b => b.classList.toggle('blue', b === el)); },
   reasonsReset: () => { const t = $('form[data-form="saveReasons"] textarea[name="list"]'); if (t) t.value = DEFAULT_SETTINGS.exit_reasons.join('\n'); toast('Lista padrão restaurada', 'Clique em salvar para gravar.'); },
   editMeet: d => meetForm(d.id ? S.d.tasks.find(t => t.id === d.id) : (d.client ? { client_id: d.client, meet_type: 'alinhamento' } : {})),
-  meetMonth: d => { S.meetMonth = d.m; renderView(); }, meetDay: d => { S.meetDay = d.d; renderView(); }, weekToggle: () => { S.weekOpen = !S.weekOpen; lsSet('bw_week_open', S.weekOpen); renderView(); }, pipeTab: d => { S.pipeTab = d.id; renderView(); },
+  meetMonth: d => { S.meetMonth = d.m; renderView(); }, meetDay: d => { S.meetDay = d.d; renderView(); }, weekToggle: () => { S.weekOpen = !S.weekOpen; lsSet('bw_week_open', S.weekOpen); renderView(); }, pipeTab: d => { S.pipeTab = d.id; S.pipeOpen = null; renderView(); }, pipeOpen: d => { S.pipeOpen = S.pipeOpen === d.id ? null : d.id; renderView(); },
   pipeStep: async d => { if (!isAdmin()) return toast('Só o administrador avança as etapas', '', 'warn');
     const deal = deals().find(x => x.last.id === d.id); if (!deal) return; const k = d.s, t = deal.last, full = PIPE.find(x => x[0] === k)[2];
     if (deal.auto[k] && !deal.p[k]) return toast(`${full}: marcado automaticamente`, k === 'carteira' ? 'Para tirar, desative o cliente em Clientes.' : 'Vem da reunião realizada. Para desfazer, mude o status da reunião.', 'warn');
