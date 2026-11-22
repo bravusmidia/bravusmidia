@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '3.2.0';
+const VERSION = '3.2.1';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings','reminders','documents'];
@@ -944,7 +944,7 @@ V.clientes = () => {
     <div class="grid g3">${cl.length ? cl.map(c => `<div class="ccard tier-${clientTier(c)}" data-act="openClient" data-id="${c.id}">
       <div class="hd"><span class="av tier-av ${clientTier(c)}">${esc(initials(c.name))}</span><div class="sp" style="min-width:0"><b>${esc(c.name)}</b><div style="margin-top:4px">${tierChip(c)}</div></div>${walletBtn(c)}</div>
       <div class="row wrap" style="gap:6px">${(c.services || []).map(s => `<span class="chip blue">${esc(svcName(s))}</span>`).join('') || '<span class="muted small">Sem serviços</span>'}</div>
-      <div class="ft"><span class="muted">${esc(c.segment || 'Segmento —')} · vence ${esc(dueTxt(c))}</span>${canFin() ? `<b>${brl(c.contract_value)}</b>` : ''}</div>
+      <div class="ft"><span class="muted">${esc(c.segment || 'Segmento —')} · <span class="due-y">vence ${esc(dueTxt(c))}</span></span>${canFin() ? `<b>${brl(c.contract_value)}</b>` : ''}</div>
       ${!inWallet(c) ? `<div class="small muted">Saiu ${c.end_date ? 'em ' + fdateY(c.end_date) : ''}${c.end_reason ? ' · ' + esc(c.end_reason) : ''}${c.start_date ? ` · cliente desde ${fdateY(c.start_date)}` : ''}</div>` : ''}
       <div class="row">${canFin() ? (isAdmin() ? payBtn(c) : finChip(clientFin(c))) : ''}${inWallet(c) ? `${c.op_status !== 'ativo' ? `<span class="chip warn">${esc(c.op_status === 'pausado' ? 'Pausado' : 'Em implantação')}</span>` : ''}${['prob', 'saldo'].includes(adState(c).k) ? adChip(c) : ''}` : ''}<span class="sp"></span><span class="small muted">${esc(firstName(c.owner))}</span></div>
     </div>`).join('') : `<div class="card" style="grid-column:1/-1">${empty(S.d.clients.length ? 'Nenhum cliente neste filtro.' : 'Cadastre seu primeiro cliente no botão “+ Cliente”.')}</div>`}</div>`;
@@ -1042,7 +1042,7 @@ V.financeiro = () => {
     <div class="grid g4">${kpi('Entrou', brl(fm.recebido), 'confirmado', 'hl', ['financeiro', 'pago', 'fin-cob'])}${kpi('A receber', brl(fm.aReceberTotal), fm.atrasado ? `mês ${brl(fm.aReceber)} + atrasado ${brl(fm.atrasado)}` : '', 'y', ['financeiro', 'pendente', 'fin-cob'])}${kpi('Atrasado (total)', brl(fm.atrasado), '', fm.atrasado ? 'r' : '', ['financeiro', 'atrasado', 'fin-cob'])}${kpi('Saiu', brl(fm.saidas), `saldo do mês ${brl(fm.saldo)}`, fm.saidas ? 'r' : '', ['financeiro', 'todos', 'fin-saidas'])}</div>
     <div class="card" id="fin-cob" style="margin-top:14px"><h3>${ic('wallet')}Cobranças<span class="sp"></span><span class="small muted">${inv.length}</span></h3>
       <div class="tabs" style="margin-bottom:10px">${fTabs.map(t => `<button data-act="finFilter" data-f="${t[0]}" class="${ff === t[0] ? 'on' : ''}">${t[1]}</button>`).join('')}</div>
-      <div class="list">${inv.length ? inv.map(i => { const c = client(i.client_id) || {}; const s = invStatus(i); return `<div class="li"><div class="t"><b>${esc(c.name || '—')} · ${brl(i.amount)}</b><small>${esc(invDesc(i))} · vence ${fdate(i.due_date)}${i.status === 'pago' ? ` · pago em ${fdate(i.paid_at)} (${esc(i.method || '')})` : ''}</small></div>${invChip(i)}
+      <div class="list">${inv.length ? inv.map(i => { const c = client(i.client_id) || {}; const s = invStatus(i); return `<div class="li"><div class="t"><b>${esc(c.name || '—')} · ${brl(i.amount)}</b><small>${esc(invDesc(i))} · <span class="due-y">vence ${fdate(i.due_date)}</span>${i.status === 'pago' ? ` · pago em ${fdate(i.paid_at)} (${esc(i.method || '')})` : ''}</small></div>${invChip(i)}
         ${isAdmin() && s !== 'pago' && s !== 'cancelado' ? `<button class="btn sm ok" data-act="payInvoice" data-id="${i.id}">${ic('check')}<span class="hide-m">Recebido</span></button><a class="btn sm ic" title="Cobrar no WhatsApp" href="${waCharge(i)}" target="_blank" rel="noopener" data-act="chargeWa" data-id="${i.id}">${ic('wa')}</a>` : ''}
         ${isAdmin() ? `<button class="btn sm ic" data-act="editInvoice" data-id="${i.id}">${ic('edit')}</button>` : ''}</div>`; }).join('') : empty(ff !== 'todos' && invAll.length ? 'Nenhuma cobrança nesse filtro.' : 'Sem cobranças de clientes ativos neste mês. Use “Gerar mensalidades” ou marque o pagamento direto no cliente.')}</div></div>
     <div class="card" id="fin-saidas" style="margin-top:14px"><h3>${ic('down')}Saídas / despesas<span class="sp"></span>${isAdmin() ? `<button class="btn sm" data-act="newExpense">${ic('plus')}Despesa</button>` : ''}</h3>
@@ -1422,7 +1422,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '3.2.0', notes: [
+const RELEASE = { version: '3.2.1', notes: [
+  'As datas de vencimento (“vence 23/11”) agora aparecem em amarelo no Financeiro, no histórico do cliente e nos cards de Clientes.',
   'Novo menu Contratos, com as abas Contratos e Propostas. Os modelos da Bravus já vêm prontos: é só trocar nome, e-mail, CPF/CNPJ, telefone, valores e prazos.',
   'Os valores e prazos do contrato saem por extenso sozinhos (ex.: R$ 1.200,00 (mil e duzentos reais)). Na proposta, os totais de cada pacote são calculados na hora.',
   'Prévia igual à folha A4, com botões Baixar PDF, Imprimir e Enviar (no celular, abre o WhatsApp para mandar o PDF). Dá para puxar os dados de um cliente já cadastrado e duplicar um documento.',
@@ -1817,7 +1818,7 @@ const A = {
   payMenu: d => {
     const c = client(d.id); if (!c) return; const k = curYM(); const inv = monthInv(c, k); const late = S.d.invoices.filter(i => i.client_id === c.id && ym(i.due_date) < k && invStatus(i) === 'atrasado');
     const B = (id, st, cur) => `<div class="row" style="gap:6px">${[['pago', 'Pago', 'ok'], ['areceber', 'A receber', 'warn'], ['atrasado', 'Em atraso', 'bad']].map(o => `<button type="button" class="btn sm ${cur === (o[0] === 'areceber' ? 'pendente' : o[0]) ? o[2] : ''}" data-act="invSet" data-id="${id}" data-s="${o[0]}" data-client="${c.id}">${o[1]}</button>`).join('')}</div>`;
-    const line = i => `<div class="li"><div class="t"><b>${brl(i.amount)} · vence ${fdate(i.due_date)}</b><small>${esc(invDesc(i))}</small></div>${B(i.id, null, invStatus(i))}</div>`;
+    const line = i => `<div class="li"><div class="t"><b>${brl(i.amount)} · <span class="due-y">vence ${fdate(i.due_date)}</span></b><small>${esc(invDesc(i))}</small></div>${B(i.id, null, invStatus(i))}</div>`;
     modal(`Pagamento · ${c.name}`, `
       <div class="sec" style="margin-top:0">${esc(monthName(k))}/${k.slice(0, 4)}</div>
       ${inv.length ? `<div class="list">${inv.map(line).join('')}</div>` : (+c.contract_value > 0 ? `<p class="small muted" style="margin-bottom:10px">Ainda não tem cobrança deste mês. Escolha o status e eu crio a mensalidade${isSplit(c) ? ' (2 parcelas)' : ''} de ${brl(c.contract_value)}:</p><div class="li"><div class="t"><b>${brl(c.contract_value)}</b><small>vence ${esc(dueTxt(c))}</small></div>${B('new', null, '')}</div>` : `<p class="note">Este cliente está sem valor de contrato. Edite o cliente e informe o valor mensal.</p>`)}

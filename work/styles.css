@@ -543,3 +543,4 @@ html,body{overscroll-behavior-y:none}
   body.printing #printArea .a4{page-break-after:always;break-after:page;box-shadow:none}
 }
 .mob-only{display:none}@media (max-width:900px){.mob-only{display:inline-flex}}
+.due-y{color:#ffbe50;font-weight:600}
