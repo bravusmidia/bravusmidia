@@ -427,7 +427,7 @@ html,body{overscroll-behavior-y:none}
 .deal{padding:12px;border-radius:var(--r2);border:1px solid var(--line2);background:var(--card2)}
 .deal-h{display:flex;align-items:center;gap:10px;margin-bottom:10px}.deal-h .t{flex:1;min-width:0}.deal-h .t b{display:block}.deal-h .t small{color:var(--tx3);font-size:12px}
 .deal-n{font-weight:800;font-size:13px;color:var(--blue2);background:rgba(47,123,255,.12);padding:3px 9px;border-radius:99px}
-.pipe{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;position:relative}
+.pipe{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;position:relative}
 .pst{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px;border-radius:var(--r2);border:1px solid var(--line2);background:var(--card);color:var(--tx2);text-align:center;min-width:0}
 .pst[disabled]{cursor:default}
 .pst i{font-style:normal;width:24px;height:24px;border-radius:99px;display:grid;place-items:center;font-size:12px;font-weight:800;background:var(--card2);border:1px solid var(--line2)}
@@ -439,3 +439,10 @@ html,body{overscroll-behavior-y:none}
 .pst.nx{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue) inset;color:var(--tx)}
 .pst.nx i{background:var(--blue);border-color:var(--blue);color:#fff}
 @media (max-width:560px){.pipe{grid-template-columns:repeat(3,1fr)}}
+
+/* v3.0.0 funil por cliente */
+.deal-act{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+.deal-act .btn{min-height:40px}
+.deal-up{display:flex!important;align-items:center;gap:5px;color:var(--blue2)!important;margin-top:3px}
+.deal-up svg{width:13px;height:13px}
+@media (max-width:560px){.deal-act .btn.pri,.deal-act .btn.ok{flex:1;justify-content:center}}
