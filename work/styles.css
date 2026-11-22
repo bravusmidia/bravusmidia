@@ -465,3 +465,81 @@ html,body{overscroll-behavior-y:none}
 .deal-nm{display:flex!important;align-items:center;gap:6px}
 .deal-nm .chev{width:16px;height:16px;flex:none;opacity:.7;transition:transform .2s}
 .deal.open .deal-nm .chev{transform:rotate(180deg)}
+
+/* ===== v3.2 — Contratos e Propostas ===== */
+@font-face{font-family:'MontDoc';src:url(fonts/montserrat-latin-400-normal.woff2) format('woff2');font-weight:400;font-display:swap}
+@font-face{font-family:'MontDoc';src:url(fonts/montserrat-latin-600-normal.woff2) format('woff2');font-weight:600;font-display:swap}
+@font-face{font-family:'MontDoc';src:url(fonts/montserrat-latin-700-normal.woff2) format('woff2');font-weight:700;font-display:swap}
+@font-face{font-family:'MontDoc';src:url(fonts/montserrat-latin-800-normal.woff2) format('woff2');font-weight:800;font-display:swap}
+.warnbox.card{display:flex;gap:10px;align-items:flex-start}.warnbox svg{width:18px;height:18px;flex:none;margin-top:1px}
+.warnbox code{background:rgba(0,0,0,.3);padding:1px 6px;border-radius:5px}
+.doc-ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;flex:none;background:rgba(47,123,255,.14);color:var(--blue2)}
+.doc-ic.proposta{background:rgba(255,190,80,.14);color:#ffcf7a}.doc-ic svg{width:19px;height:19px}
+.doc-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding:12px;position:sticky;top:8px;z-index:5;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.doc-ed{display:grid;grid-template-columns:minmax(300px,420px) 1fr;gap:16px;align-items:start}
+.doc-form{display:flex;flex-direction:column;gap:12px;min-width:0}
+.dsec{padding:0}.dsec>summary{cursor:pointer;list-style:none;padding:14px 16px;font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px}
+.dsec>summary::-webkit-details-marker{display:none}.dsec>summary::after{content:'▾';margin-left:auto;color:var(--tx3);transition:transform .2s}
+.dsec:not([open])>summary::after{transform:rotate(-90deg)}.dsec>.f{padding:0 16px 16px}
+.dsec textarea{min-height:96px}
+.doc-prev{position:sticky;top:84px;min-width:0}
+#docPages{display:flex;flex-direction:column;align-items:center;gap:14px;width:100%}
+.a4s{position:relative;overflow:hidden;border-radius:4px;box-shadow:0 10px 30px rgba(0,0,0,.45);flex:none}
+.a4s>.a4{transform-origin:0 0;position:absolute;left:0;top:0}
+@media (max-width:900px){.doc-ed{grid-template-columns:1fr}.doc-prev{position:static}}
+
+/* folha A4 (794 × 1123 px = 210 × 297 mm a 96 dpi) */
+.a4{width:794px;height:1123px;background:#fff;color:#2b2b2b;font-family:'MontDoc',Montserrat,Arial,sans-serif;position:relative;overflow:hidden;font-size:12.6px;line-height:1.55;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.a4 *{box-sizing:border-box}
+.a4 .a4b{position:absolute;left:64px;right:64px;top:52px;bottom:70px;overflow:hidden;z-index:2}
+.a4 p{margin:0 0 10px;text-align:justify}
+.a4-contrato .a4wm{position:absolute;left:50%;top:48%;width:560px;transform:translate(-50%,-50%);opacity:.16;z-index:1;pointer-events:none}
+.a4-contrato .a4f{position:absolute;left:0;right:0;bottom:26px;text-align:center;font-size:10px;color:#555;z-index:2}
+.ct-head{text-align:center;margin-bottom:6px}
+.ct-head h1{font-size:25px;font-weight:800;color:#162f6b;margin:6px 0 10px;letter-spacing:.01em}
+.ct-head i{display:block;width:150px;height:3px;background:#162f6b;margin:0 auto 12px;border-radius:2px}
+.ct-head img{width:190px;display:block;margin:0 auto}
+.party{margin:4px 0 14px}.party h3{font-size:13.5px;font-weight:800;margin:10px 0 6px;color:#111}
+.kv{display:flex;align-items:flex-end;gap:10px;margin:0 0 9px}.kv b{font-weight:700;color:#111;white-space:nowrap;min-width:78px}
+.kv span{flex:1;border-bottom:1px solid #333;padding:0 0 2px 6px;min-height:20px;font-size:13px}
+.kv2{display:grid;grid-template-columns:1.2fr 1fr;gap:28px}.kv2 .kv b{min-width:0}
+.a4 h2.ch{font-size:16px;font-weight:800;color:#111;margin:16px 0 12px;padding-bottom:7px;border-bottom:1.5px solid #444}
+.a4 ul.pix{margin:0 0 10px 18px;padding:0}.a4 ul.pix li{margin:2px 0}
+.sign{margin-top:18px}.sign .cdate{text-align:left;margin-bottom:56px}
+.sign .sg{display:grid;grid-template-columns:1fr 1fr;gap:56px;text-align:center}
+.sign .sg i{display:block;border-top:1.5px solid #111;margin-bottom:8px}.sign .sg b{display:block;font-weight:500}.sign .sg span{font-size:12px}
+/* proposta */
+.a4-proposta{background:linear-gradient(180deg,#ffffff 0%,#f6f9fe 55%,#eaf1fb 100%);color:#16233f}
+.a4-proposta .a4bar{position:absolute;left:0;right:0;top:0;height:14px;background:linear-gradient(90deg,#dce8f8,#5f93dc 55%,#dce8f8);opacity:.9}
+.a4-proposta .a4b{top:40px;left:52px;right:52px;bottom:84px}
+.a4-proposta .a4f2{position:absolute;left:52px;right:52px;bottom:18px;border-top:1px solid #c9d6ea;padding-top:9px;text-align:center;font-size:10.5px;color:#1c4f9c;font-weight:600;z-index:2}
+.a4-proposta .a4f2 span{display:block}.a4-proposta .a4f2 b{font-weight:800}.a4-proposta .a4f2 small{display:block;margin-top:8px;color:#1b2a48;font-size:11px}
+.pp-head .pp-logo{width:210px;display:block;margin:0 0 12px -4px}
+.pp-head h1{font-size:17.5px;font-weight:800;color:#1b2f5e;margin:0 0 6px}
+.pp-to{font-size:12px;color:#4a5a78;margin:0 0 8px!important}
+.pkg{border:1.5px solid #c7d7ef;border-radius:12px;background:#fff;margin:14px 0 6px;overflow:hidden;box-shadow:0 4px 14px rgba(25,70,140,.08)}
+.pkg-h{background:linear-gradient(180deg,#e9f1fc,#dce8f8);color:#1b2f5e;font-weight:800;font-size:16px;padding:10px 16px}
+.pkg-b{padding:4px 16px 10px}.pkg-b h4{font-size:13px;font-weight:800;color:#1b2f5e;margin:12px 0 4px}
+.pr{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid #e3eaf5;font-size:12.6px}.pr b{font-weight:800;min-width:120px;text-align:right}
+.pkg-t{display:flex;align-items:center;justify-content:space-between;background:linear-gradient(90deg,#0c3f8f,#1356b8);color:#fff;margin:0 10px 10px;border-radius:9px;padding:10px 18px}
+.pkg-t span{font-weight:800;font-size:15px;letter-spacing:.02em}.pkg-t b{font-size:30px;font-weight:800;letter-spacing:-.01em}.pkg-t b small{font-size:20px;margin-right:2px}
+.pp-logo2{text-align:center;margin:4px 0 26px}.pp-logo2 img{width:200px}
+.a4 h2.ph{font-size:23px;font-weight:800;color:#111c35;margin:6px 0 18px;padding-bottom:12px;border-bottom:1.5px solid #c9d3e3;line-height:1.25}
+.a4 ul.sq{list-style:none;margin:0 0 26px;padding:0}
+.a4 ul.sq li{position:relative;padding-left:30px;margin:0 0 14px;font-size:15px;line-height:1.5;font-weight:600;color:#1d2b4a}
+.a4 ul.sq li::before{content:'';position:absolute;left:4px;top:7px;width:9px;height:9px;background:#1d4f9f}
+.cond{background:linear-gradient(135deg,#f3f8ff,#e4eefc);border-radius:16px;border-left:6px solid #1356b8;padding:18px 24px;margin-top:8px;box-shadow:0 4px 14px rgba(25,70,140,.08)}
+.cond h3{font-size:22px;font-weight:800;color:#111c35;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid #c9d6ea}
+.cond p{font-size:17px;font-weight:600;text-align:left;color:#1d2b4a;margin:0;line-height:1.55}.cond em{font-style:normal;font-weight:800;color:#1356b8;font-size:24px}
+/* captura do PDF (fora da tela) e impressão */
+.doc-stage{position:fixed;left:-10000px;top:0;width:794px;z-index:-1}
+#printArea{display:none}
+@media print{
+  @page{size:A4;margin:0}
+  body.printing>*:not(#printArea){display:none!important}
+  body.printing{background:#fff!important}
+  body.printing #printArea{display:block}
+  body.printing #printArea,body.printing #printArea *{visibility:visible!important}
+  body.printing #printArea .a4{page-break-after:always;break-after:page;box-shadow:none}
+}
+.mob-only{display:none}@media (max-width:900px){.mob-only{display:inline-flex}}
