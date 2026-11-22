@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '3.2.1';
+const VERSION = '3.2.2';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings','reminders','documents'];
@@ -1287,6 +1287,31 @@ function pipeCard() {
     ${list.length ? `<div class="deals">${list.map(row).join('')}</div>` : empty(fin ? 'Nenhum cliente entrou na carteira pelo funil ainda.' : 'Assim que uma reunião comercial for realizada, o passo a passo do cliente aparece aqui.')}
     <p class="note" style="margin:10px 0 0">Toque no nome do cliente para abrir o passo a passo. ${can ? 'Use o botão de cada cliente para avançar a etapa. “Colocar na carteira” cadastra o cliente e ele vai para Clientes. Reunião marca sozinha quando a reunião é realizada (e Proposta/Onboarding, se a reunião for desse tipo). Para desmarcar, toque na etapa.' : 'Só o administrador avança as etapas. Você pode marcar novas reuniões em qualquer horário pelo botão “+ Reunião”.'}</p></div>`;
 }
+/* Cards de Reuniões clicáveis: abre a lista detalhada de cada número */
+const MK = { all: 'Reuniões no mês', feito: 'Realizadas', noshow: 'Não compareceu', wait: 'Aguardando resultado', fechou: 'Fecharam', negociando: 'Em negociação', perdido: 'Não fecharam' };
+function meetScope() {
+  const k = S.meetMonth || curYM(), mine = S.meetWho || '', tk = S.meetTicket || '';
+  const ms = meetings().filter(t => (!mine || t.assignee === mine) && (!tk || (tk === 'sem' ? !t.ticket : t.ticket === tk)) && ym(t.date) === k).sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
+  return { k, ms };
+}
+function meetKpiList(ms, m) {
+  return m === 'feito' || m === 'noshow' ? ms.filter(t => t.status === m) : m === 'wait' ? ms.filter(t => t.status === 'pendente' && isLate(t)) : ['fechou', 'negociando', 'perdido'].includes(m) ? ms.filter(t => t.outcome === m) : ms;
+}
+function meetKpi(m = 'all') {
+  const { k, ms } = meetScope(); const list = meetKpiList(ms, m);
+  const label = (l => l[0].toUpperCase() + l.slice(1))(new Date(k + '-15T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
+  const grp = (arr, key) => arr.map(([kk, nm, cls]) => [nm, list.filter(t => key(t) === kk).length, cls]).filter(x => x[1]);
+  const byType = grp(MTYPES, t => t.meet_type || 'comercial');
+  const byTicket = [...grp(TICKETS, t => t.ticket || ''), ...(list.filter(t => !t.ticket).length ? [['Sem ticket', list.filter(t => !t.ticket).length, '']] : [])];
+  const byWho = team().map(p => [p.name.split(' ')[0], list.filter(t => t.assignee === p.id).length]).filter(x => x[1]);
+  const byFmt = grp(MFORMATS, t => t.meet_format || 'meet');
+  const box = (title, rows) => rows.length ? `<div class="card" style="padding:12px;margin:0"><small class="muted" style="font-weight:600;text-transform:uppercase;letter-spacing:.06em">${title}</small><div class="list" style="margin-top:6px">${rows.map(r => `<div class="li" style="padding:6px 0"><div class="t"><b style="font-weight:500">${r[2] ? `<span class="chip ${r[2]}">${esc(r[0])}</span>` : esc(r[0])}</b></div><b class="num">${r[1]}</b></div>`).join('')}</div></div>` : '';
+  const row = t => `<div class="li" data-act="editMeet" data-id="${t.id}" style="cursor:pointer;align-items:flex-start"><div class="mtime"><b>${esc(t.time || '--:--')}</b><small>${WD[new Date(t.date + 'T12:00:00').getDay()]} ${fdate(t.date)}</small></div><div class="t"><b>${esc(meetWho(t))}${t.contact_name && t.company ? ` <span class="muted" style="font-weight:400">· ${esc(t.contact_name)}</span>` : ''}</b><small>${esc(lbl(MTYPES, t.meet_type || 'comercial'))} · ${esc(lbl(MFORMATS, t.meet_format || 'meet'))} · ${esc(firstName(t.assignee))}${t.outcome ? ' · ' + esc(lbl(MOUT, t.outcome)) : ''}</small>${t.description ? `<small style="display:block;margin-top:4px;color:var(--tx);opacity:.8;white-space:pre-wrap">${esc(String(t.description).slice(0, 220))}${String(t.description).length > 220 ? '…' : ''}</small>` : ''}</div>${ticketChip(t)}${meetChip(t)}</div>`;
+  modal(`${MK[m]} · ${label}`, `<div class="row wrap" style="gap:8px;margin-bottom:12px">${Object.entries(MK).map(([kk, nm]) => { const n = meetKpiList(ms, kk).length; return n || kk === m || kk === 'all' ? `<button type="button" class="btn sm ${kk === m ? 'pri' : ''}" data-act="meetKpi" data-m="${kk}">${nm} <small>${n}</small></button>` : ''; }).join('')}</div>
+    ${list.length ? `<div class="grid g2" style="gap:10px;margin-bottom:12px">${box('Assunto (tipo)', byType)}${box('Ticket', byTicket)}${box('Responsável', byWho)}${box('Formato', byFmt)}</div>
+    <div class="list">${list.slice().reverse().map(row).join('')}</div>` : empty('Nenhuma reunião aqui neste mês.')}
+    <p class="note" style="margin:10px 0 0">Toque numa reunião para abrir, ver as anotações completas e editar. Os filtros de pessoa e ticket da tela de Reuniões valem aqui também.</p>`, { wide: true });
+}
 V.reunioes = () => {
   const k = S.meetMonth || curYM(); const mine = S.meetWho || '';
   const tk = S.meetTicket || '';
@@ -1303,6 +1328,7 @@ V.reunioes = () => {
   const next = all.filter(t => t.status === 'pendente' && (t.date > today() || (t.date === today() && (t.time || '') >= nowHM()))).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
   const pend = all.filter(t => t.status === 'pendente' && isLate(t));
   const row = t => `<div class="li"><div class="mtime ${t.date === today() ? 'hj' : ''}" data-act="editMeet" data-id="${t.id}"><b>${esc(t.time || '--:--')}</b><small>${t.date === today() ? 'Hoje' : t.date === iso(new Date(Date.now() + 864e5)) ? 'Amanhã' : WD[new Date(t.date + 'T12:00:00').getDay()] + ' ' + fdate(t.date)}</small></div><div class="t" data-act="editMeet" data-id="${t.id}" style="cursor:pointer"><b>${esc(meetWho(t))}${t.contact_name && t.company ? ` <span class="muted" style="font-weight:400">· ${esc(t.contact_name)}</span>` : ''}</b><small>${esc(lbl(MTYPES, t.meet_type || 'comercial'))} · ${esc(lbl(MFORMATS, t.meet_format || 'meet'))} · ${esc(firstName(t.assignee))}${t.outcome ? ' · ' + esc(lbl(MOUT, t.outcome)) : ''}${reschFrom(t).length ? ` · <span style="color:var(--warn,#ffbe50)">antes: ${esc(reschFrom(t).slice(-1)[0])}</span>` : ''}</small></div>${ticketChip(t)}${reschChip(t)}${meetChip(t)}</div>`;
+  const mkpi = (m, label, val, sub = '', cls = '') => `<div class="kpi go ${cls}" role="button" tabindex="0" title="Ver ${esc(label.toLowerCase())}" data-act="meetKpi" data-m="${m}"><small>${esc(label)}</small><b>${val}</b>${sub ? `<em>${sub}</em>` : ''}<i class="kgo">${ic('right')}</i></div>`;
   return head('Reuniões', 'Bravus Meetings · tudo que você marca com clientes, organizado e contado', `<button class="btn pri" data-act="editMeet">${ic('plus')}Reunião</button>`) + `
     <div class="row wrap" style="gap:10px;margin-bottom:14px"><div class="datebar" style="margin:0"><button class="btn sm ic" data-act="meetMonth" data-m="${shift(-1)}">${ic('left')}</button><b>${label}</b><button class="btn sm ic" data-act="meetMonth" data-m="${shift(1)}">${ic('right')}</button></div><span class="sp"></span>
       <div class="tabs" style="margin:0">${[['', 'Todos'], ...team().map(p => [p.id, p.name.split(' ')[0]])].map(x => `<button data-act="meetWho" data-id="${x[0]}" class="${mine === x[0] ? 'on' : ''}">${esc(x[1])}</button>`).join('')}</div></div>
@@ -1310,10 +1336,10 @@ V.reunioes = () => {
     ${pipeCard()}
     ${weekStrip(mine)}
     <div class="grid g4" style="margin-bottom:14px">
-      ${kpi('Reuniões no mês', ms.length, `${prev} no mês anterior${prev ? ` (${ms.length >= prev ? '+' : ''}${Math.round((ms.length - prev) / prev * 100)}%)` : ''}`, 'hl')}
-      ${kpi('Realizadas', `<span style="color:var(--ok)">${real.length}</span>`, `${nos.length} não compareceu${pend.filter(t => ym(t.date) === k).length ? ` · <b style="color:var(--warn,#ffbe50)">${pend.filter(t => ym(t.date) === k).length} aguardando resultado</b>` : ''}`)}
-      ${kpi('Comparecimento', decided ? Math.round(real.length / decided * 100) + '%' : '—', 'realizadas ÷ (realizadas + faltas)')}
-      ${kpi('Fecharam', `<span style="color:var(--ok)">${won.length}</span>`, `${com.length ? Math.round(won.length / com.length * 100) : 0}% das comerciais · ${ms.filter(t => t.outcome === 'negociando').length} em negociação`)}
+      ${mkpi('all', 'Reuniões no mês', ms.length, `${prev} no mês anterior${prev ? ` (${ms.length >= prev ? '+' : ''}${Math.round((ms.length - prev) / prev * 100)}%)` : ''}`, 'hl')}
+      ${mkpi('feito', 'Realizadas', `<span style="color:var(--ok)">${real.length}</span>`, `${nos.length} não compareceu${pend.filter(t => ym(t.date) === k).length ? ` · <b style="color:var(--warn,#ffbe50)">${pend.filter(t => ym(t.date) === k).length} aguardando resultado</b>` : ''}`)}
+      ${mkpi('noshow', 'Comparecimento', decided ? Math.round(real.length / decided * 100) + '%' : '—', 'realizadas ÷ (realizadas + faltas)')}
+      ${mkpi('fechou', 'Fecharam', `<span style="color:var(--ok)">${won.length}</span>`, `${com.length ? Math.round(won.length / com.length * 100) : 0}% das comerciais · ${ms.filter(t => t.outcome === 'negociando').length} em negociação`)}
     </div>
     ${pend.length ? `<div class="card" style="margin-bottom:14px;border-color:rgba(255,190,80,.45)"><h3>${ic('bell')}Já passaram — como foi? (${pend.length})</h3><div class="list">${pend.slice(0, 8).map(t => `<div class="li"><div class="t"><b>${esc(meetWho(t))}</b><small>${fdate(t.date)} ${esc(t.time || '')}</small></div><button class="btn sm ok" data-act="meetSet" data-id="${t.id}" data-s="feito">${ic('check')}Realizada</button><button class="btn sm" data-act="meetSet" data-id="${t.id}" data-s="noshow">Faltou</button><button class="btn sm" data-act="meetResch" data-id="${t.id}">↻ Remarcar</button></div>`).join('')}</div></div>` : ''}
     <div class="grid g2">
@@ -1422,7 +1448,9 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '3.2.1', notes: [
+const RELEASE = { version: '3.2.2', notes: [
+  'Reuniões: os quadros Reuniões no mês, Realizadas, Comparecimento e Fecharam agora são clicáveis. Abre a lista de cada um com o assunto, ticket, responsável, formato, quantidades e as anotações de cada reunião.',
+  'Dentro da lista dá para trocar entre Todas, Realizadas, Não compareceu, Aguardando resultado, Fecharam, Em negociação e Não fecharam, e tocar numa reunião para abrir e editar.',
   'As datas de vencimento (“vence 23/11”) agora aparecem em amarelo no Financeiro, no histórico do cliente e nos cards de Clientes.',
   'Novo menu Contratos, com as abas Contratos e Propostas. Os modelos da Bravus já vêm prontos: é só trocar nome, e-mail, CPF/CNPJ, telefone, valores e prazos.',
   'Os valores e prazos do contrato saem por extenso sozinhos (ex.: R$ 1.200,00 (mil e duzentos reais)). Na proposta, os totais de cada pacote são calculados na hora.',
@@ -1843,6 +1871,7 @@ const A = {
   },
   pickReason: (d, el) => { const f = el.closest('form'); if (!f) return; f.end_reason.value = d.v; f.querySelectorAll('[data-act="pickReason"]').forEach(b => b.classList.toggle('blue', b === el)); },
   reasonsReset: () => { const t = $('form[data-form="saveReasons"] textarea[name="list"]'); if (t) t.value = DEFAULT_SETTINGS.exit_reasons.join('\n'); toast('Lista padrão restaurada', 'Clique em salvar para gravar.'); },
+  meetKpi: d => meetKpi(d.m || 'all'),
   editMeet: d => meetForm(d.id ? S.d.tasks.find(t => t.id === d.id) : (d.client ? { client_id: d.client, meet_type: 'alinhamento' } : {})),
   meetMonth: d => { S.meetMonth = d.m; renderView(); }, meetDay: d => { S.meetDay = d.d; renderView(); }, weekToggle: () => { S.weekOpen = !S.weekOpen; lsSet('bw_week_open', S.weekOpen); renderView(); }, pipeTab: d => { S.pipeTab = d.id; S.pipeOpen = null; renderView(); }, pipeOpen: d => { S.pipeOpen = S.pipeOpen === d.id ? null : d.id; renderView(); },
   pipeStep: async d => { if (!isAdmin()) return toast('Só o administrador avança as etapas', '', 'warn');
