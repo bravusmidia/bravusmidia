@@ -95,3 +95,9 @@ Com `config.js` vazio, o app funciona inteiro no aparelho (dados guardados no na
 2. WhatsApp Business Platform (API oficial com modelos aprovados) para cobranças automáticas.
 3. Instagram Graph API (seguidores e métricas), RD Station e ClickUp.
 4. Conjuntos de anúncios e anúncios individuais no Ads Monitor.
+
+## Padrão de cores (v3.3.0)
+- **Status** (situação) = pílula com bolinha: verde feito/positivo · âmbar precisa da sua ação · vermelho problema · azul agendado/andamento · violeta remarcada · cinza cancelado/inativo.
+- **Ticket** (valor) = etiqueta metálica com medalha: Baixo bronze · Médio prata · Alto ouro (igual ao ticket do cliente).
+- **Categoria** (serviço, tipo, canal) = etiqueta azul discreta, sem bolinha.
+- Mesma paleta do site: #34D399 · #FBBF24 · #F87171 · #60A5FA · #A78BFA.

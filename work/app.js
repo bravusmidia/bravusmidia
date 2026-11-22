@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '3.2.3';
+const VERSION = '3.3.0';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings','reminders','documents'];
@@ -256,7 +256,7 @@ const svcName = k => (SERVICES.find(s => s[0] === k) || [k, k])[1];
 const OP = [['ativo', 'Ativo (online)'], ['pausado', 'Pausado (online)'], ['onboarding', 'Em implantação (online)'], ['cancelado', 'Saiu da carteira (offline)']];
 const inWallet = c => c.op_status !== 'cancelado';
 const walletBtn = c => !isAdmin() ? walletChip(c) : `<button type="button" class="wsw ${inWallet(c) ? 'on' : ''}" data-act="setWallet" data-id="${c.id}" data-on="${inWallet(c) ? '0' : '1'}" title="${inWallet(c) ? 'Clique para desativar' : 'Clique para ativar'}"><i></i>${inWallet(c) ? 'Ativo' : 'Inativo'}</button>`;
-const walletChip = c => inWallet(c) ? '<span class="chip ok"><i class="dot on"></i>Online</span>' : '<span class="chip"><i class="dot"></i>Offline</span>';
+const walletChip = c => inWallet(c) ? '<span class="chip ok"><i class="dot on"></i>Online</span>' : '<span class="chip neu"><i class="dot"></i>Offline</span>';
 
 function invStatus(i) {
   if (i.status === 'pago' || i.status === 'cancelado' || i.status === 'atrasado') return i.status; /* atrasado = marcado manualmente */
@@ -274,8 +274,8 @@ function clientFin(c) {
 }
 /* status de pagamento clicável: Pago · A receber · Em atraso (manual) */
 const monthInv = (c, k = curYM()) => S.d.invoices.filter(i => i.client_id === c.id && ym(i.due_date) === k && i.status !== 'cancelado').sort((a, b) => a.due_date.localeCompare(b.due_date));
-const payBtn = c => { const s = clientFin(c); return `<button type="button" class="chip ${s === 'inadimplente' ? 'bad' : s === 'pago' ? 'ok' : s === 'a vencer' ? 'warn' : ''}" style="cursor:pointer" data-act="payMenu" data-id="${c.id}" title="Clique para marcar: pago, a receber ou em atraso">${esc(s)} ▾</button>`; };
-const finChip = s => `<span class="chip ${s === 'inadimplente' ? 'bad' : s === 'pago' ? 'ok' : s === 'a vencer' ? 'warn' : ''}">${esc(s)}</span>`;
+const payBtn = c => { const s = clientFin(c); return `<button type="button" class="chip st ${s === 'inadimplente' ? 'bad' : s === 'pago' ? 'ok' : s === 'a vencer' ? 'warn' : 'neu'}" style="cursor:pointer" data-act="payMenu" data-id="${c.id}" title="Clique para marcar: pago, a receber ou em atraso">${esc(s)} ▾</button>`; };
+const finChip = s => `<span class="chip st ${s === 'inadimplente' ? 'bad' : s === 'pago' ? 'ok' : s === 'a vencer' ? 'warn' : 'neu'}">${esc(s)}</span>`;
 const campsOf = id => S.d.campaigns.filter(c => c.client_id === id);
 /* Anúncios/Meta removidos do Bravus Work: nenhum status de conta de anúncios é calculado */
 function adState() { return { k: 'na', label: '', cls: '' }; }
@@ -946,7 +946,7 @@ V.clientes = () => {
       <div class="row wrap" style="gap:6px">${(c.services || []).map(s => `<span class="chip blue">${esc(svcName(s))}</span>`).join('') || '<span class="muted small">Sem serviços</span>'}</div>
       <div class="ft"><span class="muted">${esc(c.segment || 'Segmento —')} · <span class="due-y">vence ${esc(dueTxt(c))}</span></span>${canFin() ? `<b>${brl(c.contract_value)}</b>` : ''}</div>
       ${!inWallet(c) ? `<div class="small muted">Saiu ${c.end_date ? 'em ' + fdateY(c.end_date) : ''}${c.end_reason ? ' · ' + esc(c.end_reason) : ''}${c.start_date ? ` · cliente desde ${fdateY(c.start_date)}` : ''}</div>` : ''}
-      <div class="row">${canFin() ? (isAdmin() ? payBtn(c) : finChip(clientFin(c))) : ''}${inWallet(c) ? `${c.op_status !== 'ativo' ? `<span class="chip warn">${esc(c.op_status === 'pausado' ? 'Pausado' : 'Em implantação')}</span>` : ''}${['prob', 'saldo'].includes(adState(c).k) ? adChip(c) : ''}` : ''}<span class="sp"></span><span class="small muted">${esc(firstName(c.owner))}</span></div>
+      <div class="row">${canFin() ? (isAdmin() ? payBtn(c) : finChip(clientFin(c))) : ''}${inWallet(c) ? `${c.op_status !== 'ativo' ? `<span class="chip st ${c.op_status === 'pausado' ? 'warn' : 'info'}">${esc(c.op_status === 'pausado' ? 'Pausado' : 'Em implantação')}</span>` : ''}${['prob', 'saldo'].includes(adState(c).k) ? adChip(c) : ''}` : ''}<span class="sp"></span><span class="small muted">${esc(firstName(c.owner))}</span></div>
     </div>`).join('') : `<div class="card" style="grid-column:1/-1">${empty(S.d.clients.length ? 'Nenhum cliente neste filtro.' : 'Cadastre seu primeiro cliente no botão “+ Cliente”.')}</div>`}</div>`;
 };
 function clientForm(c = {}) {
@@ -1028,7 +1028,7 @@ function importPreview(list) {
 }
 
 /* ---------- FINANCEIRO ---------- */
-const invChip = i => { const s = invStatus(i); return `<span ${isAdmin() && s !== 'cancelado' ? `data-act="invMenu" data-id="${i.id}" style="cursor:pointer" title="Clique para alterar"` : ''} class="chip ${s === 'pago' ? 'ok' : s === 'atrasado' ? 'bad' : s === 'pendente' ? 'warn' : ''}">${s === 'pago' ? 'Pago' : s === 'atrasado' ? 'Atrasado' : s === 'pendente' ? 'A vencer' : 'Cancelado'}</span>`; };
+const invChip = i => { const s = invStatus(i); return `<span ${isAdmin() && s !== 'cancelado' ? `data-act="invMenu" data-id="${i.id}" style="cursor:pointer" title="Clique para alterar"` : ''} class="chip st ${s === 'pago' ? 'ok' : s === 'atrasado' ? 'bad' : s === 'pendente' ? 'warn' : 'neu'}">${s === 'pago' ? 'Pago' : s === 'atrasado' ? 'Atrasado' : s === 'pendente' ? 'A vencer' : 'Cancelado'}</span>`; };
 V.financeiro = () => {
   const k = S.finMonth, fm = finMonth(k);
   const invAll = S.d.invoices.filter(i => i.status !== 'cancelado' && inWallet(client(i.client_id) || { op_status: 'cancelado' }) && (ym(i.due_date) === k || invStatus(i) === 'atrasado')).sort((a, b) => a.due_date.localeCompare(b.due_date));
@@ -1073,17 +1073,18 @@ const MTYPES = [['comercial', 'Comercial (primeira conversa)'], ['proposta', 'Ap
 const MFORMATS = [['meet', 'Google Meet'], ['whatsapp', 'Vídeo no WhatsApp'], ['ligacao', 'Ligação'], ['presencial', 'Presencial']];
 const MSTATUS = [['pendente', 'Agendada'], ['feito', 'Realizada'], ['noshow', 'Não compareceu'], ['remarcada', 'Remarcada'], ['cancelada', 'Cancelada']];
 const MOUT = [['', '—'], ['fechou', 'Fechou'], ['negociando', 'Em negociação'], ['perdido', 'Não fechou']];
-const TICKETS = [['baixo', 'Baixo', 'ok'], ['medio', 'Médio', 'warn'], ['alto', 'Alto', 'bad']];
-const ticketChip = t => { const x = TICKETS.find(k => k[0] === t.ticket); return x ? `<span class="chip ${x[2]}" title="Ticket ${x[1]}">${ic('wallet')}${x[1]}</span>` : ''; };
-const ticketPick = v => `<div class="fl">Ticket<div class="seg" role="radiogroup">${[['', 'Sem ticket', ''], ...TICKETS].map(x => `<label class="${x[2]}"><input type="radio" name="ticket" value="${x[0]}" ${(v || '') === x[0] ? 'checked' : ''}><span>${x[1]}</span></label>`).join('')}</div></div>`;
+const TICKETS = [['baixo', 'Baixo', 'bronze'], ['medio', 'Médio', 'prata'], ['alto', 'Alto', 'ouro']]; // valor = metal (igual ao ticket do cliente)
+const ticketChip = t => { const x = TICKETS.find(k => k[0] === t.ticket); return x ? `<span class="chip tk ${x[2]}" title="Ticket ${x[1]}">${medal(x[2], 14)}${x[1]}</span>` : ''; };
+const ticketPick = v => `<div class="fl">Ticket<div class="seg" role="radiogroup">${[['', 'Sem ticket', ''], ...TICKETS].map(x => `<label class="${x[2]} tkl"><input type="radio" name="ticket" value="${x[0]}" ${(v || '') === x[0] ? 'checked' : ''}><span>${x[2] ? medal(x[2], 14) : ''}${x[1]}</span></label>`).join('')}</div></div>`;
 const lbl = (L, k) => (L.find(x => x[0] === k) || ['', k || '—'])[1];
 /* v2.8.2: remarcar move a própria reunião para a nova data/hora — registros antigos com status "remarcada" eram duplicados e não contam mais */
 const meetings = () => realTasks().filter(t => t.kind === 'reuniao' && t.status !== 'remarcada');
 const RESCH = '↻ Remarcada de ';
 const reschFrom = t => { const m = String(t.description || '').match(/↻ Remarcada de ([^\n]+)/g); return m ? m.map(x => x.slice(RESCH.length)) : []; };
-const reschChip = t => { const r = reschFrom(t); return r.length ? `<span class="chip warn" title="${esc('Remarcada de ' + r.join(', '))}">↻ Remarcada${r.length > 1 ? ' ' + r.length + 'x' : ''}</span>` : ''; };
+const reschChip = t => { const r = reschFrom(t); return r.length ? `<span class="chip chg" title="${esc('Remarcada de ' + r.join(', '))}">↻ Remarcada${r.length > 1 ? ' ' + r.length + 'x' : ''}</span>` : ''; };
 const meetWho = t => t.company || (t.client_id && cname(t.client_id)) || t.contact_name || t.title;
-const meetChip = t => { const s = t.status === 'pendente' && isLate(t) ? ['warn', 'Aguardando resultado'] : [{ feito: 'ok', noshow: 'bad', cancelada: 'bad', remarcada: 'warn' }[t.status] || 'blue', lbl(MSTATUS, t.status)]; return `<span class="chip ${s[0]}">${esc(s[1])}</span>`; };
+const meetChip = t => { const s = t.status === 'pendente' && isLate(t) ? ['warn', 'Aguardando resultado'] : [{ feito: 'ok', noshow: 'bad', cancelada: 'neu', remarcada: 'chg' }[t.status] || 'info', lbl(MSTATUS, t.status)]; return `<span class="chip st ${s[0]}">${esc(s[1])}</span>`; };
+const outTx = o => o ? ` · <span class="${{ fechou: 'tx-ok', negociando: 'tx-info', perdido: 'tx-bad' }[o] || ''}">${esc(lbl(MOUT, o))}</span>` : '';
 /* lê a conversa colada do WhatsApp e tenta achar data, hora e telefone */
 function parseWa(txt) {
   const out = {}; const t = (txt || '').toLowerCase();
@@ -1241,7 +1242,7 @@ const lostStage = d => { const i = d.done.lastIndexOf(true); return i >= 0 ? PIP
 function lostRow(d, can, mini = false) {
   const tel = onlyDigits(d.phone).replace(/^55/, '');
   const ret = d.lo.retorno; const retDue = ret && ret <= today();
-  return `<div class="deal lost"><div class="deal-h"><div class="t" data-act="editMeet" data-id="${d.past.id}" style="cursor:pointer"><b>${esc(d.who)}</b><small><span style="color:var(--bad)">Não fechou</span> · ${d.lostAt ? fdate(String(d.lostAt).slice(0, 10)) : '—'}${d.last.ticket ? ' · ticket ' + esc(lbl(TICKETS.map(x => [x[0], x[1]]), d.last.ticket)) : ''}${d.lo.by ? ' · por ' + esc(firstName(d.lo.by)) : ''}</small></div><span class="chip bad">${esc(d.lo.motivo ? lbl(LOST_REASONS, d.lo.motivo) : 'Sem motivo')}</span></div>
+  return `<div class="deal lost"><div class="deal-h"><div class="t" data-act="editMeet" data-id="${d.past.id}" style="cursor:pointer"><b>${esc(d.who)}</b><small><span class="tx-bad">Não fechou</span> · ${d.lostAt ? fdate(String(d.lostAt).slice(0, 10)) : '—'}${d.last.ticket ? ' · ticket ' + esc(lbl(TICKETS.map(x => [x[0], x[1]]), d.last.ticket)) : ''}${d.lo.by ? ' · por ' + esc(firstName(d.lo.by)) : ''}</small></div><span class="chip bad">${esc(d.lo.motivo ? lbl(LOST_REASONS, d.lo.motivo) : 'Sem motivo')}</span></div>
     ${mini ? '' : `<div class="lost-info"><span>Parou em: <b>${esc(lostStage(d))}</b></span>${ret ? `<span class="${retDue ? 'due' : ''}">${ic('cal')}Retomar contato ${ret === today() ? 'hoje' : ret < today() ? 'desde ' + fdate(ret) : 'em ' + fdate(ret)}</span>` : ''}</div>${d.lo.obs ? `<p class="lost-obs">${esc(d.lo.obs)}</p>` : ''}`}
     ${mini ? '' : `<div class="deal-act">${can ? `<button class="btn pri" data-act="dealRetake" data-id="${d.past.id}">${ic('spark')}Retomar negociação</button>` : ''}${tel ? `<a class="btn ok" href="https://wa.me/55${tel}" target="_blank" rel="noopener">${ic('wa')}WhatsApp</a>` : ''}<span class="sp"></span><button class="btn" data-act="dealMeet" data-id="${d.last.id}">${ic('plus')}Reunião</button></div>`}</div>`;
 }
@@ -1302,11 +1303,11 @@ function meetKpi(m = 'all') {
   const label = (l => l[0].toUpperCase() + l.slice(1))(new Date(k + '-15T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
   const grp = (arr, key) => arr.map(([kk, nm, cls]) => [nm, list.filter(t => key(t) === kk).length, cls]).filter(x => x[1]);
   const byType = grp(MTYPES, t => t.meet_type || 'comercial');
-  const byTicket = [...grp(TICKETS, t => t.ticket || ''), ...(list.filter(t => !t.ticket).length ? [['Sem ticket', list.filter(t => !t.ticket).length, '']] : [])];
+  const byTicket = [...grp(TICKETS.map(x => [x[0], x[1], 'tk ' + x[2]]), t => t.ticket || ''), ...(list.filter(t => !t.ticket).length ? [['Sem ticket', list.filter(t => !t.ticket).length, '']] : [])];
   const byWho = team().map(p => [p.name.split(' ')[0], list.filter(t => t.assignee === p.id).length]).filter(x => x[1]);
   const byFmt = grp(MFORMATS, t => t.meet_format || 'meet');
   const box = (title, rows) => rows.length ? `<div class="card" style="padding:12px;margin:0"><small class="muted" style="font-weight:600;text-transform:uppercase;letter-spacing:.06em">${title}</small><div class="list" style="margin-top:6px">${rows.map(r => `<div class="li" style="padding:6px 0"><div class="t"><b style="font-weight:500">${r[2] ? `<span class="chip ${r[2]}">${esc(r[0])}</span>` : esc(r[0])}</b></div><b class="num">${r[1]}</b></div>`).join('')}</div></div>` : '';
-  const row = t => `<div class="li mrow" data-act="editMeet" data-id="${t.id}" style="cursor:pointer"><div class="mtime"><b>${esc(t.time || '--:--')}</b><small>${WD[new Date(t.date + 'T12:00:00').getDay()]} ${fdate(t.date)}</small></div><div class="t"><b>${esc(meetWho(t))}${t.contact_name && t.company ? ` <span class="muted" style="font-weight:400">· ${esc(t.contact_name)}</span>` : ''}</b><small>${esc(lbl(MTYPES, t.meet_type || 'comercial'))} · ${esc(lbl(MFORMATS, t.meet_format || 'meet'))} · ${esc(firstName(t.assignee))}${t.outcome ? ' · ' + esc(lbl(MOUT, t.outcome)) : ''}</small>${t.description ? `<small style="display:block;margin-top:4px;color:var(--tx);opacity:.8;white-space:pre-wrap">${esc(String(t.description).slice(0, 220))}${String(t.description).length > 220 ? '…' : ''}</small>` : ''}</div><div class="mchips">${ticketChip(t)}${meetChip(t)}</div></div>`;
+  const row = t => `<div class="li mrow" data-act="editMeet" data-id="${t.id}" style="cursor:pointer"><div class="mtime"><b>${esc(t.time || '--:--')}</b><small>${WD[new Date(t.date + 'T12:00:00').getDay()]} ${fdate(t.date)}</small></div><div class="t"><b>${esc(meetWho(t))}${t.contact_name && t.company ? ` <span class="muted" style="font-weight:400">· ${esc(t.contact_name)}</span>` : ''}</b><small>${esc(lbl(MTYPES, t.meet_type || 'comercial'))} · ${esc(lbl(MFORMATS, t.meet_format || 'meet'))} · ${esc(firstName(t.assignee))}${outTx(t.outcome)}</small>${t.description ? `<small style="display:block;margin-top:4px;color:var(--tx);opacity:.8;white-space:pre-wrap">${esc(String(t.description).slice(0, 220))}${String(t.description).length > 220 ? '…' : ''}</small>` : ''}</div><div class="mchips">${ticketChip(t)}${meetChip(t)}</div></div>`;
   modal(`${MK[m]} · ${label}`, `<div class="row wrap" style="gap:8px;margin-bottom:12px">${Object.entries(MK).map(([kk, nm]) => { const n = meetKpiList(ms, kk).length; return n || kk === m || kk === 'all' ? `<button type="button" class="btn sm ${kk === m ? 'pri' : ''}" data-act="meetKpi" data-m="${kk}">${nm} <small>${n}</small></button>` : ''; }).join('')}</div>
     ${list.length ? `<div class="grid g2" style="gap:10px;margin-bottom:12px">${box('Assunto (tipo)', byType)}${box('Ticket', byTicket)}${box('Responsável', byWho)}${box('Formato', byFmt)}</div>
     <div class="list">${list.slice().reverse().map(row).join('')}</div>` : empty('Nenhuma reunião aqui neste mês.')}
@@ -1327,12 +1328,12 @@ V.reunioes = () => {
   const prev = all.filter(t => ym(t.date) === shift(-1)).length;
   const next = all.filter(t => t.status === 'pendente' && (t.date > today() || (t.date === today() && (t.time || '') >= nowHM()))).sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
   const pend = all.filter(t => t.status === 'pendente' && isLate(t));
-  const row = t => `<div class="li mrow"><div class="mtime ${t.date === today() ? 'hj' : ''}" data-act="editMeet" data-id="${t.id}"><b>${esc(t.time || '--:--')}</b><small>${t.date === today() ? 'Hoje' : t.date === iso(new Date(Date.now() + 864e5)) ? 'Amanhã' : WD[new Date(t.date + 'T12:00:00').getDay()] + ' ' + fdate(t.date)}</small></div><div class="t" data-act="editMeet" data-id="${t.id}" style="cursor:pointer"><b>${esc(meetWho(t))}${t.contact_name && t.company ? ` <span class="muted" style="font-weight:400">· ${esc(t.contact_name)}</span>` : ''}</b><small>${esc(lbl(MTYPES, t.meet_type || 'comercial'))} · ${esc(lbl(MFORMATS, t.meet_format || 'meet'))} · ${esc(firstName(t.assignee))}${t.outcome ? ' · ' + esc(lbl(MOUT, t.outcome)) : ''}${reschFrom(t).length ? ` · <span style="color:var(--warn,#ffbe50)">antes: ${esc(reschFrom(t).slice(-1)[0])}</span>` : ''}</small></div><div class="mchips">${ticketChip(t)}${reschChip(t)}${meetChip(t)}</div></div>`;
+  const row = t => `<div class="li mrow"><div class="mtime ${t.date === today() ? 'hj' : ''}" data-act="editMeet" data-id="${t.id}"><b>${esc(t.time || '--:--')}</b><small>${t.date === today() ? 'Hoje' : t.date === iso(new Date(Date.now() + 864e5)) ? 'Amanhã' : WD[new Date(t.date + 'T12:00:00').getDay()] + ' ' + fdate(t.date)}</small></div><div class="t" data-act="editMeet" data-id="${t.id}" style="cursor:pointer"><b>${esc(meetWho(t))}${t.contact_name && t.company ? ` <span class="muted" style="font-weight:400">· ${esc(t.contact_name)}</span>` : ''}</b><small>${esc(lbl(MTYPES, t.meet_type || 'comercial'))} · ${esc(lbl(MFORMATS, t.meet_format || 'meet'))} · ${esc(firstName(t.assignee))}${outTx(t.outcome)}${reschFrom(t).length ? ` · <span class="tx-chg">↻ antes: ${esc(reschFrom(t).slice(-1)[0])}</span>` : ''}</small></div><div class="mchips">${ticketChip(t)}${reschChip(t)}${meetChip(t)}</div></div>`;
   const mkpi = (m, label, val, sub = '', cls = '') => `<div class="kpi go ${cls}" role="button" tabindex="0" title="Ver ${esc(label.toLowerCase())}" data-act="meetKpi" data-m="${m}"><small>${esc(label)}</small><b>${val}</b>${sub ? `<em>${sub}</em>` : ''}<i class="kgo">${ic('right')}</i></div>`;
   return head('Reuniões', 'Bravus Meetings · tudo que você marca com clientes, organizado e contado', `<button class="btn pri" data-act="editMeet">${ic('plus')}Reunião</button>`) + `
     <div class="row wrap" style="gap:10px;margin-bottom:14px"><div class="datebar" style="margin:0"><button class="btn sm ic" data-act="meetMonth" data-m="${shift(-1)}">${ic('left')}</button><b>${label}</b><button class="btn sm ic" data-act="meetMonth" data-m="${shift(1)}">${ic('right')}</button></div><span class="sp"></span>
       <div class="tabs" style="margin:0">${[['', 'Todos'], ...team().map(p => [p.id, p.name.split(' ')[0]])].map(x => `<button data-act="meetWho" data-id="${x[0]}" class="${mine === x[0] ? 'on' : ''}">${esc(x[1])}</button>`).join('')}</div></div>
-    <div class="row wrap" style="gap:10px;margin-bottom:14px"><span class="muted small" style="font-weight:600">Ticket</span><div class="tabs tk-tabs" style="margin:0">${(() => { const mm = allWho.filter(t => ym(t.date) === k); return [['', 'Todos', '', mm.length], ...TICKETS.map(x => [x[0], x[1], x[2], mm.filter(t => t.ticket === x[0]).length]), ['sem', 'Sem ticket', '', mm.filter(t => !t.ticket).length]].map(x => `<button data-act="meetTicket" data-id="${x[0]}" class="${x[2]} ${tk === x[0] ? 'on' : ''}">${esc(x[1])} <small>${x[3]}</small></button>`).join(''); })()}</div></div>
+    <div class="row wrap" style="gap:10px;margin-bottom:14px"><span class="muted small" style="font-weight:600">Ticket</span><div class="tabs tk-tabs" style="margin:0">${(() => { const mm = allWho.filter(t => ym(t.date) === k); return [['', 'Todos', '', mm.length], ...TICKETS.map(x => [x[0], x[1], x[2], mm.filter(t => t.ticket === x[0]).length]), ['sem', 'Sem ticket', '', mm.filter(t => !t.ticket).length]].map(x => `<button data-act="meetTicket" data-id="${x[0]}" class="${x[2]} ${tk === x[0] ? 'on' : ''}">${x[2] ? medal(x[2], 14) : ''}${esc(x[1])} <small>${x[3]}</small></button>`).join(''); })()}</div></div>
     ${pipeCard()}
     ${weekStrip(mine)}
     <div class="grid g4" style="margin-bottom:14px">
@@ -1402,7 +1403,7 @@ function taskRow(t) {
     <button class="ck" data-act="toggleTask" data-id="${t.id}" aria-label="Concluir">${t.status === 'feito' ? ic('check') : ''}</button>
     <span class="tm">${esc(t.time || '—')}</span>
     <div class="bd"><div class="tt">${esc(t.title)}</div>${t.description ? `<div class="small muted">${esc(t.description)}</div>` : ''}
-      <div class="mt">${t.kind !== 'tarefa' ? `<span class="chip blue">${esc((KINDS.find(k => k[0] === t.kind) || ['', t.kind])[1])}</span>` : ''}${t.priority === 'alta' ? '<span class="chip bad">Alta</span>' : ''}${t.client_id ? `<span class="chip">${esc(cname(t.client_id))}</span>` : ''}${S.agendaWho === 'all' ? `<span class="chip">${esc(firstName(t.assignee))}</span>` : ''}${late ? '<span class="chip bad">Atrasada</span>' : ''}${t.template_id ? '<span class="chip">Rotina</span>' : ''}</div>
+      <div class="mt">${t.kind !== 'tarefa' ? `<span class="chip blue">${esc((KINDS.find(k => k[0] === t.kind) || ['', t.kind])[1])}</span>` : ''}${t.priority === 'alta' ? '<span class="chip bad">Alta</span>' : ''}${t.client_id ? `<span class="chip">${esc(cname(t.client_id))}</span>` : ''}${S.agendaWho === 'all' ? `<span class="chip">${esc(firstName(t.assignee))}</span>` : ''}${late ? '<span class="chip st bad">Atrasada</span>' : ''}${t.template_id ? '<span class="chip">Rotina</span>' : ''}</div>
       ${t.goal ? `<div class="cnt"><button class="btn sm ic" data-act="cnt" data-id="${t.id}" data-v="-1">−</button><b>${t.count || 0} / ${t.goal}</b><button class="btn sm ic" data-act="cnt" data-id="${t.id}" data-v="1">+</button><span class="cadd"><button class="btn sm" data-act="cntStep" data-id="${t.id}" aria-label="Somar a quantidade ao lado">+</button><input type="number" inputmode="numeric" class="cstep" min="1" max="9999" value="${cStep(t)}" data-cstep="${t.id}" aria-label="Quantidade a somar"></span><input type="range" class="cslide sp" min="0" max="${Math.max(t.goal, t.count || 0)}" step="1" value="${t.count || 0}" data-cslide="${t.id}" aria-label="Arraste para marcar a quantidade" style="--p:${Math.min(100, (t.count || 0) / Math.max(t.goal, t.count || 0) * 100)}%"></div>` : ''}
     </div>
     <button class="btn sm ic" data-act="editTask" data-id="${t.id}" aria-label="Editar">${ic('edit')}</button></div>`;
@@ -1448,7 +1449,11 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '3.2.3', notes: [
+const RELEASE = { version: '3.3.0', notes: [
+  'Cores padronizadas no app inteiro: STATUS tem bolinha (verde = feito, âmbar = precisa da sua ação, vermelho = problema, azul = agendado, violeta = remarcada, cinza = cancelado/inativo).',
+  'TICKET agora é metal, igual ao ticket do cliente: Baixo = bronze, Médio = prata, Alto = ouro. Nunca mais se confunde com status.',
+  'Resultado da reunião colorido na linha: Fechou (verde), Em negociação (azul), Não fechou (vermelho). Remarcadas em violeta com ↻.',
+  'Mesma paleta do site da Bravus Mídia.',
   'Reuniões no celular: o ticket (Baixo/Médio/Alto) e o status (Realizada, Aguardando resultado…) agora ficam embaixo do nome e do tipo da reunião, deixando o texto em linha inteira. No quadro “Já passaram”, os botões Realizada/Faltou/Remarcar também descem para baixo do nome.',
   'Reuniões: os quadros Reuniões no mês, Realizadas, Comparecimento e Fecharam agora são clicáveis. Abre a lista de cada um com o assunto, ticket, responsável, formato, quantidades e as anotações de cada reunião.',
   'Dentro da lista dá para trocar entre Todas, Realizadas, Não compareceu, Aguardando resultado, Fecharam, Em negociação e Não fecharam, e tocar numa reunião para abrir e editar.',
@@ -1722,7 +1727,7 @@ V.metas = () => {
       ${kpi('Progresso médio', avg + '%', `${pace}% do mês já passou`, avg >= pace ? 'g' : 'y')}
     </div>
     <div class="grid g2">${rows.map(r => { const ok = r.goal && r.val >= r.goal; const behind = !ok && k === curYM() && r.pct < pace - 10;
-      return `<div class="card goal"><div class="row" style="margin-bottom:10px">${ic(r.icon)}<b class="sp">${esc(r.name)}</b>${ok ? '<span class="chip ok">Batida</span>' : behind ? '<span class="chip warn">Abaixo do ritmo</span>' : '<span class="chip blue">No caminho</span>'}</div>
+      return `<div class="card goal"><div class="row" style="margin-bottom:10px">${ic(r.icon)}<b class="sp">${esc(r.name)}</b>${ok ? '<span class="chip st ok">Batida</span>' : behind ? '<span class="chip st warn">Abaixo do ritmo</span>' : '<span class="chip st info">No caminho</span>'}</div>
         <div class="row" style="align-items:baseline;gap:8px"><b class="gv">${fmt(r, r.val)}</b><span class="muted">de ${fmt(r, r.goal)}</span><span class="sp"></span><b class="num" style="color:${ok ? 'var(--ok)' : 'var(--tx)'}">${r.pct}%</b></div>
         <div class="prog" style="margin:10px 0 6px;position:relative"><i style="width:${r.pct}%;${ok ? 'background:linear-gradient(90deg,#14a86b,#2bd48a)' : ''}"></i>${k === curYM() ? `<span class="pace" style="left:${pace}%" title="ritmo esperado hoje"></span>` : ''}</div>
         <div class="small muted">${esc(r.sub)}${!ok && r.goal ? ` · faltam ${fmt(r, r.goal - r.val)}` : ''}</div></div>`; }).join('')}</div>
@@ -1743,7 +1748,7 @@ function goalsForm() {
 V.ajustes = () => {
   const s = S.set; const tpls = S.d.tasks.filter(t => t.is_template).sort((a, b) => firstName(a.assignee).localeCompare(firstName(b.assignee)) || (a.time || '').localeCompare(b.time || ''));
   const DN = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
-  const integ = (n, st, how) => `<div class="li"><div class="t"><b>${n}</b><small>${how}</small></div><span class="chip ${st ? 'ok' : ''}">${st ? 'Conectado' : 'Pendente'}</span></div>`;
+  const integ = (n, st, how) => `<div class="li"><div class="t"><b>${n}</b><small>${how}</small></div><span class="chip st ${st ? 'ok' : 'neu'}">${st ? 'Conectado' : 'Pendente'}</span></div>`;
   return head('Ajustes', 'Somente o administrador vê esta tela') + `
   <form class="card f" data-form="saveSettings"><h3>${ic('gear')}Operação</h3>
     <div class="f2">${fld('Nome da agência', 'agency_name', s.agency_name)}${fld('Limite de clientes', 'max_clients', s.max_clients, 'number', 'min="1" max="500"')}</div>

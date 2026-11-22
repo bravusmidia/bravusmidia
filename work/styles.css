@@ -3,7 +3,7 @@
   --bg:#05070d; --bg2:#0a0f1c; --card:#0e1526; --card2:#121b31; --line:#1c2742; --line2:#263559;
   --tx:#eef2f8; --tx2:#a4b0c7; --tx3:#6b7893;
   --blue:#2f7bff; --blue2:#5aa6ff; --blue3:#0f3ea8; --plat:linear-gradient(180deg,#fff,#c9d1dc 45%,#8b95a5 55%,#e8ecf1);
-  --ok:#2bd48a; --warn:#ffb547; --bad:#ff5a6a; --r:14px; --r2:10px;
+  --ok:#34d399; --warn:#fbbf24; --bad:#f87171; --info:#60a5fa; --chg:#a78bfa; --neu:#94a3b8; --r:14px; --r2:10px;
   --safe-b:env(safe-area-inset-bottom,0px);
   color-scheme:dark;
 }
@@ -558,3 +558,43 @@ html,body{overscroll-behavior-y:none}
 }
 /* 3.2.3 · celular: nomes nunca cortam com "…" nas listas */
 @media (max-width:860px){.li .t b{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.3}}
+
+/* ================================================================
+   3.3.0 · SISTEMA DE CORES (padrão único do app e do site)
+   Regra 1 — STATUS (situação) = pílula translúcida com BOLINHA:
+     verde  --ok   concluído/positivo  (Realizada, Pago, Fechou, Online)
+     âmbar  --warn precisa da sua ação (Aguardando resultado, A vencer)
+     vermelho --bad problema           (Não compareceu, Atrasado, Não fechou)
+     azul   --info agendado/andamento  (Agendada, No caminho, Em negociação)
+     violeta --chg alterado            (Remarcada)
+     cinza  --neu  inativo/neutro      (Cancelada, Offline, Pendente)
+   Regra 2 — VALOR (ticket) = etiqueta METÁLICA sólida com medalha:
+     bronze = Baixo · prata = Médio · ouro = Alto (igual ao ticket do cliente)
+   Regra 3 — CATEGORIA (serviço, tipo, canal) = etiqueta sem bolinha.
+   Mesmas cores do site (paleta Bravus: #34D399 #FBBF24 #F87171 #60A5FA #A78BFA).
+   ================================================================ */
+.chip.ok{color:var(--ok);border-color:rgba(52,211,153,.38);background:rgba(52,211,153,.10)}
+.chip.warn{color:var(--warn);border-color:rgba(251,191,36,.40);background:rgba(251,191,36,.10)}
+.chip.bad{color:var(--bad);border-color:rgba(248,113,113,.40);background:rgba(248,113,113,.10)}
+.chip.info{color:var(--info);border-color:rgba(96,165,250,.40);background:rgba(96,165,250,.10)}
+.chip.chg{color:var(--chg);border-color:rgba(167,139,250,.42);background:rgba(167,139,250,.11)}
+.chip.neu{color:var(--neu);border-color:rgba(148,163,184,.30);background:rgba(148,163,184,.07)}
+.chip.st{padding-left:8px}
+.chip.st::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none;box-shadow:0 0 0 3px color-mix(in srgb,currentColor 18%,transparent)}
+.dot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(52,211,153,.18)}
+/* categoria: etiqueta discreta, cantos menos redondos, sem bolinha */
+.chip.blue{color:#9cc3ff;border-color:rgba(96,165,250,.28);background:rgba(96,165,250,.06);border-radius:7px}
+/* VALOR · ticket e nível do cliente: metal sólido */
+.chip.tk,.chip.tier{height:26px;padding:0 10px 0 5px;gap:5px;border-radius:7px;font-weight:700;letter-spacing:.01em;border-width:1px;text-shadow:0 1px 0 rgba(255,255,255,.25)}
+.chip.tk.ouro,.chip.tier.ouro{color:#2a1d00;border-color:#f7d873;background:linear-gradient(180deg,#ffe27a,#e2ad2c 55%,#c48f16)}
+.chip.tk.prata,.chip.tier.prata{color:#151b24;border-color:#eef2f7;background:linear-gradient(180deg,#f4f7fb,#c3ccd8 55%,#9ea9b8)}
+.chip.tk.bronze,.chip.tier.bronze{color:#2a1306;border-color:#eab088;background:linear-gradient(180deg,#f0b285,#c27a45 55%,#9a5a2c)}
+.chip.tk .medal,.chip.tier .medal{filter:drop-shadow(0 1px 1px rgba(0,0,0,.35))}
+.tk-tabs button .medal{margin-right:4px;vertical-align:-4px}
+.tk-tabs button.ouro.on{color:var(--gold);border-color:var(--gold);background:rgba(245,197,66,.12)}
+.tk-tabs button.prata.on{color:var(--silver);border-color:var(--silver);background:rgba(201,211,224,.1)}
+.tk-tabs button.bronze.on{color:var(--bronze);border-color:var(--bronze);background:rgba(217,138,78,.12)}
+.seg .tkl span{display:flex;align-items:center;justify-content:center;gap:5px}
+/* texto de resultado e histórico nas linhas */
+.tx-ok{color:var(--ok);font-weight:600}.tx-bad{color:var(--bad);font-weight:600}.tx-info{color:var(--info);font-weight:600}.tx-chg{color:var(--chg)}
+.due-y{color:var(--warn)}
