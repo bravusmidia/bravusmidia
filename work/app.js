@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '3.0.0';
+const VERSION = '3.1.0';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings','reminders'];
@@ -823,6 +823,7 @@ V.painel = () => {
   realTasks().filter(t => isLate(t) && (isAdmin() || t.assignee === S.me.id)).slice(0, 5).forEach(t => prio.push(['warn', t.title, `Atrasada · ${firstName(t.assignee)} · ${fdate(t.date)}`, 'agenda']));
   if (isAdmin()) upcomingDates(7).forEach(x => prio.push(['blue', `${x.hol ? 'Feriado' : 'Data comercial'} ${x.i === 0 ? 'hoje' : x.i === 1 ? 'amanhã' : `em ${x.i} dias`}: ${x.name}`, `${fdate(x.ds)} · crie panfleto, flyer e desconto`, 'conteudo']));
   mWait.slice(0, 5).forEach(t => prio.push(['warn', `Como foi a reunião com ${meetWho(t)}?`, `${fdate(t.date)} às ${t.time || '--:--'} · toque e marque Realizada ou Faltou`, 'reunioes', { act: 'editMeet', k: '', id: t.id }]));
+  lostDeals().filter(x => x.lo.retorno && x.lo.retorno <= d).forEach(x => prio.push(['warn', `Retomar contato com ${x.who}`, `Não fechou (${lbl(LOST_REASONS, x.lo.motivo || 'outro').toLowerCase()}) · retorno ${x.lo.retorno === d ? 'hoje' : 'desde ' + fdate(x.lo.retorno)}`, 'reunioes', { act: 'lostGo', k: '', id: '' }]));
   if (S.d.content.some(c => c.status === 'aprovacao')) prio.push(['blue', `${S.d.content.filter(c => c.status === 'aprovacao').length} publicação(ões) aguardando aprovação`, 'Conteúdo', 'conteudo']);
 
   return head(`${greet}, ${firstName(S.me.id)}`, fdateL(d), isAdmin() ? `<button class="btn pri" data-act="newTask">${ic('plus')}Tarefa</button>` : `<button class="btn pri" data-act="editMeet">${ic('plus')}Reunião</button>`) + `
@@ -861,6 +862,7 @@ V.painel = () => {
       ${weekChart()}
     </div>
   </div>
+  ${lostCard()}
   ${monthSummary(k)}
   ${datesCard()}
   <div class="sec">Equipe</div>
@@ -1175,7 +1177,11 @@ const pipeOf = t => { let c = {}; if (typeof t.category === 'string' && t.catego
 const dealKey = t => t.client_id || ((t.company || t.contact_name || '').trim().toLowerCase()) || t.phone || t.id;
 const nextHour = () => `${pad((new Date().getHours() + 1) % 24)}:00`;
 const meetUpcoming = t => t.status === 'pendente' && (t.date > today() || (t.date === today() && (t.time || '') >= nowHM()));
-function deals() {
+/* v3.1.0 — Proposta não fechada: sai do funil e vai para a lista "Não fecharam" (Reuniões + Painel) */
+const LOST_REASONS = [['preco', 'Achou o preço alto'], ['orcamento', 'Sem orçamento no momento'], ['concorrente', 'Fechou com outra agência'], ['adiou', 'Vai pensar / adiou a decisão'], ['sumiu', 'Parou de responder'], ['valor', 'Não viu valor no serviço'], ['proprio', 'Vai fazer por conta própria'], ['outro', 'Outro motivo']];
+const deals = () => allDeals().filter(d => !d.lost);
+const lostDeals = () => allDeals().filter(d => d.lost).sort((a, b) => (b.lostAt || '').localeCompare(a.lostAt || ''));
+function allDeals() {
   const g = {};
   meetings().forEach(t => { const k = dealKey(t); (g[k] = g[k] || []).push(t); });
   return Object.values(g).map(ms => {
@@ -1187,14 +1193,17 @@ function deals() {
     const marked = PIPE.some(([k]) => k !== 'reuniao' && k !== 'carteira' && p[k]);
     const comercial = ms.some(t => ['comercial', 'proposta'].includes(t.meet_type || 'comercial'));
     // aparece assim que a reunião comercial é realizada (ou quando já tem resultado / etapa marcada); "Não fechou" sai do funil
-    const show = out.outcome === 'perdido' ? false : ['fechou', 'negociando'].includes(out.outcome) || marked || (comercial && done1() && !(cl && inWallet(cl) && !p.carteira));
+    const lost = out.outcome === 'perdido';
+    const show = lost || ['fechou', 'negociando'].includes(out.outcome) || marked || (comercial && done1() && !(cl && inWallet(cl) && !p.carteira));
     if (!show) return null;
     const auto = { reuniao: done1(), proposta: done1('proposta'), onboarding: done1('onboarding'), carteira: !!cl && inWallet(cl) };
     if (p.carteira && cl && !inWallet(cl)) delete p.carteira; // saiu da carteira → volta a ficar pendente
     const done = PIPE.map(([k]) => !!(p[k] || auto[k]));
     const next = done.indexOf(false);
     const up = ms.filter(meetUpcoming)[0] || null;
-    return { ms, last, past: ms.filter(t => !meetUpcoming(t)).pop() || last, outcome: out.outcome, p, auto, done, next, cid, cl, up, n: done.filter(Boolean).length, who: meetWho(last) };
+    const lo = p.perdido && typeof p.perdido === 'object' ? p.perdido : {};
+    return { ms, last, past: ms.filter(t => !meetUpcoming(t)).pop() || last, outcome: out.outcome, p, auto, done, next, cid, cl, up, n: done.filter(Boolean).length, who: meetWho(last),
+      lost, lo, lostAt: lo.at || out.done_at || out.date || '', phone: (ms.slice().reverse().find(t => t.phone) || {}).phone || (cl && (cl.whatsapp || cl.phone)) || '' };
   }).filter(Boolean).sort((a, b) => (a.next < 0) - (b.next < 0) || (b.last.date || '').localeCompare(a.last.date || ''));
 }
 async function putPipe(m, obj) {
@@ -1224,14 +1233,55 @@ async function pipeToWallet(deal) {
   }
   clientForm({ name: t.company || t.contact_name || '', contact: t.contact_name || '', whatsapp: t.phone || '', services: ['trafego'], op_status: 'ativo', start_date: today(), notes: deal.ms.map(m => m.description).filter(Boolean).join('\n'), _deal: t.id });
 }
+const pipeTabs = (all, lost) => `<span class="tabs" style="margin:0"><button data-act="pipeTab" data-id="" class="${!S.pipeTab ? 'on' : ''}">Em andamento <small>${all.filter(d => d.next >= 0).length}</small></button><button data-act="pipeTab" data-id="fin" class="${S.pipeTab === 'fin' ? 'on' : ''}">Na carteira <small>${all.filter(d => d.next < 0).length}</small></button><button data-act="pipeTab" data-id="lost" class="tab-lost ${S.pipeTab === 'lost' ? 'on' : ''}">Não fecharam <small>${lost.length}</small></button></span>`;
+const pipeHead = (all, lost) => `<h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${ic('target')}Andamento pós-reunião <span class="sp"></span>${pipeTabs(all, lost)}</h3>`;
+/* etapa em que o cliente parou antes de recusar */
+const lostStage = d => { const i = d.done.lastIndexOf(true); return i >= 0 ? PIPE[i][2] : 'Antes da reunião'; };
+function lostRow(d, can, mini = false) {
+  const tel = onlyDigits(d.phone).replace(/^55/, '');
+  const ret = d.lo.retorno; const retDue = ret && ret <= today();
+  return `<div class="deal lost"><div class="deal-h"><div class="t" data-act="editMeet" data-id="${d.past.id}" style="cursor:pointer"><b>${esc(d.who)}</b><small><span style="color:var(--bad)">Não fechou</span> · ${d.lostAt ? fdate(String(d.lostAt).slice(0, 10)) : '—'}${d.last.ticket ? ' · ticket ' + esc(lbl(TICKETS.map(x => [x[0], x[1]]), d.last.ticket)) : ''}${d.lo.by ? ' · por ' + esc(firstName(d.lo.by)) : ''}</small></div><span class="chip bad">${esc(d.lo.motivo ? lbl(LOST_REASONS, d.lo.motivo) : 'Sem motivo')}</span></div>
+    ${mini ? '' : `<div class="lost-info"><span>Parou em: <b>${esc(lostStage(d))}</b></span>${ret ? `<span class="${retDue ? 'due' : ''}">${ic('cal')}Retomar contato ${ret === today() ? 'hoje' : ret < today() ? 'desde ' + fdate(ret) : 'em ' + fdate(ret)}</span>` : ''}</div>${d.lo.obs ? `<p class="lost-obs">${esc(d.lo.obs)}</p>` : ''}`}
+    ${mini ? '' : `<div class="deal-act">${can ? `<button class="btn pri" data-act="dealRetake" data-id="${d.past.id}">${ic('spark')}Retomar negociação</button>` : ''}${tel ? `<a class="btn ok" href="https://wa.me/55${tel}" target="_blank" rel="noopener">${ic('wa')}WhatsApp</a>` : ''}<span class="sp"></span><button class="btn" data-act="dealMeet" data-id="${d.last.id}">${ic('plus')}Reunião</button></div>`}</div>`;
+}
+function lostForm(d) {
+  modal('Cliente não fechou', `<div class="f">
+    <p class="note" style="margin:0 0 4px"><b>${esc(d.who)}</b> sai do funil e vai para a lista <b>Não fecharam</b> (Reuniões e Painel). Dá para retomar depois.</p>
+    <input type="hidden" name="id" value="${esc(d.last.id)}">
+    ${sel('Motivo *', 'motivo', [['', 'Escolha o motivo'], ...LOST_REASONS], '', 'required')}
+    ${area('Observação (opcional)', 'obs')}
+    ${fld('Retomar contato em (opcional)', 'retorno', '', 'date', `min="${today()}"`)}
+    ${d.ms.some(meetUpcoming) ? `<label class="sw"><input type="checkbox" name="cancel_up" checked> Cancelar as reuniões futuras deste cliente</label>` : ''}
+    <p class="note" style="margin:0">Com data de retorno, o app cria um follow-up na agenda e avisa no dia.</p></div>`,
+    { form: 'saveLost', footer: `<button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn bad">${ic('x')}Confirmar: não fechou</button>` });
+}
+function lostCard() {
+  const ls = lostDeals(); const k = curYM();
+  const mes = ls.filter(d => ym(String(d.lostAt).slice(0, 10)) === k);
+  const won = allDeals().filter(d => !d.lost && (d.next < 0 || d.outcome === 'fechou') && ym(String((d.p.carteira && d.p.carteira !== true ? d.p.carteira : d.last.date) || '').slice(0, 10)) === k).length;
+  const rate = won + mes.length ? Math.round(won / (won + mes.length) * 100) : null;
+  const cnt = {}; ls.forEach(d => { const m = d.lo.motivo || 'outro'; cnt[m] = (cnt[m] || 0) + 1; });
+  const top = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0];
+  return `<div class="card" style="margin-top:14px"><h3>${ic('x')}Propostas não fechadas<span class="sp"></span><a class="small" href="#reunioes" data-act="lostGo">ver todas →</a></h3>
+    <div class="grid g3" style="grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
+      ${kpi('Não fecharam no mês', `<span style="color:${mes.length ? 'var(--bad)' : 'inherit'}">${mes.length}</span>`, `${ls.length} no total`)}
+      ${kpi('Taxa de fechamento', rate === null ? '—' : rate + '%', `${won} fecharam × ${mes.length} não fecharam (mês)`, rate === null ? '' : rate >= 50 ? 'g' : 'y')}
+      ${kpi('Motivo mais comum', top ? `<span style="font-size:15px">${esc(lbl(LOST_REASONS, top[0]))}</span>` : '—', top ? `${top[1]} cliente(s)` : 'nenhum ainda')}
+    </div>
+    <div class="deals">${ls.length ? ls.slice(0, 5).map(d => lostRow(d, isAdmin(), true)).join('') : empty('Nenhum cliente recusou proposta. 💪')}</div></div>`;
+}
 function pipeCard() {
   const all = deals(); const fin = S.pipeTab === 'fin'; const list = all.filter(d => fin ? d.next < 0 : d.next >= 0);
   const can = isAdmin();
   const row = d => { const nk = d.next >= 0 ? PIPE[d.next][0] : null;
     return `<div class="deal"><div class="deal-h"><div class="t" data-act="editMeet" data-id="${d.last.id}" style="cursor:pointer"><b>${esc(d.who)}</b><small>${d.next < 0 ? '<span style="color:var(--ok)">Na carteira</span>' : d.outcome === 'fechou' ? '<span style="color:var(--ok)">Fechou</span>' : d.outcome === 'negociando' ? 'Em negociação' : 'Reunião realizada'} · última reunião ${fdate(d.past.date)}${d.last.ticket ? ' · ticket ' + esc(lbl(TICKETS.map(x => [x[0], x[1]]), d.last.ticket)) : ''}</small>${d.up ? `<small class="deal-up">${ic('cal')}Próxima reunião: ${d.up.date === today() ? 'hoje' : fdate(d.up.date)} às ${esc(d.up.time || '--:--')}</small>` : ''}</div><span class="deal-n">${d.n}/${PIPE.length}</span></div>
     <div class="pipe">${PIPE.map(([k, nm, full], i) => { const ok = d.done[i], au = !d.p[k] && d.auto[k], nx = i === d.next; const dt = d.p[k] && d.p[k] !== true ? fdate(String(d.p[k]).slice(0, 10)) : au ? 'automático' : nx ? 'próximo' : ''; return `<button class="pst ${ok ? 'ok' : ''} ${nx ? 'nx' : ''}" ${can && !au ? `data-act="pipeStep" data-id="${d.last.id}" data-s="${k}"` : 'disabled'} title="${esc(full)}${au ? ' (marcado automaticamente)' : ''}"><i>${ok ? ic('check') : i + 1}</i><b>${nm}</b><small>${dt}</small></button>`; }).join('')}</div>
-    <div class="deal-act">${nk && can ? `<button class="btn ${nk === 'carteira' ? 'ok' : 'pri'}" data-act="pipeStep" data-id="${d.last.id}" data-s="${nk}">${ic(nk === 'carteira' ? 'plus' : 'check')}${PIPE_BTN[nk]}</button>` : nk ? `<span class="muted small">Próximo passo: <b style="color:var(--tx)">${esc(PIPE[d.next][2])}</b></span>` : d.cid ? `<button class="btn" data-act="openClient" data-id="${d.cid}">${ic('users')}Ver cliente</button>` : ''}<span class="sp"></span><button class="btn" data-act="dealMeet" data-id="${d.last.id}">${ic('plus')}Reunião</button></div></div>`; };
-  return `<div class="card" style="margin-bottom:14px"><h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${ic('target')}Andamento pós-reunião <span class="sp"></span><span class="tabs" style="margin:0"><button data-act="pipeTab" data-id="" class="${fin ? '' : 'on'}">Em andamento <small>${all.filter(d => d.next >= 0).length}</small></button><button data-act="pipeTab" data-id="fin" class="${fin ? 'on' : ''}">Na carteira <small>${all.filter(d => d.next < 0).length}</small></button></span></h3>
+    <div class="deal-act">${nk && can ? `<button class="btn ${nk === 'carteira' ? 'ok' : 'pri'}" data-act="pipeStep" data-id="${d.last.id}" data-s="${nk}">${ic(nk === 'carteira' ? 'plus' : 'check')}${PIPE_BTN[nk]}</button>` : nk ? `<span class="muted small">Próximo passo: <b style="color:var(--tx)">${esc(PIPE[d.next][2])}</b></span>` : d.cid ? `<button class="btn" data-act="openClient" data-id="${d.cid}">${ic('users')}Ver cliente</button>` : ''}<span class="sp"></span>${can && nk ? `<button class="btn lostbtn" data-act="dealLost" data-id="${d.last.id}">${ic('x')}Não fechou</button>` : ''}<button class="btn" data-act="dealMeet" data-id="${d.last.id}">${ic('plus')}Reunião</button></div></div>`; };
+  const lost = lostDeals();
+  if (S.pipeTab === 'lost') return `<div class="card" style="margin-bottom:14px">${pipeHead(all, lost)}
+    ${lost.length ? `<div class="deals">${lost.map(d => lostRow(d, can)).join('')}</div>` : empty('Nenhuma proposta recusada. Quando um cliente não fechar, toque em “Não fechou” no card dele.')}
+    <p class="note" style="margin:10px 0 0">Aqui ficam os clientes que receberam a proposta e não fecharam, com o motivo. ${can ? '“Retomar” devolve o cliente para o funil como Em negociação.' : ''}</p></div>`;
+  return `<div class="card" style="margin-bottom:14px"><h3 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${ic('target')}Andamento pós-reunião <span class="sp"></span>${pipeTabs(all, lost)}</h3>
     ${list.length ? `<div class="deals">${list.map(row).join('')}</div>` : empty(fin ? 'Nenhum cliente entrou na carteira pelo funil ainda.' : 'Assim que uma reunião comercial for realizada, o passo a passo do cliente aparece aqui.')}
     <p class="note" style="margin:10px 0 0">${can ? 'Use o botão de cada cliente para avançar a etapa. “Colocar na carteira” cadastra o cliente e ele vai para Clientes. Reunião marca sozinha quando a reunião é realizada (e Proposta/Onboarding, se a reunião for desse tipo). Para desmarcar, toque na etapa.' : 'Só o administrador avança as etapas. Você pode marcar novas reuniões em qualquer horário pelo botão “+ Reunião”.'}</p></div>`;
 }
@@ -1370,7 +1420,10 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '3.0.0', notes: [
+const RELEASE = { version: '3.1.0', notes: [
+  'Novo botão “Não fechou” em cada cliente do funil (Reuniões → Andamento pós-reunião). Você escolhe o motivo (preço, sem orçamento, concorrente, adiou, parou de responder…), escreve uma observação e, se quiser, uma data para retomar o contato.',
+  'O cliente sai do funil e vai para a nova aba “Não fecharam”, com motivo, data, em que etapa parou e botões de WhatsApp, + Reunião e “Retomar negociação”.',
+  'Painel: novo card “Propostas não fechadas” com quantos não fecharam no mês, taxa de fechamento e o motivo mais comum. Quando chega o dia de retomar, aparece nas Prioridades de hoje e vira um follow-up na agenda.',
   'Reuniões: o “Andamento pós-reunião” virou um funil por cliente: Reunião → Proposta enviada → Contrato assinado → Onboarding → Cliente na carteira. Cada cliente tem um botão para avançar a próxima etapa.',
   '“Colocar na carteira” abre o cadastro do cliente já preenchido. Ao salvar, ele vai direto para a lista de Clientes e as reuniões ficam ligadas a ele.',
   'Tudo conversa: reunião realizada marca a etapa Reunião sozinha; reunião do tipo Proposta ou Onboarding realizada marca a etapa dela; cliente que sai da carteira volta a ficar pendente no funil. Cada etapa avisa a equipe no celular.',
@@ -1796,7 +1849,17 @@ const A = {
     if (on) { await log(`${deal.who}: ${full.toLowerCase()}`, deal.cid); await notifyTeam(`${full}: ${deal.who} ✅`, `Funil ${deal.n + 1}/${PIPE.length} · marcado por ${firstName(S.me.id)}`, 'tarefa', `pipe:${t.id}:${k}`, 'reunioes'); }
     else await log(`${deal.who}: desmarcou ${full.toLowerCase()}`, deal.cid);
     toast(on ? `${full} ✓` : `${full} desmarcado`, deal.who, on ? 'ok' : ''); await refresh(); },
-  dealMeet: d => { const deal = deals().find(x => x.last.id === d.id); const t = deal ? deal.last : S.d.tasks.find(x => x.id === d.id); if (!t) return;
+  dealLost: d => { if (!isAdmin()) return toast('Só o administrador marca que o cliente não fechou', '', 'warn');
+    const deal = deals().find(x => x.last.id === d.id); if (deal) lostForm(deal); },
+  dealRetake: async d => { if (!isAdmin()) return toast('Só o administrador retoma a negociação', '', 'warn');
+    const deal = lostDeals().find(x => x.ms.some(m => m.id === d.id)); if (!deal) return;
+    if (!d.ok) return confirmBox(`Retomar negociação com ${esc(deal.who)}?`, 'O cliente volta para o funil como “Em negociação”, na etapa em que parou.', 'Retomar', () => A.dealRetake({ ...d, ok: 1 }));
+    for (const m of deal.ms) { const q = pipeOf(m); if (q.perdido) { delete q.perdido; await putPipe(m, q); } if (m.outcome === 'perdido') await store.update('tasks', m.id, { outcome: 'negociando' }); }
+    await log(`Retomou a negociação com ${deal.who}`, deal.cid);
+    await notifyTeam(`Negociação retomada: ${deal.who}`, `Voltou para o funil · por ${firstName(S.me.id)}`, 'tarefa', `retake:${deal.past.id}:${Date.now()}`, 'reunioes');
+    S.pipeTab = ''; toast('Negociação retomada', `${deal.who} voltou para o funil.`, 'ok'); await refresh(); },
+  lostGo: () => { S.pipeTab = 'lost'; if (location.hash.replace('#', '') === 'reunioes') renderView(); else location.hash = 'reunioes'; setTimeout(() => { const t = document.querySelector('.tab-lost'); if (t) t.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 120); },
+  dealMeet: d => { const deal = allDeals().find(x => x.last.id === d.id); const t = deal ? deal.last : S.d.tasks.find(x => x.id === d.id); if (!t) return;
     const nk = deal && deal.next >= 0 ? PIPE[deal.next][0] : 'carteira';
     meetForm({ client_id: (deal && deal.cid) || t.client_id || '', company: t.company || '', contact_name: t.contact_name || '', phone: t.phone || '', ticket: t.ticket || '', assignee: t.assignee, meet_type: PIPE_MTYPE[nk] || 'alinhamento', date: today(), time: nextHour() }); },
   meetSlot: d => meetForm({ date: d.d, time: d.t }), meetWho: d => { S.meetWho = d.id; renderView(); }, meetTicket: d => { S.meetTicket = d.id; renderView(); },
@@ -2026,6 +2089,20 @@ const A = {
    ===================================================================== */
 const num = v => v === '' || v == null ? null : Number(v);
 const F = {
+  saveLost: async v => {
+    if (!isAdmin()) return toast('Só o administrador marca que o cliente não fechou', '', 'warn');
+    if (!v.motivo) return toast('Escolha o motivo', 'Ajuda a entender por que os clientes não fecham.', 'bad');
+    const deal = deals().find(x => x.last.id === v.id); if (!deal) { closeModal(); return toast('Cliente não encontrado no funil', '', 'bad'); }
+    const m = deal.past, why = lbl(LOST_REASONS, v.motivo), obs = (v.obs || '').trim().slice(0, 500);
+    const info = { at: new Date().toISOString(), motivo: v.motivo, obs: obs || null, retorno: v.retorno || null, by: S.me.id, etapa: lostStage(deal) };
+    await putPipe(m, { ...pipeOf(m), perdido: info });
+    await store.update('tasks', m.id, { outcome: 'perdido', ...(m.status === 'pendente' && !meetUpcoming(m) ? { status: 'feito', done_at: m.done_at || new Date().toISOString() } : {}) });
+    if (v.cancel_up) for (const t of deal.ms.filter(meetUpcoming)) await store.update('tasks', t.id, { status: 'cancelada' });
+    if (v.retorno) await store.insert('tasks', { title: `Retomar contato: ${deal.who}`, kind: 'followup', date: v.retorno, time: S.set.calls_start || '12:00', assignee: S.me.id, client_id: deal.cid || null, priority: 'media', remind_min: 20, description: `Não fechou: ${why}${obs ? ' — ' + obs : ''}`, status: 'pendente', count: 0, is_template: false });
+    await log(`${deal.who} não fechou a proposta (${why.toLowerCase()})`, deal.cid);
+    await notifyTeam(`${deal.who} não fechou`, `Motivo: ${why}${v.retorno ? ' · retomar em ' + fdate(v.retorno) : ''} · por ${firstName(S.me.id)}`, 'info', `lost:${m.id}`, 'reunioes');
+    closeModal(); S.pipeTab = 'lost'; toast('Movido para “Não fecharam”', `${deal.who} · ${why}`, 'ok'); await refresh();
+  },
   login: async v => { AUTH.pin = v.pw; await tryLogin(); },
   authEmail: async v => { AUTH.email = v.email.trim().toLowerCase(); lsSet('bw_email', AUTH.email); AUTH.stage = 'pin'; renderAuth(); },
   setup: async v => {

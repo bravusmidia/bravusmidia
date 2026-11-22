@@ -446,3 +446,16 @@ html,body{overscroll-behavior-y:none}
 .deal-up{display:flex!important;align-items:center;gap:5px;color:var(--blue2)!important;margin-top:3px}
 .deal-up svg{width:13px;height:13px}
 @media (max-width:560px){.deal-act .btn.pri,.deal-act .btn.ok{flex:1;justify-content:center}}
+/* v3.1.0 — Não fechou */
+.btn.lostbtn{color:var(--bad);border-color:rgba(255,90,106,.35)}
+.btn.lostbtn:hover{background:rgba(255,90,106,.08)}
+.deal.lost{border-left:3px solid var(--bad)}
+.deal.lost .deal-h{margin-bottom:6px}
+.lost-info{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--tx3)}
+.lost-info b{color:var(--tx)}
+.lost-info span{display:inline-flex;align-items:center;gap:5px}
+.lost-info .i{width:14px;height:14px}
+.lost-info .due{color:var(--warn);font-weight:600}
+.lost-obs{margin:8px 0 0;font-size:13px;color:var(--tx2,var(--tx));background:rgba(255,255,255,.03);border-radius:8px;padding:8px 10px;white-space:pre-wrap}
+.tabs .tab-lost.on{background:var(--bad);border-color:var(--bad);color:#fff}
+@media (max-width:560px){.deal-act .btn.lostbtn{flex:1;justify-content:center}}
