@@ -27,6 +27,8 @@ h1{font-size:24px;margin:0 0 6px;text-align:center;letter-spacing:.2px}
 .slot{display:flex;flex-direction:column;gap:2px;padding:14px;border-radius:14px;border:1px solid rgba(43,212,138,.45);background:rgba(43,212,138,.07);color:#e8edf7;text-decoration:none}
 .slot b{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums}
 .slot span{color:#2bd48a;font-weight:700;font-size:14px}.slot small{color:#8592ad;font-size:12px}
+.slot.busy{border-color:rgba(255,90,106,.45);background:rgba(255,90,106,.08)}.slot.busy span{color:#ff5a6a}
+.legend{display:flex;gap:16px;justify-content:center;margin:14px 0 0;font-size:12.5px;color:#9aa6bf}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
 .empty{grid-column:1/-1;text-align:center;color:#8592ad;padding:26px 10px;border:1px dashed #22304d;border-radius:14px}
 .cta{display:block;margin:22px auto 0;text-align:center;padding:14px 18px;border-radius:14px;background:#25d366;color:#062b14;font-weight:800;text-decoration:none}
 .foot{text-align:center;color:#5d6984;font-size:12px;margin-top:26px}
@@ -38,6 +40,7 @@ h1{font-size:24px;margin:0 0 6px;text-align:center;letter-spacing:.2px}
   <h1>Horários livres para reunião</h1>
   <p class="sub">Escolha um horário e fale com a gente no WhatsApp para confirmar.<br>Reunião online de até 1 hora, sem compromisso.</p>
   <div class="days" id="days"></div>
+  <div class="legend"><span><i style="background:#2bd48a"></i>Livre</span><span><i style="background:#ff5a6a"></i>Reservado</span></div>
   <div class="slots" id="slots"><div class="empty">Carregando horários…</div></div>
   <a class="cta" id="cta" target="_blank" rel="noopener">Falar no WhatsApp</a>
   <p class="foot">Bravus Mídia · Tráfego pago com foco em vendas</p>
@@ -60,21 +63,20 @@ h1{font-size:24px;margin:0 0 6px;text-align:center;letter-spacing:.2px}
 
   var D, sel;
   function nowLocal() { var n = new Date(); return { ds: iso(n), m: n.getHours() * 60 + n.getMinutes() }; }
-  function free(ds) {
+  function grid(ds) {
     var dur = Math.max(15, +D.slot || 60), st = hm2m(D.start), en = Math.max(hm2m(D.end), st + dur);
-    var times = [];
-    for (var m = st; m + dur <= en; m += dur) times.push(m2hm(m));
-    (D.extra[ds] || []).forEach(function (t) { if (/^\d{2}:\d{2}$/.test(t) && times.indexOf(t) < 0) times.push(t); });
+    var base = []; for (var m = st; m + dur <= en; m += dur) base.push(m2hm(m));
+    var extra = (D.extra[ds] || []).filter(function (t) { return /^\d{2}:\d{2}$/.test(t) && base.indexOf(t) < 0; });
     var closed = D.closed[ds] || [];
     var busy = D.busy.filter(function (b) { return b.d === ds; }).map(function (b) { return hm2m(b.t); });
-    var now = nowLocal();
-    return times.filter(function (t) {
-      var a = hm2m(t);
-      if (closed.indexOf(t) >= 0) return false;
-      if (ds < now.ds || (ds === now.ds && a <= now.m)) return false;
-      return !busy.some(function (b) { return b < a + dur && b + dur > a; });
-    }).sort(function (a, b) { return hm2m(a) - hm2m(b); });
+    var now = nowLocal(), out = [];
+    var past = function (a) { return ds < now.ds || (ds === now.ds && a <= now.m); };
+    base.forEach(function (t) { var a = hm2m(t); if (past(a)) return; var b = busy.some(function (x) { return x < a + dur && x + dur > a; }); if (!b && closed.indexOf(t) >= 0) return; out.push({ t: t, busy: b }); });
+    extra.forEach(function (t) { var a = hm2m(t); if (past(a)) return; out.push({ t: t, busy: busy.indexOf(a) >= 0 }); });
+    busy.forEach(function (a) { var t = m2hm(a); if (past(a) || out.some(function (x) { return x.busy && Math.abs(hm2m(x.t) - a) < dur; })) return; out.push({ t: t, busy: true }); });
+    return out.sort(function (a, b) { return hm2m(a.t) - hm2m(b.t); });
   }
+  function free(ds) { return grid(ds).filter(function (x) { return !x.busy; }).map(function (x) { return x.t; }); }
   function render() {
     var days = []; for (var i = 0; i < 7; i++) days.push(addDays(D.today, i));
     if (!sel) sel = days.filter(function (d) { return free(d).length; })[0] || days[0];
@@ -82,11 +84,12 @@ h1{font-size:24px;margin:0 0 6px;text-align:center;letter-spacing:.2px}
       var n = free(ds).length;
       return '<button class="day ' + (n ? '' : 'none ') + (ds === sel ? 'on' : '') + '" data-d="' + ds + '"><b>' + dname(ds, i) + '</b><small>' + fdate(ds) + '</small><i>' + (n ? n + ' livre' + (n > 1 ? 's' : '') : 'sem vagas') + '</i></button>';
     }).join('');
-    var idx = days.indexOf(sel), l = free(sel);
-    $('slots').innerHTML = l.length ? l.map(function (t) {
-      var msg = 'Olá! Quero marcar uma reunião com a Bravus Mídia ' + (idx === 0 ? 'hoje' : idx === 1 ? 'amanhã' : 'na ' + dname(sel, idx)) + ' (' + fdate(sel) + ') às ' + t + '.';
-      return '<a class="slot" target="_blank" rel="noopener" href="' + waLink(msg) + '"><b>' + t + '</b><span>Livre</span><small>toque para escolher</small></a>';
-    }).join('') : '<div class="empty">Sem horários livres neste dia. Veja outro dia ou chame no WhatsApp.</div>';
+    var idx = days.indexOf(sel), g = grid(sel);
+    $('slots').innerHTML = g.length ? g.map(function (x) {
+      if (x.busy) return '<div class="slot busy"><b>' + x.t + '</b><span>Reservado</span><small>já tem reunião</small></div>';
+      var msg = 'Olá! Quero marcar uma reunião com a Bravus Mídia ' + (idx === 0 ? 'hoje' : idx === 1 ? 'amanhã' : 'na ' + dname(sel, idx)) + ' (' + fdate(sel) + ') às ' + x.t + '.';
+      return '<a class="slot" target="_blank" rel="noopener" href="' + waLink(msg) + '"><b>' + x.t + '</b><span>Livre</span><small>toque para escolher</small></a>';
+    }).join('') : '<div class="empty">Sem horários neste dia. Veja outro dia ou chame no WhatsApp.</div>';
   }
   $('days').addEventListener('click', function (e) { var b = e.target.closest('[data-d]'); if (b) { sel = b.dataset.d; render(); } });
 

@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '3.4.1';
+const VERSION = '3.4.2';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings','reminders','documents'];
@@ -1163,7 +1163,8 @@ function daySlots(ds, who) {
     out.push({ time: m2hm(m), meets: hit, past: isPast(m), locked: !hit.length && !meetAllowed(ds, m2hm(m)) });
   }
   // horários extras abertos à mão (ex.: 15:00 num dia específico)
-  slotExtra(ds).filter(t => !out.some(x => x.time === t)).forEach(t => { const m = hm2m(t); const hit = ms.filter(x => { const a = hm2m(x.time); return a < m + dur && a + dur > m; }); const dup = hit.length && hit.every(h => out.some(x => x.meets.includes(h))); out.push({ time: t, meets: dup ? [] : hit, past: isPast(m), extra: true, dup: !!dup }); });
+  // horário aberto à mão vale como livre mesmo colado numa reunião; só fica ocupado se tiver reunião exatamente nessa hora
+  slotExtra(ds).filter(t => !out.some(x => x.time === t)).forEach(t => { const m = hm2m(t); const hit = ms.filter(x => hm2m(x.time) === m); out.push({ time: t, meets: hit, past: isPast(m), extra: true }); });
   out.forEach(x => { x.closed = !x.meets.length && !x.dup && slotClosed(ds, x.time); });
   // reuniões fora do bloco padrão (ex.: 12:00) também aparecem e contam como ocupadas
   ms.filter(t => !out.some(x => x.meets.includes(t))).forEach(t => out.push({ time: t.time, meets: [t], past: isPast(hm2m(t.time)) }));
@@ -1473,7 +1474,9 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '3.4.1', notes: [
+const RELEASE = { version: '3.4.2', notes: [
+  'Horário aberto por você (ex.: 19:00) fica livre e verde mesmo perto de outra reunião — você decide.',
+  'Página do cliente mostra a grade inteira: verde = livre para escolher, vermelho = reservado (sem nomes).',
   'Horário extra que bate com uma reunião não aparece mais como “Ocupado” repetido; em “Escolher livres” ele aparece para você tirar.',
   'Reuniões → Horários da semana: botão “Escolher livres” para fechar ou abrir cada horário e abrir horários extras.',
   'Botão “Divulgar horários”: mensagem pronta no WhatsApp com os horários livres e link da página pública (o cliente só vê horários, nunca nomes).',
@@ -2341,7 +2344,7 @@ const F = {
 
   availAddSave: async v => {
     if (!/^\d{2}:\d{2}$/.test(v.time || '')) return toast('Escolha o horário', '', 'warn');
-    { const dur = Math.max(15, +S.set.meet_slot || 60), m = hm2m(v.time); const hit = meetings().find(t => t.date === v.date && t.time && busyMeet(t) && hm2m(t.time) < m + dur && hm2m(t.time) + dur > m); if (hit) return toast('Horário ocupado', `Já tem reunião às ${hit.time} (${meetWho(hit)}). Escolha outro horário.`, 'warn'); }
+    { const dur = Math.max(15, +S.set.meet_slot || 60), m = hm2m(v.time); const hit = meetings().find(t => t.date === v.date && t.time && busyMeet(t) && hm2m(t.time) === m); if (hit) return toast('Horário ocupado', `Já tem reunião às ${hit.time} (${meetWho(hit)}). Escolha outro horário.`, 'warn'); }
     closeModal();
     await saveAvail(a => { a.extra[v.date] = [...new Set([...(a.extra[v.date] || []), v.time])].sort(); if (a.closed[v.date]) a.closed[v.date] = a.closed[v.date].filter(t => t !== v.time); });
     toast('Horário aberto', `${fdate(v.date)} às ${v.time}`, 'ok');
