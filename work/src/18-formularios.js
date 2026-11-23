@@ -3,6 +3,7 @@
    ===================================================================== */
 const num = v => v === '' || v == null ? null : Number(v);
 const F = {
+  rpSave: async v => { if (!isAdmin()) return toast('Só o administrador agenda reprospecção', '', 'warn'); if (!/^\d{4}-\d{2}-\d{2}$/.test(v.date || '')) return modalAlert('Escolha a data', '', 'warn'); closeModal(); await setReprospect(v.id, v.k, v.date, (v.obs || '').trim()); },
   saveLost: async v => {
     if (!isAdmin()) return toast('Só o administrador marca que o cliente não fechou', '', 'warn');
     if (!v.motivo) return toast('Escolha o motivo', 'Ajuda a entender por que os clientes não fecham.', 'bad');

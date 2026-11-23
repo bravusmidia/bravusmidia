@@ -1,7 +1,10 @@
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '3.6.0', notes: [
+const RELEASE = { version: '3.7.0', notes: [
+  'Reuniões → Funil do mês por pessoa: quantas marcaram, quantas compareceram e quantas fecharam, com as taxas e os últimos 6 meses.',
+  'Novo “Reprospectar depois”: lista com barra de rolagem de quem não fechou ou não compareceu, com botão para escolher quando prospectar de novo (cria lembrete).',
+  'Métricas enviadas para o painel no Google Drive (planilha Bravus Work).',
   'Segurança reforçada: biblioteca do Supabase agora fica dentro do próprio app (sem depender de site externo) e funções internas de alerta bloqueadas para quem é de fora.',
   'Código organizado por áreas e com teste automático a cada atualização — menos risco de uma mudança quebrar outra tela.',
   'Botões de salvar não enviam duas vezes se você tocar rápido.',

@@ -105,6 +105,16 @@ const A = {
     await notifyTeam(`Negociação retomada: ${deal.who}`, `Voltou para o funil · por ${firstName(S.me.id)}`, 'tarefa', `retake:${deal.past.id}:${Date.now()}`, 'reunioes');
     S.pipeTab = ''; toast('Negociação retomada', `${deal.who} voltou para o funil.`, 'ok'); await refresh(); },
   lostGo: () => { S.pipeTab = 'lost'; if (location.hash.replace('#', '') === 'reunioes') renderView(); else location.hash = 'reunioes'; setTimeout(() => { const t = document.querySelector('.tab-lost'); if (t) t.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 120); },
+  rpTab: d => { S.rpTab = d.id; renderView(true); },
+  rpWhen: d => { const add = n => addDays(today(), n);
+    modal('Prospectar de novo', `<input type="hidden" name="id" value="${esc(d.id)}"><input type="hidden" name="k" value="${esc(d.k)}">
+      <p class="muted small" style="margin:0 0 10px">Escolha quando voltar a falar com essa pessoa. O app cria o lembrete na agenda.</p>
+      <div class="row wrap" style="gap:8px;margin-bottom:10px">${[[30, 'Em 1 mês'], [60, 'Em 2 meses'], [90, 'Em 3 meses'], [180, 'Em 6 meses']].map(([n, l]) => `<button type="button" class="btn sm" data-act="rpQuick" data-v="${add(n)}">${l}</button>`).join('')}</div>
+      ${fld('Data', 'date', add(30), 'date', `min="${today()}" required`)}
+      <label class="fl">Observação (opcional)<textarea name="obs" rows="2" maxlength="140" placeholder="Ex.: voltar depois do Carnaval, quando tiver verba"></textarea></label>`,
+      { form: 'rpSave', footer: `<button type="button" class="btn" data-act="rpClear">Tirar data</button><span class="sp"></span><button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` }); },
+  rpQuick: d => { const f = $('#modal-root form[data-form=rpSave]'); if (f) f.date.value = d.v; },
+  rpClear: async () => { const f = $('#modal-root form[data-form=rpSave]'); if (!f) return; const id = f.id.value, k = f.k.value; closeModal(); await setReprospect(id, k, null, ''); },
   dealMeet: d => { const deal = allDeals().find(x => x.last.id === d.id); const t = deal ? deal.last : S.d.tasks.find(x => x.id === d.id); if (!t) return;
     const nk = deal && deal.next >= 0 ? PIPE[deal.next][0] : 'carteira';
     meetForm({ client_id: (deal && deal.cid) || t.client_id || '', company: t.company || '', contact_name: t.contact_name || '', phone: t.phone || '', ticket: t.ticket || '', assignee: t.assignee, meet_type: PIPE_MTYPE[nk] || 'alinhamento', date: today(), time: nextHour() }); },

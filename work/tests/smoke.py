@@ -3,7 +3,7 @@
 Roda o app no modo local (sem Supabase), com dados de exemplo, e confere:
   - todas as telas abrem sem erro de JavaScript, como admin e como comercial;
   - fluxos críticos: bloquear/liberar horário com motivo, abrir horário extra.
-Uso:  python3 work/tests/smoke.py        (precisa de: pip install playwright && playwright install chromium)
+Uso:  python3 tests/smoke.py        (precisa de: pip install playwright && playwright install chromium)
 Sai com código 1 se algo falhar.
 """
 import json, sys, threading, functools, http.server, socketserver, datetime, pathlib
@@ -31,7 +31,9 @@ def seed():
             {'id': 'u-com', 'name': 'Priscila', 'role': 'comercial', 'email': 'com@teste.local', 'color': '#b44cff'},
         ],
         'clients': [{'id': 'c1', 'name': 'Cliente Teste', 'contract_value': 900, 'due_day': 10, 'status': 'ativo', 'services': ['trafego']}],
-        'tasks': [{'id': 'm1', 'title': 'Reunião', 'kind': 'reuniao', 'date': d(0), 'time': '18:30', 'status': 'pendente', 'company': 'Empresa X', 'assignee': 'u-adm', 'meet_type': 'comercial'}],
+        'tasks': [{'id': 'm1', 'title': 'Reunião', 'kind': 'reuniao', 'date': d(0), 'time': '18:30', 'status': 'pendente', 'company': 'Empresa X', 'assignee': 'u-adm', 'meet_type': 'comercial'},
+                  {'id': 'm2', 'title': 'Reunião', 'kind': 'reuniao', 'date': d(-3), 'time': '19:30', 'status': 'noshow', 'company': 'Faltou Ltda', 'phone': '85999990000', 'assignee': 'u-adm', 'meet_type': 'comercial'},
+                  {'id': 'm3', 'title': 'Reunião', 'kind': 'reuniao', 'date': d(-2), 'time': '20:30', 'status': 'feito', 'outcome': 'fechou', 'company': 'Fechou SA', 'assignee': 'u-adm', 'meet_type': 'comercial'}],
         'invoices': [], 'expenses': [], 'campaigns': [], 'content': [], 'messages': [], 'notifications': [],
         'activity': [], 'settings': [{'id': 'main', 'data': {}}], 'reminders': [], 'documents': [],
     }
@@ -72,6 +74,15 @@ def run():
                     pg.locator('[data-act=availLog]').click(); pg.wait_for_timeout(200)
                     if pg.locator('.av-log li').count() < 2: fails.append('histórico não registrou as alterações')
                     pg.locator('[data-act=closeModal]').first.click()
+            if who == 'u-adm':
+                pg.evaluate("location.hash='#painel'"); pg.wait_for_timeout(200); pg.evaluate("location.hash='#reunioes'"); pg.wait_for_timeout(400)
+                if pg.locator('.fn-row').count() != 3: fails.append('funil do mês não apareceu')
+                pg.locator('[data-act=rpTab][data-id=noshow]').click(); pg.wait_for_timeout(300)
+                if 'Faltou Ltda' not in pg.inner_text('.rp-box'): fails.append('reprospecção: faltante não listado')
+                else:
+                    pg.locator('.rp-row [data-act=rpWhen]').first.click(); pg.wait_for_selector('form[data-form=rpSave]')
+                    pg.locator('[data-act=rpQuick]').nth(1).click(); pg.locator('form[data-form=rpSave] button.pri').click(); pg.wait_for_timeout(600)
+                    if 'prospectar em' not in pg.inner_text('.rp-box'): fails.append('reprospecção: data não salvou')
             fails += [f'[{who}] JS: {e}' for e in errs]
             ctx.close()
         b.close()

@@ -14,7 +14,7 @@ async function startSession(userId) {
     if (!S.d.settings.length) await store.upsertSettings(S.set);
   }
   if (isAdmin()) try { const n = await genMonthInvoices(curYM()); if (n) { await log(`Gerou ${n} mensalidade(s) de ${curYM()} automaticamente`); await loadAll('invoices'); } } catch (e) { console.warn('auto mensalidades', e); }
-  await heartbeat(); await log('Entrou no app');
+  await heartbeat(); await log('Entrou no app'); setTimeout(() => syncMetrics(), 6000);
   S.route = (location.hash.replace(/^#\/?/, '') || 'painel').split('?')[0];
   render(); tick(); setTimeout(releaseNotice, 800); checkVersion(); setTimeout(() => pushSubscribe(), 2500);
   timers.forEach(clearInterval);

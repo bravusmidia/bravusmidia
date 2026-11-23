@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '3.6.0';
+const VERSION = '3.7.0';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings','reminders','documents'];
@@ -674,7 +674,7 @@ async function startSession(userId) {
     if (!S.d.settings.length) await store.upsertSettings(S.set);
   }
   if (isAdmin()) try { const n = await genMonthInvoices(curYM()); if (n) { await log(`Gerou ${n} mensalidade(s) de ${curYM()} automaticamente`); await loadAll('invoices'); } } catch (e) { console.warn('auto mensalidades', e); }
-  await heartbeat(); await log('Entrou no app');
+  await heartbeat(); await log('Entrou no app'); setTimeout(() => syncMetrics(), 6000);
   S.route = (location.hash.replace(/^#\/?/, '') || 'painel').split('?')[0];
   render(); tick(); setTimeout(releaseNotice, 800); checkVersion(); setTimeout(() => pushSubscribe(), 2500);
   timers.forEach(clearInterval);
@@ -1070,6 +1070,85 @@ function waCharge(i) {
 /* ---------- AGENDA (Bravus Daily + Weekend) ---------- */
 const KINDS = [['tarefa', 'Tarefa'], ['ligacao', 'Ligação'], ['reuniao', 'Reunião'], ['followup', 'Follow-up']];
 const PRIO = [['alta', 'Alta'], ['media', 'Média'], ['baixa', 'Baixa']];
+/* ---------- v3.7.0 — MÉTRICAS DO FUNIL + BANCO DE REPROSPECÇÃO + PAINEL NO DRIVE ----------
+   Pessoas (não reuniões): cada empresa/contato conta uma vez no mês.
+   Agendadas → Compareceram → Fecharam. "Não fecharam" e "Não compareceram" vão para o banco de reprospecção. */
+const monthOf = s => String(s || '').slice(0, 7);
+function funnelMonth(k) {
+  const ms = meetings().filter(t => monthOf(t.date) === k && t.status !== 'cancelada');
+  const keys = f => new Set(ms.filter(f).map(dealKey));
+  const ag = keys(() => true), comp = keys(t => t.status === 'feito'), falt = keys(t => t.status === 'noshow');
+  [...comp].forEach(x => falt.delete(x));
+  const won = keys(t => t.outcome === 'fechou');
+  allDeals().forEach(d => { const c = d.p && d.p.carteira; if (c && c !== true && monthOf(c) === k) won.add(dealKey(d.last)); });
+  const lost = lostDeals().filter(d => monthOf(d.lostAt) === k).length;
+  return { ym: k, reunioes: ms.length, realizadas: ms.filter(t => t.status === 'feito').length, agendadas: ag.size, compareceram: comp.size, faltaram: falt.size, fecharam: won.size, nao_fecharam: lost };
+}
+const fpct = (a, b) => b ? Math.round(a / b * 100) : 0;
+const monthsBack = (k, n) => { const out = []; const d = new Date(k + '-15T12:00:00'); for (let i = 0; i < n; i++) { out.unshift(`${d.getFullYear()}-${pad(d.getMonth() + 1)}`); d.setMonth(d.getMonth() - 1); } return out; };
+const monthShort = k => new Date(k + '-15T12:00:00').toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '');
+
+/* pessoas que fizeram reunião (ou marcaram) e não viraram cliente: Não fecharam + Não compareceram */
+function reprospectList() {
+  const lost = lostDeals().map(d => ({ id: d.past.id, who: d.who, kind: 'lost', why: d.lo.motivo ? lbl(LOST_REASONS, d.lo.motivo) : 'Sem motivo', at: String(d.lostAt || d.past.date).slice(0, 10), ret: d.lo.retorno || null, phone: d.phone, obs: d.lo.obs || '' }));
+  const g = {}; meetings().forEach(t => { const k = dealKey(t); (g[k] = g[k] || []).push(t); });
+  const lostKeys = new Set(lostDeals().map(d => dealKey(d.last)));
+  const nos = Object.entries(g).filter(([k, ms]) => !lostKeys.has(k) && ms.some(t => t.status === 'noshow') && !ms.some(t => t.status === 'feito' || meetUpcoming(t)) && !ms.some(t => t.client_id && client(t.client_id) && inWallet(client(t.client_id))))
+    .map(([, ms]) => { ms.sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || ''))); const t = ms[ms.length - 1]; const p = pipeOf(t);
+      return { id: t.id, who: meetWho(t), kind: 'noshow', why: 'Não compareceu', at: t.date, ret: p.retorno || null, phone: (ms.slice().reverse().find(x => x.phone) || {}).phone || '', obs: '' }; });
+  return [...lost, ...nos].sort((a, b) => (a.ret && a.ret <= today() ? 0 : 1) - (b.ret && b.ret <= today() ? 0 : 1) || (b.at || '').localeCompare(a.at || ''));
+}
+
+function funnelCard(k) {
+  const f = funnelMonth(k); const hist = monthsBack(k, 6).map(funnelMonth); const max = Math.max(1, f.agendadas);
+  const bar = (label, n, sub, cls) => `<div class="fn-row"><span class="fn-l">${label}</span><div class="fn-bar"><i class="${cls}" style="width:${Math.max(n ? 6 : 0, n / max * 100)}%"></i></div><b class="fn-n">${n}</b><small class="fn-s">${sub}</small></div>`;
+  const url = S.set.sheet_url;
+  return `<div class="card" style="margin-bottom:14px"><h3>${ic('target')}Funil do mês — pessoas<span class="sp"></span>${url ? `<a class="btn sm" href="${esc(url)}" target="_blank" rel="noopener">${ic('file')}Painel no Drive</a>` : ''}</h3>
+    ${bar('Marcaram reunião', f.agendadas, `${f.reunioes} reuniões`, 'b')}
+    ${bar('Compareceram', f.compareceram, `${fpct(f.compareceram, f.agendadas)}% das marcadas`, 'g')}
+    ${bar('Fecharam', f.fecharam, `${fpct(f.fecharam, f.compareceram)}% de quem veio`, 'o')}
+    <div class="fn-foot"><span>Faltaram: <b>${f.faltaram}</b></span><span>Não fecharam: <b>${f.nao_fecharam}</b></span><span>Conversão total: <b>${fpct(f.fecharam, f.agendadas)}%</b></span></div>
+    <div class="fn-hist"><div class="fn-hh"><span>MÊS</span><span>MARCOU</span><span>VEIO</span><span>FECHOU</span><span>%</span></div>${hist.slice().reverse().map(h => `<div class="${h.ym === k ? 'on' : ''}"><span>${monthShort(h.ym)}/${h.ym.slice(2, 4)}</span><span>${h.agendadas}</span><span>${h.compareceram}</span><span>${h.fecharam}</span><span>${fpct(h.fecharam, h.agendadas)}%</span></div>`).join('')}</div>
+    <p class="note" style="margin:8px 0 0">Cada pessoa/empresa conta uma vez por mês, mesmo com várias reuniões.</p></div>`;
+}
+
+function reprospectCard() {
+  const L = reprospectList(); const tab = S.rpTab || 'todos';
+  const list = L.filter(x => tab === 'todos' || (tab === 'agora' ? x.ret && x.ret <= today() : x.kind === tab));
+  const n = f => L.filter(f).length;
+  const row = x => { const tel = onlyDigits(x.phone).replace(/^55/, ''); const due = x.ret && x.ret <= today();
+    return `<div class="rp-row"><div class="rp-t"><b>${esc(x.who)}</b><small><span class="${x.kind === 'lost' ? 'tx-bad' : 'tx-warn'}">${esc(x.why)}</span> · ${fdate(x.at)}${x.ret ? ` · <span class="${due ? 'tx-warn' : ''}">${due ? 'prospectar agora' : 'prospectar em ' + fdate(x.ret)}</span>` : ''}</small>${x.obs ? `<small class="muted">${esc(x.obs)}</small>` : ''}</div>
+      <div class="rp-a">${isAdmin() ? `<button class="btn sm" data-act="rpWhen" data-id="${x.id}" data-k="${x.kind}">${ic('cal')}${x.ret ? 'Mudar data' : 'Prospectar em…'}</button>` : ''}${tel ? `<a class="btn sm ok ic" href="https://wa.me/55${tel}" target="_blank" rel="noopener" title="WhatsApp">${ic('wa')}</a>` : ''}<button class="btn sm ic" data-act="dealMeet" data-id="${x.id}" title="Marcar nova reunião">${ic('plus')}</button></div></div>`; };
+  return `<div class="card" style="margin-bottom:14px"><h3>${ic('users')}Reprospectar depois <span class="muted small" style="font-weight:400">(${L.length})</span></h3>
+    <div class="tabs" style="margin:0 0 10px">${[['todos', 'Todos', L.length], ['agora', 'Retomar agora', n(x => x.ret && x.ret <= today())], ['lost', 'Não fecharam', n(x => x.kind === 'lost')], ['noshow', 'Não compareceram', n(x => x.kind === 'noshow')]].map(([k2, l, c]) => `<button data-act="rpTab" data-id="${k2}" class="${tab === k2 ? 'on' : ''}">${l} <small>${c}</small></button>`).join('')}</div>
+    <div class="rp-box">${list.length ? list.map(row).join('') : empty(tab === 'agora' ? 'Ninguém para retomar hoje.' : 'Ninguém nesta lista ainda.')}</div>
+    <p class="note" style="margin:8px 0 0">Quem fez reunião e não fechou, ou marcou e não veio. Escolha quando prospectar de novo: o app cria o lembrete na agenda e avisa no dia.</p></div>`;
+}
+
+/* salva a data de reprospecção e cria o lembrete na agenda */
+async function setReprospect(id, kind, date, obs) {
+  const m = S.d.tasks.find(t => t.id === id); if (!m) return toast('Registro não encontrado', '', 'bad');
+  const p = pipeOf(m); const who = meetWho(m);
+  if (kind === 'lost') await putPipe(m, { ...p, perdido: { ...(p.perdido || {}), retorno: date } });
+  else await putPipe(m, { ...p, retorno: date });
+  if (date) await store.insert('tasks', { title: `Reprospectar: ${who}`, kind: 'followup', date, time: S.set.calls_start || '12:00', assignee: S.me.id, client_id: m.client_id || null, priority: 'media', remind_min: 20, description: `${kind === 'lost' ? 'Não fechou' : 'Não compareceu'} em ${fdate(m.date)}${obs ? ' — ' + obs : ''}` });
+  await log(`Reprospecção de ${who}: ${date ? fdate(date) : 'sem data'}${obs ? ` (${obs})` : ''}`, m.client_id);
+  toast(date ? 'Reprospecção agendada' : 'Data removida', date ? `${who} · ${fdateL(date)}` : who, 'ok'); await refresh();
+}
+
+/* snapshot das métricas para o painel do Google Drive (só o admin grava; a planilha lê pela função bw_metrics com chave) */
+let lastMetricsJson = '';
+async function syncMetrics(force) {
+  if (!isAdmin() || !SUPA) return;
+  const months = monthsBack(curYM(), 12).map(funnelMonth);
+  const rp = reprospectList().map(x => ({ nome: x.who, situacao: x.kind === 'lost' ? 'Não fechou' : 'Não compareceu', motivo: x.why, data: x.at, retomar: x.ret || '' }));
+  const body = JSON.stringify({ months, reprospect: rp });
+  const prev = S.set.metrics ? JSON.stringify({ months: S.set.metrics.months, reprospect: S.set.metrics.reprospect }) : '';
+  if (!force && (body === lastMetricsJson || body === prev)) { lastMetricsJson = body; return; }
+  lastMetricsJson = body;
+  const s = { ...S.set, metrics: { updated_at: new Date().toISOString(), months, reprospect: rp } };
+  try { await store.upsertSettings(s); S.set = s; } catch (e) { console.warn('métricas', e); }
+}
 /* ---------- REUNIÕES (Bravus Meetings) ---------- */
 const MTYPES = [['comercial', 'Comercial (primeira conversa)'], ['proposta', 'Apresentação de proposta'], ['alinhamento', 'Alinhamento'], ['onboarding', 'Onboarding / implantação'], ['resultado', 'Resultados / relatório'], ['outro', 'Outro']];
 const MFORMATS = [['meet', 'Google Meet'], ['whatsapp', 'Vídeo no WhatsApp'], ['ligacao', 'Ligação'], ['presencial', 'Presencial']];
@@ -1397,6 +1476,8 @@ V.reunioes = () => {
       ${mkpi('noshow', 'Comparecimento', decided ? Math.round(real.length / decided * 100) + '%' : '—', 'realizadas ÷ (realizadas + faltas)')}
       ${mkpi('fechou', 'Fecharam', `<span style="color:var(--ok)">${won.length}</span>`, `${com.length ? Math.round(won.length / com.length * 100) : 0}% das comerciais · ${ms.filter(t => t.outcome === 'negociando').length} em negociação`)}
     </div>
+    ${funnelCard(k)}
+    ${reprospectCard()}
     ${pend.length ? `<div class="card" style="margin-bottom:14px;border-color:rgba(255,190,80,.45)"><h3>${ic('bell')}Já passaram — como foi? (${pend.length})</h3><div class="list">${pend.slice(0, 8).map(t => `<div class="li mrow nm"><div class="t"><b>${esc(meetWho(t))}</b><small>${fdate(t.date)} ${esc(t.time || '')}</small></div><div class="mchips"><button class="btn sm ok" data-act="meetSet" data-id="${t.id}" data-s="feito">${ic('check')}Realizada</button><button class="btn sm" data-act="meetSet" data-id="${t.id}" data-s="noshow">Faltou</button><button class="btn sm" data-act="meetResch" data-id="${t.id}">↻ Remarcar</button></div></div>`).join('')}</div></div>` : ''}
     <div class="grid g2">
       <div class="card"><h3>${ic('cal')}Próximas</h3><div class="list">${next.length ? next.slice(0, 10).map(t => row(t).replace('<div class="mchips">', `<div class="mchips">${t.phone || (client(t.client_id) || {}).whatsapp ? `<button class="btn sm ic" data-act="meetConfirm" data-id="${t.id}" title="Confirmar no WhatsApp">${ic('wa')}</button>` : ''}`)).join('') : empty('Nenhuma reunião marcada. Use “+ Reunião”.')}</div></div>
@@ -1504,7 +1585,10 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '3.6.0', notes: [
+const RELEASE = { version: '3.7.0', notes: [
+  'Reuniões → Funil do mês por pessoa: quantas marcaram, quantas compareceram e quantas fecharam, com as taxas e os últimos 6 meses.',
+  'Novo “Reprospectar depois”: lista com barra de rolagem de quem não fechou ou não compareceu, com botão para escolher quando prospectar de novo (cria lembrete).',
+  'Métricas enviadas para o painel no Google Drive (planilha Bravus Work).',
   'Segurança reforçada: biblioteca do Supabase agora fica dentro do próprio app (sem depender de site externo) e funções internas de alerta bloqueadas para quem é de fora.',
   'Código organizado por áreas e com teste automático a cada atualização — menos risco de uma mudança quebrar outra tela.',
   'Botões de salvar não enviam duas vezes se você tocar rápido.',
@@ -1968,6 +2052,16 @@ const A = {
     await notifyTeam(`Negociação retomada: ${deal.who}`, `Voltou para o funil · por ${firstName(S.me.id)}`, 'tarefa', `retake:${deal.past.id}:${Date.now()}`, 'reunioes');
     S.pipeTab = ''; toast('Negociação retomada', `${deal.who} voltou para o funil.`, 'ok'); await refresh(); },
   lostGo: () => { S.pipeTab = 'lost'; if (location.hash.replace('#', '') === 'reunioes') renderView(); else location.hash = 'reunioes'; setTimeout(() => { const t = document.querySelector('.tab-lost'); if (t) t.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 120); },
+  rpTab: d => { S.rpTab = d.id; renderView(true); },
+  rpWhen: d => { const add = n => addDays(today(), n);
+    modal('Prospectar de novo', `<input type="hidden" name="id" value="${esc(d.id)}"><input type="hidden" name="k" value="${esc(d.k)}">
+      <p class="muted small" style="margin:0 0 10px">Escolha quando voltar a falar com essa pessoa. O app cria o lembrete na agenda.</p>
+      <div class="row wrap" style="gap:8px;margin-bottom:10px">${[[30, 'Em 1 mês'], [60, 'Em 2 meses'], [90, 'Em 3 meses'], [180, 'Em 6 meses']].map(([n, l]) => `<button type="button" class="btn sm" data-act="rpQuick" data-v="${add(n)}">${l}</button>`).join('')}</div>
+      ${fld('Data', 'date', add(30), 'date', `min="${today()}" required`)}
+      <label class="fl">Observação (opcional)<textarea name="obs" rows="2" maxlength="140" placeholder="Ex.: voltar depois do Carnaval, quando tiver verba"></textarea></label>`,
+      { form: 'rpSave', footer: `<button type="button" class="btn" data-act="rpClear">Tirar data</button><span class="sp"></span><button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Salvar</button>` }); },
+  rpQuick: d => { const f = $('#modal-root form[data-form=rpSave]'); if (f) f.date.value = d.v; },
+  rpClear: async () => { const f = $('#modal-root form[data-form=rpSave]'); if (!f) return; const id = f.id.value, k = f.k.value; closeModal(); await setReprospect(id, k, null, ''); },
   dealMeet: d => { const deal = allDeals().find(x => x.last.id === d.id); const t = deal ? deal.last : S.d.tasks.find(x => x.id === d.id); if (!t) return;
     const nk = deal && deal.next >= 0 ? PIPE[deal.next][0] : 'carteira';
     meetForm({ client_id: (deal && deal.cid) || t.client_id || '', company: t.company || '', contact_name: t.contact_name || '', phone: t.phone || '', ticket: t.ticket || '', assignee: t.assignee, meet_type: PIPE_MTYPE[nk] || 'alinhamento', date: today(), time: nextHour() }); },
@@ -2224,6 +2318,7 @@ const A = {
    ===================================================================== */
 const num = v => v === '' || v == null ? null : Number(v);
 const F = {
+  rpSave: async v => { if (!isAdmin()) return toast('Só o administrador agenda reprospecção', '', 'warn'); if (!/^\d{4}-\d{2}-\d{2}$/.test(v.date || '')) return modalAlert('Escolha a data', '', 'warn'); closeModal(); await setReprospect(v.id, v.k, v.date, (v.obs || '').trim()); },
   saveLost: async v => {
     if (!isAdmin()) return toast('Só o administrador marca que o cliente não fechou', '', 'warn');
     if (!v.motivo) return toast('Escolha o motivo', 'Ajuda a entender por que os clientes não fecham.', 'bad');
@@ -2465,7 +2560,8 @@ const F = {
    EVENTOS GLOBAIS
    ===================================================================== */
 let refreshing;
-async function refresh(t) { await loadAll(t); if (S.me) { popNew(); popMsgs(); renderShellBadges(); renderPresence(); if (!t || (t !== 'messages' && (t !== 'profiles' || S.route === 'equipe'))) renderViewSoft(); if (!t || ['messages', 'profiles'].includes(t)) renderChat(); } }
+let metricsTimer = 0;
+async function refresh(t) { await loadAll(t); if (S.me && (!t || t === 'tasks')) { clearTimeout(metricsTimer); metricsTimer = setTimeout(() => syncMetrics(), 4000); } if (S.me) { popNew(); popMsgs(); renderShellBadges(); renderPresence(); if (!t || (t !== 'messages' && (t !== 'profiles' || S.route === 'equipe'))) renderViewSoft(); if (!t || ['messages', 'profiles'].includes(t)) renderChat(); } }
 function renderShellBadges() { if (!$('.shell')) return render(); const cur = $('.nav'); if (!cur) return; const u = unread(), c = chatUnread();
   document.querySelectorAll('.nav a, .bnav a').forEach(a => { const k = a.getAttribute('href').slice(1); let b = a.querySelector('.badge'); const n = k === 'alertas' ? u : k === 'chat' && S.route !== 'chat' ? c : 0; if (n) { if (!b) { b = document.createElement('span'); b.className = 'badge'; a.appendChild(b); } b.textContent = n; } else if (b) b.remove(); });
   const mb = $('.mtop a[href="#alertas"]'); if (mb) { let b = mb.querySelector('.badge'); if (u) { if (!b) { b = document.createElement('span'); b.className = 'badge'; b.style.cssText = 'position:absolute;top:-6px;right:-6px'; mb.appendChild(b); } b.textContent = u; } else if (b) b.remove(); } }

@@ -2,7 +2,8 @@
    EVENTOS GLOBAIS
    ===================================================================== */
 let refreshing;
-async function refresh(t) { await loadAll(t); if (S.me) { popNew(); popMsgs(); renderShellBadges(); renderPresence(); if (!t || (t !== 'messages' && (t !== 'profiles' || S.route === 'equipe'))) renderViewSoft(); if (!t || ['messages', 'profiles'].includes(t)) renderChat(); } }
+let metricsTimer = 0;
+async function refresh(t) { await loadAll(t); if (S.me && (!t || t === 'tasks')) { clearTimeout(metricsTimer); metricsTimer = setTimeout(() => syncMetrics(), 4000); } if (S.me) { popNew(); popMsgs(); renderShellBadges(); renderPresence(); if (!t || (t !== 'messages' && (t !== 'profiles' || S.route === 'equipe'))) renderViewSoft(); if (!t || ['messages', 'profiles'].includes(t)) renderChat(); } }
 function renderShellBadges() { if (!$('.shell')) return render(); const cur = $('.nav'); if (!cur) return; const u = unread(), c = chatUnread();
   document.querySelectorAll('.nav a, .bnav a').forEach(a => { const k = a.getAttribute('href').slice(1); let b = a.querySelector('.badge'); const n = k === 'alertas' ? u : k === 'chat' && S.route !== 'chat' ? c : 0; if (n) { if (!b) { b = document.createElement('span'); b.className = 'badge'; a.appendChild(b); } b.textContent = n; } else if (b) b.remove(); });
   const mb = $('.mtop a[href="#alertas"]'); if (mb) { let b = mb.querySelector('.badge'); if (u) { if (!b) { b = document.createElement('span'); b.className = 'badge'; b.style.cssText = 'position:absolute;top:-6px;right:-6px'; mb.appendChild(b); } b.textContent = u; } else if (b) b.remove(); } }
