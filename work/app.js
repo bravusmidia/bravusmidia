@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '3.3.0';
+const VERSION = '3.4.0';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings','reminders','documents'];
@@ -1139,6 +1139,19 @@ const holidayName = ds => ds ? holidays(+ds.slice(0, 4))[ds] || '' : '';
 const meetFreeDay = ds => { const w = new Date(ds + 'T12:00:00').getDay(); return w === 0 || w === 6 || !!holidayName(ds); };
 const meetAllowed = () => true;
 const meetRuleMsg = ds => holidayName(ds) ? `Feriado (${holidayName(ds)}): pode marcar em qualquer horário.` : 'Pode marcar em qualquer horário.';
+/* v3.4.0 — disponibilidade: o admin fecha/abre horários e divulga os livres para o cliente (página pública) */
+const avail = () => (S.set && S.set.avail) || {};
+const slotClosed = (ds, t) => ((avail().closed || {})[ds] || []).includes(t);
+const slotExtra = ds => ((avail().extra || {})[ds] || []).filter(t => /^\d{2}:\d{2}$/.test(t));
+const PUBLIC_URL = 'https://www.bravusmidia.com.br/work/horarios.html';
+async function saveAvail(fn) {
+  const a = JSON.parse(JSON.stringify(avail())); a.closed = a.closed || {}; a.extra = a.extra || {};
+  fn(a);
+  const t0 = today(); ['closed', 'extra'].forEach(k => Object.keys(a[k]).forEach(d => { if (d < t0 || !(a[k][d] || []).length) delete a[k][d]; }));
+  const s = { ...S.set, avail: a };
+  try { await store.upsertSettings(s); S.set = s; renderView(); } catch (e) { toast('Não salvou', 'Só o administrador muda os horários.', 'warn'); }
+}
+function freeList(ds) { return daySlots(ds).filter(x => !x.past && !x.locked && !x.meets.length && !x.closed).map(x => x.time); }
 function daySlots(ds, who) {
   const dur = Math.max(15, +S.set.meet_slot || 60), st = hm2m(S.set.meetings_start || '18:30'), en = Math.max(hm2m(S.set.meetings_end || '21:30'), st + dur);
   const ms = meetings().filter(t => t.date === ds && t.time && busyMeet(t) && (!who || t.assignee === who));
@@ -1149,6 +1162,9 @@ function daySlots(ds, who) {
     const hit = ms.filter(t => { const a = hm2m(t.time); return a < m + dur && a + dur > m; });
     out.push({ time: m2hm(m), meets: hit, past: isPast(m), locked: !hit.length && !meetAllowed(ds, m2hm(m)) });
   }
+  // horários extras abertos à mão (ex.: 15:00 num dia específico)
+  slotExtra(ds).filter(t => !out.some(x => x.time === t)).forEach(t => { const m = hm2m(t); const hit = ms.filter(x => { const a = hm2m(x.time); return a < m + dur && a + dur > m; }); out.push({ time: t, meets: hit, past: isPast(m), extra: true }); });
+  out.forEach(x => { x.closed = !x.meets.length && slotClosed(ds, x.time); });
   // reuniões fora do bloco padrão (ex.: 12:00) também aparecem e contam como ocupadas
   ms.filter(t => !out.some(x => x.meets.includes(t))).forEach(t => out.push({ time: t.time, meets: [t], past: isPast(hm2m(t.time)) }));
   return out.sort((a, b) => hm2m(a.time) - hm2m(b.time));
@@ -1156,20 +1172,26 @@ function daySlots(ds, who) {
 function weekStrip(who) {
   const days = []; const d0 = new Date(); for (let i = 0; i < 7; i++) { const d = new Date(d0); d.setDate(d0.getDate() + i); days.push(iso(d)); }
   const sel = days.includes(S.meetDay) ? S.meetDay : days[0];
-  const info = days.map((ds, i) => { const sl = daySlots(ds, who); const free = sl.filter(x => !x.past && !x.locked && !x.meets.length).length; const busy = sl.filter(x => x.meets.length).length; return { ds, i, free, busy, open: sl.filter(x => !x.past).length }; });
+  const info = days.map((ds, i) => { const sl = daySlots(ds, who); const free = sl.filter(x => !x.past && !x.locked && !x.meets.length && !x.closed).length; const busy = sl.filter(x => x.meets.length).length; return { ds, i, free, busy, open: sl.filter(x => !x.past).length }; });
   const slots = daySlots(sel, who);
   const tag = x => x.open === 0 ? ['off', 'Encerrado'] : x.free === 0 ? ['bad', 'Lotado'] : ['ok', `${x.free} livre${x.free > 1 ? 's' : ''}`];
   const hol = holidayName(sel);
   const td = info[0];
   if (!S.weekOpen) return `<button class="card wk-toggle" data-act="weekToggle" style="margin-bottom:14px">${ic('cal')}<b>Horários da semana</b><span class="muted small">${td.open ? `${td.free} livre${td.free === 1 ? '' : 's'} hoje` : 'hoje encerrado'} · ${info.reduce((n, x) => n + x.free, 0)} na semana</span><span class="sp"></span><span class="btn sm">Ver horários ${ic('down')}</span></button>`;
   return `<div class="card wk-card" style="margin-bottom:14px"><h3>${ic('cal')}Horários da semana <span class="muted small" style="font-weight:400;margin-left:auto">blocos de ${S.set.meet_slot || 60} min · ${esc(S.set.meetings_start)} às ${esc(S.set.meetings_end || '21:30')}</span><button class="btn sm" data-act="weekToggle">Ocultar</button></h3>
+    <div class="wk-tools">${isAdmin() ? `<button class="btn sm ${S.availEdit ? 'pri' : ''}" data-act="availEdit">${ic('edit')}${S.availEdit ? 'Concluir' : 'Escolher livres'}</button>` : ''}<button class="btn sm ok" data-act="availShare" data-d="${sel}">${ic('wa')}Divulgar horários</button></div>
+    ${S.availEdit ? `<p class="note" style="margin:8px 0 0">Toque num horário para <b>fechar</b> ou <b>abrir</b>. Só os livres aparecem para o cliente.</p>` : ''}
     <div class="wk">${info.map(x => { const [c, t] = tag(x); return `<button class="wd ${c} ${x.ds === sel ? 'on' : ''}" data-act="meetDay" data-d="${x.ds}"><b>${dayName(x.ds, x.i)}</b><small>${fdate(x.ds)}${holidayName(x.ds) ? ' · feriado' : ''}</small><i>${t}</i></button>`; }).join('')}</div>
     ${hol || !isAdmin() ? `<p class="note" style="margin:8px 0 0">${hol ? `${esc(hol)} · ` : ''}${isAdmin() ? 'Você pode marcar em qualquer horário.' : esc(meetRuleMsg(sel))}</p>` : ''}
-    <div class="slots">${slots.map(x => x.meets.length
+    <div class="slots">${slots.map(x => S.availEdit && !x.meets.length && !x.past
+      ? (x.closed ? `<button class="slot closed" data-act="slotToggle" data-d="${sel}" data-t="${x.time}"><b>${x.time}</b><span>Fechado</span><small>toque para abrir</small></button>`
+        : `<button class="slot free" data-act="slotToggle" data-d="${sel}" data-t="${x.time}" data-x="${x.extra ? 1 : ''}"><b>${x.time}</b><span>Livre${x.extra ? ' · extra' : ''}</span><small>${x.extra ? 'toque para tirar' : 'toque para fechar'}</small></button>`)
+      : x.meets.length
       ? `<button class="slot busy" data-act="editMeet" data-id="${x.meets[0].id}"><b>${x.time}</b><span>Ocupado</span><small>${esc(x.meets[0].time)} · ${esc(meetWho(x.meets[0]))}</small></button>`
       : x.past ? `<div class="slot past"><b>${x.time}</b><span>Passou</span></div>`
+      : x.closed ? `<button class="slot closed" data-act="meetSlot" data-d="${sel}" data-t="${x.time}"><b>${x.time}</b><span>Fechado</span><small>não aparece pro cliente</small></button>`
       : x.locked ? `<div class="slot past" title="${esc(meetRuleMsg(sel))}"><b>${x.time}</b><span>Fora da regra</span></div>`
-      : `<button class="slot free" data-act="meetSlot" data-d="${sel}" data-t="${x.time}"><b>${x.time}</b><span>Livre</span><small>toque para marcar</small></button>`).join('')}<button class="slot free" data-act="meetSlot" data-d="${sel}" data-t="${sel === today() ? nextHour() : '09:00'}"><b>${ic('plus')}</b><span>Outro horário</span><small>qualquer hora</small></button></div></div>`;
+      : `<button class="slot free" data-act="meetSlot" data-d="${sel}" data-t="${x.time}"><b>${x.time}</b><span>Livre</span><small>toque para marcar</small></button>`).join('')}${S.availEdit ? `<button class="slot free" data-act="availAdd" data-d="${sel}"><b>${ic('plus')}</b><span>Abrir horário</span><small>deixar livre p/ cliente</small></button>` : ''}<button class="slot free" data-act="meetSlot" data-d="${sel}" data-t="${sel === today() ? nextHour() : '09:00'}"><b>${ic('plus')}</b><span>Outro horário</span><small>qualquer hora</small></button></div></div>`;
 }
 /* v3.0.0 — Funil pós-reunião por cliente: Reunião → Proposta enviada → Contrato assinado → Onboarding → Cliente na carteira (vai para Clientes) */
 const PIPE = [['reuniao', 'Reunião', 'Reunião realizada'], ['proposta', 'Proposta', 'Proposta enviada'], ['contrato', 'Contrato', 'Contrato assinado'], ['onboarding', 'Onboarding', 'Onboarding feito'], ['carteira', 'Carteira', 'Cliente na carteira']];
@@ -1449,7 +1471,10 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '3.3.0', notes: [
+const RELEASE = { version: '3.4.0', notes: [
+  'Reuniões → Horários da semana: botão “Escolher livres” para fechar ou abrir cada horário e abrir horários extras.',
+  'Botão “Divulgar horários”: mensagem pronta no WhatsApp com os horários livres e link da página pública (o cliente só vê horários, nunca nomes).',
+
   'Cores padronizadas no app inteiro: STATUS tem bolinha (verde = feito, âmbar = precisa da sua ação, vermelho = problema, azul = agendado, violeta = remarcada, cinza = cancelado/inativo).',
   'TICKET agora é metal, igual ao ticket do cliente: Baixo = bronze, Médio = prata, Alto = ouro. Nunca mais se confunde com status.',
   'Resultado da reunião colorido na linha: Fechou (verde), Em negociação (azul), Não fechou (vermelho). Remarcadas em violeta com ↻.',
@@ -1904,7 +1929,23 @@ const A = {
   dealMeet: d => { const deal = allDeals().find(x => x.last.id === d.id); const t = deal ? deal.last : S.d.tasks.find(x => x.id === d.id); if (!t) return;
     const nk = deal && deal.next >= 0 ? PIPE[deal.next][0] : 'carteira';
     meetForm({ client_id: (deal && deal.cid) || t.client_id || '', company: t.company || '', contact_name: t.contact_name || '', phone: t.phone || '', ticket: t.ticket || '', assignee: t.assignee, meet_type: PIPE_MTYPE[nk] || 'alinhamento', date: today(), time: nextHour() }); },
-  meetSlot: d => meetForm({ date: d.d, time: d.t }), meetWho: d => { S.meetWho = d.id; renderView(); }, meetTicket: d => { S.meetTicket = d.id; renderView(); },
+  meetSlot: d => meetForm({ date: d.d, time: d.t }),
+  availEdit: () => { S.availEdit = !S.availEdit; S.weekOpen = true; renderView(); },
+  slotToggle: d => saveAvail(a => {
+    if (d.x) { a.extra[d.d] = (a.extra[d.d] || []).filter(t => t !== d.t); return; }
+    const c = a.closed[d.d] || []; a.closed[d.d] = c.includes(d.t) ? c.filter(t => t !== d.t) : [...c, d.t];
+  }),
+  availAdd: d => modal('Abrir horário livre', `<p class="muted small" style="margin:0 0 10px">${esc(fdateL(d.d))}</p><input type="hidden" name="date" value="${d.d}">${fld('Horário', 'time', d.d === today() ? nextHour() : '15:00', 'time', 'required')}`, { form: 'availAddSave', footer: `<span class="sp"></span><button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Deixar livre</button>` }),
+  availShare: d => {
+    const days = []; for (let i = 0; i < 7; i++) days.push(addDays(today(), i));
+    const lines = days.map((ds, i) => [ds, i, freeList(ds)]).filter(x => x[2].length).slice(0, 4).map(([ds, i, l]) => `*${dayName(ds, i)} (${fdate(ds)})*: ${l.join(' · ')}`);
+    const txt = lines.length ? `Olá! Estes são os horários livres para uma reunião com a ${S.set.agency_name || 'Bravus Mídia'}:\n\n${lines.join('\n')}\n\nVeja e escolha o seu aqui: ${PUBLIC_URL}` : `No momento não temos horários livres nesta semana. Veja as próximas vagas: ${PUBLIC_URL}`;
+    const on = avail().public !== false;
+    modal('Divulgar horários livres', `<p class="muted small" style="margin:0 0 8px">Mensagem pronta para mandar no WhatsApp ou status. Só aparecem os horários <b>livres</b> — nada de nomes de clientes.</p><pre class="share-txt">${esc(txt)}</pre>${isAdmin() ? `<p class="small" style="margin:12px 0 0">Página pública: <b class="${on ? 'ok-t' : 'bad-t'}">${on ? 'ligada' : 'desligada'}</b> <button type="button" class="btn sm" data-act="availPublic">${on ? 'Desligar' : 'Ligar'}</button></p>` : ''}`,
+      { footer: `<a class="btn ok" href="https://wa.me/?text=${encodeURIComponent(txt)}" target="_blank" rel="noopener">${ic('wa')}WhatsApp</a><button type="button" class="btn" data-act="copyTxt" data-txt="${esc(txt)}">Copiar</button><span class="sp"></span><a class="btn pri" href="${PUBLIC_URL}" target="_blank" rel="noopener">Ver página</a>` });
+  },
+  availPublic: () => saveAvail(a => { a.public = a.public === false; }).then(() => { closeModal(); toast(avail().public === false ? 'Página de horários desligada' : 'Página de horários ligada', '', 'ok'); }),
+  copyTxt: d => { navigator.clipboard && navigator.clipboard.writeText(d.txt).then(() => toast('Texto copiado', '', 'ok')); }, meetWho: d => { S.meetWho = d.id; renderView(); }, meetTicket: d => { S.meetTicket = d.id; renderView(); },
   meetResch: d => { const t = S.d.tasks.find(x => x.id === d.id); if (!t) return; meetForm(t); const f = $('#modal-root form[data-form="saveMeet"]'); if (f) { f.status.value = 'remarcada'; f.status.dispatchEvent(new Event('change')); f.new_date.focus(); } },
   meetSet: async d => { const t = S.d.tasks.find(x => x.id === d.id); if (!t) return; await store.update('tasks', t.id, { status: d.s, done_at: d.s === 'feito' ? new Date().toISOString() : null }); await log(`Reunião com ${meetWho(t)}: ${lbl(MSTATUS, d.s).toLowerCase()}`, t.client_id); toast('Reunião atualizada', lbl(MSTATUS, d.s), 'ok'); await refresh(); if (d.s === 'feito') meetForm(S.d.tasks.find(x => x.id === d.id)); },
   meetConfirm: d => { const t = S.d.tasks.find(x => x.id === d.id); if (!t) return; const c = client(t.client_id) || {}; const ph = t.phone || c.whatsapp || c.phone; const dia = t.date === today() ? 'hoje' : `no dia ${fdate(t.date)}`;
@@ -2295,6 +2336,12 @@ const F = {
     await loadAll('messages'); renderChat(true);
   },
 
+  availAddSave: async v => {
+    if (!/^\d{2}:\d{2}$/.test(v.time || '')) return toast('Escolha o horário', '', 'warn');
+    closeModal();
+    await saveAvail(a => { a.extra[v.date] = [...new Set([...(a.extra[v.date] || []), v.time])].sort(); if (a.closed[v.date]) a.closed[v.date] = a.closed[v.date].filter(t => t !== v.time); });
+    toast('Horário aberto', `${fdate(v.date)} às ${v.time}`, 'ok');
+  },
   saveSettings: async (v, fd, form) => {
     const offs = String(v.reminder_offsets || '').split(/[,; ]+/).filter(x => x !== '').map(Number).filter(n => Number.isFinite(n) && Math.abs(n) <= 60);
     const s = { ...S.set, agency_name: v.agency_name, max_clients: num(v.max_clients) || 20, calls_start: v.calls_start, meetings_start: v.meetings_start, meetings_end: v.meetings_end || '21:30', meet_slot: num(v.meet_slot) || 60, prospect_goal: num(v.prospect_goal) || 0, followup_goal: num(v.followup_goal) || 0,

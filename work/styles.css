@@ -598,3 +598,8 @@ html,body{overscroll-behavior-y:none}
 /* texto de resultado e histórico nas linhas */
 .tx-ok{color:var(--ok);font-weight:600}.tx-bad{color:var(--bad);font-weight:600}.tx-info{color:var(--info);font-weight:600}.tx-chg{color:var(--chg)}
 .due-y{color:var(--warn)}
+/* v3.4.0 — disponibilidade */
+.wk-tools{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+.slot.closed{border-style:dashed;border-color:var(--line2);background:transparent;opacity:.7}.slot.closed span{color:var(--tx3)}
+.share-txt{white-space:pre-wrap;font:inherit;font-size:13.5px;line-height:1.5;background:var(--card2);border:1px solid var(--line2);border-radius:var(--r2);padding:12px;margin:0}
+.ok-t{color:var(--ok)}.bad-t{color:var(--bad)}
