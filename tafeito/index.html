@@ -2,7 +2,15 @@
 <html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>TáFeito mudou de endereço</title>
-<meta http-equiv="refresh" content="0; url=https://tafeito.bravusmidia.com.br/">
-<script>location.replace('https://tafeito.bravusmidia.com.br/' + location.hash)</script>
+<noscript><meta http-equiv="refresh" content="0; url=https://tafeito.bravusmidia.com.br/"></noscript>
+<script>
+// Vai para o endereço novo; se ele ainda não estiver ativo, usa o endereço reserva da Cloudflare.
+(function () {
+  var novo = 'https://tafeito.bravusmidia.com.br/', reserva = 'https://tafeito-7kx.pages.dev/', h = location.hash, foi = false;
+  function ir(u) { if (!foi) { foi = true; location.replace(u + h); } }
+  setTimeout(function () { ir(reserva); }, 4000);
+  fetch(novo + 'manifest.webmanifest', { mode: 'no-cors', cache: 'no-store' }).then(function () { ir(novo); }, function () { ir(reserva); });
+})();
+</script>
 <style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0b1020;color:#e6ecff;font-family:system-ui,sans-serif;text-align:center;padding:20px}a{color:#7b9bff}</style>
-</head><body><p>O TáFeito mudou para<br><a href="https://tafeito.bravusmidia.com.br/">tafeito.bravusmidia.com.br</a></p></body></html>
+</head><body><p>Abrindo o TáFeito no endereço novo…<br><a href="https://tafeito.bravusmidia.com.br/">tafeito.bravusmidia.com.br</a></p></body></html>
