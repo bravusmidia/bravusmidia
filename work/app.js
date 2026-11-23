@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '3.4.0';
+const VERSION = '3.4.1';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings','reminders','documents'];
@@ -1151,7 +1151,7 @@ async function saveAvail(fn) {
   const s = { ...S.set, avail: a };
   try { await store.upsertSettings(s); S.set = s; renderView(); } catch (e) { toast('Não salvou', 'Só o administrador muda os horários.', 'warn'); }
 }
-function freeList(ds) { return daySlots(ds).filter(x => !x.past && !x.locked && !x.meets.length && !x.closed).map(x => x.time); }
+function freeList(ds) { return daySlots(ds).filter(x => !x.past && !x.locked && !x.meets.length && !x.closed && !x.dup).map(x => x.time); }
 function daySlots(ds, who) {
   const dur = Math.max(15, +S.set.meet_slot || 60), st = hm2m(S.set.meetings_start || '18:30'), en = Math.max(hm2m(S.set.meetings_end || '21:30'), st + dur);
   const ms = meetings().filter(t => t.date === ds && t.time && busyMeet(t) && (!who || t.assignee === who));
@@ -1163,8 +1163,8 @@ function daySlots(ds, who) {
     out.push({ time: m2hm(m), meets: hit, past: isPast(m), locked: !hit.length && !meetAllowed(ds, m2hm(m)) });
   }
   // horários extras abertos à mão (ex.: 15:00 num dia específico)
-  slotExtra(ds).filter(t => !out.some(x => x.time === t)).forEach(t => { const m = hm2m(t); const hit = ms.filter(x => { const a = hm2m(x.time); return a < m + dur && a + dur > m; }); out.push({ time: t, meets: hit, past: isPast(m), extra: true }); });
-  out.forEach(x => { x.closed = !x.meets.length && slotClosed(ds, x.time); });
+  slotExtra(ds).filter(t => !out.some(x => x.time === t)).forEach(t => { const m = hm2m(t); const hit = ms.filter(x => { const a = hm2m(x.time); return a < m + dur && a + dur > m; }); const dup = hit.length && hit.every(h => out.some(x => x.meets.includes(h))); out.push({ time: t, meets: dup ? [] : hit, past: isPast(m), extra: true, dup: !!dup }); });
+  out.forEach(x => { x.closed = !x.meets.length && !x.dup && slotClosed(ds, x.time); });
   // reuniões fora do bloco padrão (ex.: 12:00) também aparecem e contam como ocupadas
   ms.filter(t => !out.some(x => x.meets.includes(t))).forEach(t => out.push({ time: t.time, meets: [t], past: isPast(hm2m(t.time)) }));
   return out.sort((a, b) => hm2m(a.time) - hm2m(b.time));
@@ -1172,7 +1172,7 @@ function daySlots(ds, who) {
 function weekStrip(who) {
   const days = []; const d0 = new Date(); for (let i = 0; i < 7; i++) { const d = new Date(d0); d.setDate(d0.getDate() + i); days.push(iso(d)); }
   const sel = days.includes(S.meetDay) ? S.meetDay : days[0];
-  const info = days.map((ds, i) => { const sl = daySlots(ds, who); const free = sl.filter(x => !x.past && !x.locked && !x.meets.length && !x.closed).length; const busy = sl.filter(x => x.meets.length).length; return { ds, i, free, busy, open: sl.filter(x => !x.past).length }; });
+  const info = days.map((ds, i) => { const sl = daySlots(ds, who); const free = sl.filter(x => !x.past && !x.locked && !x.meets.length && !x.closed && !x.dup).length; const busy = sl.filter(x => x.meets.length).length; return { ds, i, free, busy, open: sl.filter(x => !x.past).length }; });
   const slots = daySlots(sel, who);
   const tag = x => x.open === 0 ? ['off', 'Encerrado'] : x.free === 0 ? ['bad', 'Lotado'] : ['ok', `${x.free} livre${x.free > 1 ? 's' : ''}`];
   const hol = holidayName(sel);
@@ -1183,7 +1183,9 @@ function weekStrip(who) {
     ${S.availEdit ? `<p class="note" style="margin:8px 0 0">Toque num horário para <b>fechar</b> ou <b>abrir</b>. Só os livres aparecem para o cliente.</p>` : ''}
     <div class="wk">${info.map(x => { const [c, t] = tag(x); return `<button class="wd ${c} ${x.ds === sel ? 'on' : ''}" data-act="meetDay" data-d="${x.ds}"><b>${dayName(x.ds, x.i)}</b><small>${fdate(x.ds)}${holidayName(x.ds) ? ' · feriado' : ''}</small><i>${t}</i></button>`; }).join('')}</div>
     ${hol || !isAdmin() ? `<p class="note" style="margin:8px 0 0">${hol ? `${esc(hol)} · ` : ''}${isAdmin() ? 'Você pode marcar em qualquer horário.' : esc(meetRuleMsg(sel))}</p>` : ''}
-    <div class="slots">${slots.map(x => S.availEdit && !x.meets.length && !x.past
+    <div class="slots">${slots.filter(x => !x.dup || (S.availEdit && !x.past)).map(x => x.dup
+      ? `<button class="slot closed" data-act="slotToggle" data-d="${sel}" data-t="${x.time}" data-x="1"><b>${x.time}</b><span>Bate com reunião</span><small>toque para tirar</small></button>`
+      : S.availEdit && !x.meets.length && !x.past
       ? (x.closed ? `<button class="slot closed" data-act="slotToggle" data-d="${sel}" data-t="${x.time}"><b>${x.time}</b><span>Fechado</span><small>toque para abrir</small></button>`
         : `<button class="slot free" data-act="slotToggle" data-d="${sel}" data-t="${x.time}" data-x="${x.extra ? 1 : ''}"><b>${x.time}</b><span>Livre${x.extra ? ' · extra' : ''}</span><small>${x.extra ? 'toque para tirar' : 'toque para fechar'}</small></button>`)
       : x.meets.length
@@ -1471,7 +1473,8 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '3.4.0', notes: [
+const RELEASE = { version: '3.4.1', notes: [
+  'Horário extra que bate com uma reunião não aparece mais como “Ocupado” repetido; em “Escolher livres” ele aparece para você tirar.',
   'Reuniões → Horários da semana: botão “Escolher livres” para fechar ou abrir cada horário e abrir horários extras.',
   'Botão “Divulgar horários”: mensagem pronta no WhatsApp com os horários livres e link da página pública (o cliente só vê horários, nunca nomes).',
 
@@ -2338,6 +2341,7 @@ const F = {
 
   availAddSave: async v => {
     if (!/^\d{2}:\d{2}$/.test(v.time || '')) return toast('Escolha o horário', '', 'warn');
+    { const dur = Math.max(15, +S.set.meet_slot || 60), m = hm2m(v.time); const hit = meetings().find(t => t.date === v.date && t.time && busyMeet(t) && hm2m(t.time) < m + dur && hm2m(t.time) + dur > m); if (hit) return toast('Horário ocupado', `Já tem reunião às ${hit.time} (${meetWho(hit)}). Escolha outro horário.`, 'warn'); }
     closeModal();
     await saveAvail(a => { a.extra[v.date] = [...new Set([...(a.extra[v.date] || []), v.time])].sort(); if (a.closed[v.date]) a.closed[v.date] = a.closed[v.date].filter(t => t !== v.time); });
     toast('Horário aberto', `${fdate(v.date)} às ${v.time}`, 'ok');
