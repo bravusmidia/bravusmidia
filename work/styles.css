@@ -603,3 +603,13 @@ html,body{overscroll-behavior-y:none}
 .slot.closed{border-style:dashed;border-color:var(--line2);background:transparent;opacity:.7}.slot.closed span{color:var(--tx3)}
 .share-txt{white-space:pre-wrap;font:inherit;font-size:13.5px;line-height:1.5;background:var(--card2);border:1px solid var(--line2);border-radius:var(--r2);padding:12px;margin:0}
 .ok-t{color:var(--ok)}.bad-t{color:var(--bad)}
+/* v3.5.0 — horários com justificativa */
+.sheet-st{display:flex;flex-direction:column;gap:3px;padding:12px 14px;border-radius:var(--r2);border:1px solid var(--line2);margin-bottom:12px}
+.sheet-st.free{border-color:rgba(43,212,138,.45);background:rgba(43,212,138,.07)}.sheet-st.free b{color:var(--ok)}
+.sheet-st.closed{border-style:dashed}.sheet-st span{font-size:13px;color:var(--tx2,var(--tx3))}.sheet-st small{font-size:12px;color:var(--tx3);line-height:1.5;margin-top:4px}
+.wide-b{width:100%;justify-content:center;margin-bottom:6px}
+.sheet-h{margin:16px 0 8px;font-size:14px;padding-top:12px;border-top:1px solid var(--line2)}
+.av-log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.av-log li{display:flex;gap:10px;align-items:flex-start}.av-log li div{display:flex;flex-direction:column;gap:2px}.av-log small{font-size:12px}
+.av-op{flex:0 0 74px;text-align:center;font-size:11px;font-weight:800;text-transform:uppercase;padding:4px 6px;border-radius:99px;background:var(--card2)}
+.av-op.block,.av-op.remove{color:var(--bad);background:rgba(255,90,106,.1)}.av-op.unblock,.av-op.open{color:var(--ok);background:rgba(43,212,138,.1)}

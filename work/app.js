@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '3.4.2';
+const VERSION = '3.5.0';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings','reminders','documents'];
@@ -1139,19 +1139,53 @@ const holidayName = ds => ds ? holidays(+ds.slice(0, 4))[ds] || '' : '';
 const meetFreeDay = ds => { const w = new Date(ds + 'T12:00:00').getDay(); return w === 0 || w === 6 || !!holidayName(ds); };
 const meetAllowed = () => true;
 const meetRuleMsg = ds => holidayName(ds) ? `Feriado (${holidayName(ds)}): pode marcar em qualquer horário.` : 'Pode marcar em qualquer horário.';
-/* v3.4.0 — disponibilidade: o admin fecha/abre horários e divulga os livres para o cliente (página pública) */
+/* v3.5.0 — disponibilidade com justificativa: todo bloqueio, liberação ou horário extra exige motivo e fica no histórico.
+   avail.closed / avail.extra guardam só horários (vão para a página pública); motivos ficam em avail.notes / avail.log (só a equipe vê). */
 const avail = () => (S.set && S.set.avail) || {};
 const slotClosed = (ds, t) => ((avail().closed || {})[ds] || []).includes(t);
 const slotExtra = ds => ((avail().extra || {})[ds] || []).filter(t => /^\d{2}:\d{2}$/.test(t));
+const slotNote = (ds, t) => (avail().notes || {})[`${ds} ${t}`] || null;
 const PUBLIC_URL = 'https://www.bravusmidia.com.br/work/horarios.html';
+const AV_WHY = {
+  block: ['Compromisso pessoal', 'Gravação de conteúdo', 'Reunião fora do app', 'Atendimento a cliente da carteira', 'Trabalho na CLT', 'Folga / descanso', 'Outro motivo'],
+  unblock: ['Compromisso cancelado', 'Liberar para cliente', 'Bloqueio feito por engano', 'Outro motivo'],
+  open: ['Encaixe para cliente', 'Horário extra da semana', 'Pedido do cliente', 'Outro motivo'],
+  remove: ['Não vou conseguir atender', 'Compromisso pessoal', 'Aberto por engano', 'Outro motivo']
+};
+const AV_VERB = { block: 'bloqueou', unblock: 'liberou', open: 'abriu', remove: 'removeu' };
+const AV_TITLE = { block: 'Bloquear horário', unblock: 'Liberar horário', open: 'Abrir horário extra', remove: 'Remover horário extra' };
+const whyTxt = n => n ? `${n.why}${n.obs ? ` — ${n.obs}` : ''}` : '';
+const stamp = iso_ => { const d = new Date(iso_); return `${fdate(iso(d))} às ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 async function saveAvail(fn) {
-  const a = JSON.parse(JSON.stringify(avail())); a.closed = a.closed || {}; a.extra = a.extra || {};
+  const a = JSON.parse(JSON.stringify(avail())); a.closed = a.closed || {}; a.extra = a.extra || {}; a.notes = a.notes || {}; a.log = a.log || [];
   fn(a);
   const t0 = today(); ['closed', 'extra'].forEach(k => Object.keys(a[k]).forEach(d => { if (d < t0 || !(a[k][d] || []).length) delete a[k][d]; }));
+  Object.keys(a.notes).forEach(k => { if (k.slice(0, 10) < t0) delete a.notes[k]; });
+  a.log = a.log.slice(-80);
   const s = { ...S.set, avail: a };
-  try { await store.upsertSettings(s); S.set = s; renderView(); } catch (e) { toast('Não salvou', 'Só o administrador muda os horários.', 'warn'); }
+  try { await store.upsertSettings(s); S.set = s; renderView(); return true; } catch (e) { toast('Não foi salvo', 'Só o administrador altera a disponibilidade.', 'warn'); return false; }
 }
-function freeList(ds) { return daySlots(ds).filter(x => !x.past && !x.locked && !x.meets.length && !x.closed && !x.dup).map(x => x.time); }
+async function availChange(op, ds, t, why, obs) {
+  const by = S.me.id, at = new Date().toISOString(), k = `${ds} ${t}`;
+  const ok = await saveAvail(a => {
+    if (op === 'block') { a.closed[ds] = [...new Set([...(a.closed[ds] || []), t])]; a.notes[k] = { kind: 'block', why, obs, by, at }; }
+    if (op === 'unblock') { a.closed[ds] = (a.closed[ds] || []).filter(x => x !== t); delete a.notes[k]; }
+    if (op === 'open') { a.extra[ds] = [...new Set([...(a.extra[ds] || []), t])].sort(); if (a.closed[ds]) a.closed[ds] = a.closed[ds].filter(x => x !== t); a.notes[k] = { kind: 'open', why, obs, by, at }; }
+    if (op === 'remove') { a.extra[ds] = (a.extra[ds] || []).filter(x => x !== t); delete a.notes[k]; }
+    a.log.push({ op, ds, t, why, obs, by, at });
+  });
+  if (!ok) return;
+  const head = `${firstName(S.me.id)} ${AV_VERB[op]} o horário ${t} de ${fdate(ds)}`;
+  toast(`Horário ${t} ${({ block: 'bloqueado', unblock: 'liberado', open: 'aberto', remove: 'removido' })[op]}`, `${fdate(ds)} · ${why}`, 'ok');
+  try { await log(`${head} — ${why}${obs ? ` (${obs})` : ''}`); await notifyTeam(head, `Motivo: ${why}${obs ? ` — ${obs}` : ''}`, 'tarefa', `avail:${ds}:${t}:${op}:${Date.now()}`, 'reunioes'); } catch {}
+}
+function availForm(op, ds, t, pre = '') {
+  const timeFld = op === 'open' ? fld('Horário', 't', t || (ds === today() ? nextHour() : '15:00'), 'time', 'required') : `<input type="hidden" name="t" value="${t}">`;
+  return `${pre}<input type="hidden" name="op" value="${op}"><input type="hidden" name="d" value="${ds}">${timeFld}
+    ${sel('Motivo (obrigatório)', 'why', [['', 'Escolha o motivo…'], ...AV_WHY[op]], '', 'required')}
+    <label class="fl">Observação <span class="muted small">(obrigatória em “Outro motivo”)</span><textarea name="obs" rows="2" maxlength="140" placeholder="Ex.: levar o Lorenzo ao médico"></textarea></label>`;
+}
+function freeList(ds) { return daySlots(ds).filter(x => !x.past && !x.locked && !x.meets.length && !x.closed).map(x => x.time); }
 function daySlots(ds, who) {
   const dur = Math.max(15, +S.set.meet_slot || 60), st = hm2m(S.set.meetings_start || '18:30'), en = Math.max(hm2m(S.set.meetings_end || '21:30'), st + dur);
   const ms = meetings().filter(t => t.date === ds && t.time && busyMeet(t) && (!who || t.assignee === who));
@@ -1165,7 +1199,7 @@ function daySlots(ds, who) {
   // horários extras abertos à mão (ex.: 15:00 num dia específico)
   // horário aberto à mão vale como livre mesmo colado numa reunião; só fica ocupado se tiver reunião exatamente nessa hora
   slotExtra(ds).filter(t => !out.some(x => x.time === t)).forEach(t => { const m = hm2m(t); const hit = ms.filter(x => hm2m(x.time) === m); out.push({ time: t, meets: hit, past: isPast(m), extra: true }); });
-  out.forEach(x => { x.closed = !x.meets.length && !x.dup && slotClosed(ds, x.time); });
+  out.forEach(x => { x.closed = !x.meets.length && slotClosed(ds, x.time); });
   // reuniões fora do bloco padrão (ex.: 12:00) também aparecem e contam como ocupadas
   ms.filter(t => !out.some(x => x.meets.includes(t))).forEach(t => out.push({ time: t.time, meets: [t], past: isPast(hm2m(t.time)) }));
   return out.sort((a, b) => hm2m(a.time) - hm2m(b.time));
@@ -1173,28 +1207,22 @@ function daySlots(ds, who) {
 function weekStrip(who) {
   const days = []; const d0 = new Date(); for (let i = 0; i < 7; i++) { const d = new Date(d0); d.setDate(d0.getDate() + i); days.push(iso(d)); }
   const sel = days.includes(S.meetDay) ? S.meetDay : days[0];
-  const info = days.map((ds, i) => { const sl = daySlots(ds, who); const free = sl.filter(x => !x.past && !x.locked && !x.meets.length && !x.closed && !x.dup).length; const busy = sl.filter(x => x.meets.length).length; return { ds, i, free, busy, open: sl.filter(x => !x.past).length }; });
+  const info = days.map((ds, i) => { const sl = daySlots(ds, who); const free = sl.filter(x => !x.past && !x.locked && !x.meets.length && !x.closed).length; const busy = sl.filter(x => x.meets.length).length; return { ds, i, free, busy, open: sl.filter(x => !x.past).length }; });
   const slots = daySlots(sel, who);
   const tag = x => x.open === 0 ? ['off', 'Encerrado'] : x.free === 0 ? ['bad', 'Lotado'] : ['ok', `${x.free} livre${x.free > 1 ? 's' : ''}`];
   const hol = holidayName(sel);
   const td = info[0];
   if (!S.weekOpen) return `<button class="card wk-toggle" data-act="weekToggle" style="margin-bottom:14px">${ic('cal')}<b>Horários da semana</b><span class="muted small">${td.open ? `${td.free} livre${td.free === 1 ? '' : 's'} hoje` : 'hoje encerrado'} · ${info.reduce((n, x) => n + x.free, 0)} na semana</span><span class="sp"></span><span class="btn sm">Ver horários ${ic('down')}</span></button>`;
   return `<div class="card wk-card" style="margin-bottom:14px"><h3>${ic('cal')}Horários da semana <span class="muted small" style="font-weight:400;margin-left:auto">blocos de ${S.set.meet_slot || 60} min · ${esc(S.set.meetings_start)} às ${esc(S.set.meetings_end || '21:30')}</span><button class="btn sm" data-act="weekToggle">Ocultar</button></h3>
-    <div class="wk-tools">${isAdmin() ? `<button class="btn sm ${S.availEdit ? 'pri' : ''}" data-act="availEdit">${ic('edit')}${S.availEdit ? 'Concluir' : 'Escolher livres'}</button>` : ''}<button class="btn sm ok" data-act="availShare" data-d="${sel}">${ic('wa')}Divulgar horários</button></div>
-    ${S.availEdit ? `<p class="note" style="margin:8px 0 0">Toque num horário para <b>fechar</b> ou <b>abrir</b>. Só os livres aparecem para o cliente.</p>` : ''}
+    <div class="wk-tools"><button class="btn sm ok" data-act="availShare" data-d="${sel}">${ic('wa')}Divulgar horários</button>${isAdmin() ? `<button class="btn sm" data-act="availOpen" data-d="${sel}">${ic('plus')}Abrir horário</button><button class="btn sm" data-act="availLog">${ic('file')}Histórico</button>` : ''}</div>
     <div class="wk">${info.map(x => { const [c, t] = tag(x); return `<button class="wd ${c} ${x.ds === sel ? 'on' : ''}" data-act="meetDay" data-d="${x.ds}"><b>${dayName(x.ds, x.i)}</b><small>${fdate(x.ds)}${holidayName(x.ds) ? ' · feriado' : ''}</small><i>${t}</i></button>`; }).join('')}</div>
     ${hol || !isAdmin() ? `<p class="note" style="margin:8px 0 0">${hol ? `${esc(hol)} · ` : ''}${isAdmin() ? 'Você pode marcar em qualquer horário.' : esc(meetRuleMsg(sel))}</p>` : ''}
-    <div class="slots">${slots.filter(x => !x.dup || (S.availEdit && !x.past)).map(x => x.dup
-      ? `<button class="slot closed" data-act="slotToggle" data-d="${sel}" data-t="${x.time}" data-x="1"><b>${x.time}</b><span>Bate com reunião</span><small>toque para tirar</small></button>`
-      : S.availEdit && !x.meets.length && !x.past
-      ? (x.closed ? `<button class="slot closed" data-act="slotToggle" data-d="${sel}" data-t="${x.time}"><b>${x.time}</b><span>Fechado</span><small>toque para abrir</small></button>`
-        : `<button class="slot free" data-act="slotToggle" data-d="${sel}" data-t="${x.time}" data-x="${x.extra ? 1 : ''}"><b>${x.time}</b><span>Livre${x.extra ? ' · extra' : ''}</span><small>${x.extra ? 'toque para tirar' : 'toque para fechar'}</small></button>`)
-      : x.meets.length
+    <div class="slots">${slots.map(x => x.meets.length
       ? `<button class="slot busy" data-act="editMeet" data-id="${x.meets[0].id}"><b>${x.time}</b><span>Ocupado</span><small>${esc(x.meets[0].time)} · ${esc(meetWho(x.meets[0]))}</small></button>`
       : x.past ? `<div class="slot past"><b>${x.time}</b><span>Passou</span></div>`
-      : x.closed ? `<button class="slot closed" data-act="meetSlot" data-d="${sel}" data-t="${x.time}"><b>${x.time}</b><span>Fechado</span><small>não aparece pro cliente</small></button>`
+      : x.closed ? `<button class="slot closed" data-act="slotSheet" data-d="${sel}" data-t="${x.time}"><b>${x.time}</b><span>Bloqueado</span><small>${esc((slotNote(sel, x.time) || {}).why || 'sem motivo registrado')}</small></button>`
       : x.locked ? `<div class="slot past" title="${esc(meetRuleMsg(sel))}"><b>${x.time}</b><span>Fora da regra</span></div>`
-      : `<button class="slot free" data-act="meetSlot" data-d="${sel}" data-t="${x.time}"><b>${x.time}</b><span>Livre</span><small>toque para marcar</small></button>`).join('')}${S.availEdit ? `<button class="slot free" data-act="availAdd" data-d="${sel}"><b>${ic('plus')}</b><span>Abrir horário</span><small>deixar livre p/ cliente</small></button>` : ''}<button class="slot free" data-act="meetSlot" data-d="${sel}" data-t="${sel === today() ? nextHour() : '09:00'}"><b>${ic('plus')}</b><span>Outro horário</span><small>qualquer hora</small></button></div></div>`;
+      : `<button class="slot free" data-act="slotSheet" data-d="${sel}" data-t="${x.time}"><b>${x.time}</b><span>Livre${x.extra ? ' · extra' : ''}</span><small>toque para opções</small></button>`).join('')}<button class="slot free" data-act="meetSlot" data-d="${sel}" data-t="${sel === today() ? nextHour() : '09:00'}"><b>${ic('plus')}</b><span>Outro horário</span><small>reunião em qualquer hora</small></button></div></div>`;
 }
 /* v3.0.0 — Funil pós-reunião por cliente: Reunião → Proposta enviada → Contrato assinado → Onboarding → Cliente na carteira (vai para Clientes) */
 const PIPE = [['reuniao', 'Reunião', 'Reunião realizada'], ['proposta', 'Proposta', 'Proposta enviada'], ['contrato', 'Contrato', 'Contrato assinado'], ['onboarding', 'Onboarding', 'Onboarding feito'], ['carteira', 'Carteira', 'Cliente na carteira']];
@@ -1474,7 +1502,10 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '3.4.2', notes: [
+const RELEASE = { version: '3.5.0', notes: [
+  'Horários da semana mais profissionais: tocar num horário abre as opções (marcar reunião, bloquear, liberar) — nada muda com um toque só.',
+  'Todo bloqueio, liberação ou horário extra exige motivo (e observação em “Outro motivo”), avisa a equipe e fica no Histórico.',
+  'Horário bloqueado mostra o motivo no card; o cliente nunca vê motivos nem nomes.',
   'Horário aberto por você (ex.: 19:00) fica livre e verde mesmo perto de outra reunião — você decide.',
   'Página do cliente mostra a grade inteira: verde = livre para escolher, vermelho = reservado (sem nomes).',
   'Horário extra que bate com uma reunião não aparece mais como “Ocupado” repetido; em “Escolher livres” ele aparece para você tirar.',
@@ -1936,12 +1967,22 @@ const A = {
     const nk = deal && deal.next >= 0 ? PIPE[deal.next][0] : 'carteira';
     meetForm({ client_id: (deal && deal.cid) || t.client_id || '', company: t.company || '', contact_name: t.contact_name || '', phone: t.phone || '', ticket: t.ticket || '', assignee: t.assignee, meet_type: PIPE_MTYPE[nk] || 'alinhamento', date: today(), time: nextHour() }); },
   meetSlot: d => meetForm({ date: d.d, time: d.t }),
-  availEdit: () => { S.availEdit = !S.availEdit; S.weekOpen = true; renderView(); },
-  slotToggle: d => saveAvail(a => {
-    if (d.x) { a.extra[d.d] = (a.extra[d.d] || []).filter(t => t !== d.t); return; }
-    const c = a.closed[d.d] || []; a.closed[d.d] = c.includes(d.t) ? c.filter(t => t !== d.t) : [...c, d.t];
-  }),
-  availAdd: d => modal('Abrir horário livre', `<p class="muted small" style="margin:0 0 10px">${esc(fdateL(d.d))}</p><input type="hidden" name="date" value="${d.d}">${fld('Horário', 'time', d.d === today() ? nextHour() : '15:00', 'time', 'required')}`, { form: 'availAddSave', footer: `<span class="sp"></span><button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn pri">Deixar livre</button>` }),
+  slotSheet: d => {
+    const st = daySlots(d.d).find(x => x.time === d.t) || {}; const n = slotNote(d.d, d.t); const adm = isAdmin();
+    const head = `<div class="sheet-st ${st.closed ? 'closed' : 'free'}"><b>${st.closed ? 'Bloqueado' : 'Livre'}${st.extra ? ' · horário extra' : ''}</b><span>${st.closed ? 'Não aparece para o cliente.' : 'Aparece em verde para o cliente.'}</span>${n ? `<small>${n.kind === 'block' ? 'Bloqueado' : 'Aberto'} por ${esc(firstName(n.by))} em ${stamp(n.at)}<br>Motivo: ${esc(whyTxt(n))}</small>` : st.closed ? '<small>Sem motivo registrado (bloqueio antigo).</small>' : ''}</div>`;
+    const op = st.closed ? 'unblock' : st.extra ? 'remove' : 'block';
+    const book = !st.closed ? `<button type="button" class="btn pri wide-b" data-act="meetSlot" data-d="${d.d}" data-t="${d.t}">${ic('meet')}Marcar reunião neste horário</button>` : '';
+    if (!adm) return modal(`${d.t} · ${fdateL(d.d)}`, head + book + '<p class="note" style="margin:10px 0 0">Só o administrador bloqueia ou libera horários.</p>', { footer: `<span class="sp"></span><button type="button" class="btn" data-act="closeModal">Fechar</button>` });
+    modal(`${d.t} · ${fdateL(d.d)}`, head + book + `<h4 class="sheet-h">${AV_TITLE[op]}</h4>` + availForm(op, d.d, d.t),
+      { form: 'availSave', footer: `<span class="sp"></span><button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn ${op === 'block' || op === 'remove' ? 'bad' : 'ok'}">${AV_TITLE[op]}</button>` });
+  },
+  availOpen: d => modal('Abrir horário extra', `<p class="muted small" style="margin:0 0 10px">${esc(fdateL(d.d))} · o horário aparece em verde para o cliente.</p>` + availForm('open', d.d, ''),
+    { form: 'availSave', footer: `<span class="sp"></span><button type="button" class="btn" data-act="closeModal">Cancelar</button><button class="btn ok">Abrir horário</button>` }),
+  availLog: () => {
+    const L = (avail().log || []).slice().reverse().slice(0, 40);
+    modal('Histórico de horários', L.length ? `<ul class="av-log">${L.map(x => `<li><span class="av-op ${x.op}">${AV_VERB[x.op]}</span><div><b>${x.t} · ${esc(fdateL(x.ds))}</b><small>${esc(x.why)}${x.obs ? ` — ${esc(x.obs)}` : ''}</small><small class="muted">${esc(firstName(x.by))} · ${stamp(x.at)}</small></div></li>`).join('')}</ul>` : '<p class="muted">Nenhuma alteração registrada ainda.</p>',
+      { footer: `<span class="sp"></span><button type="button" class="btn pri" data-act="closeModal">Fechar</button>` });
+  },
   availShare: d => {
     const days = []; for (let i = 0; i < 7; i++) days.push(addDays(today(), i));
     const lines = days.map((ds, i) => [ds, i, freeList(ds)]).filter(x => x[2].length).slice(0, 4).map(([ds, i, l]) => `*${dayName(ds, i)} (${fdate(ds)})*: ${l.join(' · ')}`);
@@ -2342,12 +2383,16 @@ const F = {
     await loadAll('messages'); renderChat(true);
   },
 
-  availAddSave: async v => {
-    if (!/^\d{2}:\d{2}$/.test(v.time || '')) return toast('Escolha o horário', '', 'warn');
-    { const dur = Math.max(15, +S.set.meet_slot || 60), m = hm2m(v.time); const hit = meetings().find(t => t.date === v.date && t.time && busyMeet(t) && hm2m(t.time) === m); if (hit) return toast('Horário ocupado', `Já tem reunião às ${hit.time} (${meetWho(hit)}). Escolha outro horário.`, 'warn'); }
-    closeModal();
-    await saveAvail(a => { a.extra[v.date] = [...new Set([...(a.extra[v.date] || []), v.time])].sort(); if (a.closed[v.date]) a.closed[v.date] = a.closed[v.date].filter(t => t !== v.time); });
-    toast('Horário aberto', `${fdate(v.date)} às ${v.time}`, 'ok');
+  availSave: async v => {
+    const op = v.op, ds = v.d, t = (v.t || '').trim(), why = (v.why || '').trim(), obs = (v.obs || '').trim();
+    if (!/^\d{2}:\d{2}$/.test(t)) return modalAlert('Escolha o horário', '', 'warn');
+    if (!why) return modalAlert('Escolha o motivo', 'Toda alteração de horário precisa de justificativa.', 'warn');
+    if (why === 'Outro motivo' && obs.length < 3) return modalAlert('Explique o motivo', 'Em “Outro motivo”, escreva uma observação.', 'warn');
+    if (op === 'open') {
+      if (daySlots(ds).some(x => x.time === t && !x.closed)) return modalAlert('Esse horário já existe', `${t} já está na grade de ${fdate(ds)}.`, 'warn');
+      const hit = meetings().find(x => x.date === ds && x.time === t && busyMeet(x)); if (hit) return modalAlert('Horário ocupado', `Já tem reunião às ${t} (${meetWho(hit)}).`, 'warn');
+    }
+    closeModal(); await availChange(op, ds, t, why, obs);
   },
   saveSettings: async (v, fd, form) => {
     const offs = String(v.reminder_offsets || '').split(/[,; ]+/).filter(x => x !== '').map(Number).filter(n => Number.isFinite(n) && Math.abs(n) <= 60);
