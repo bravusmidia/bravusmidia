@@ -1,0 +1,24 @@
+name: Bravus Work — build e teste
+on:
+  push:
+    paths: ['work/**', '.github/workflows/bravus-work.yml']
+  pull_request:
+    paths: ['work/**']
+permissions:
+  contents: read
+jobs:
+  teste:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: app.js em dia com src/
+        run: node work/build.mjs --check
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Instalar navegador de teste
+        run: pip install playwright==1.47.0 && python -m playwright install --with-deps chromium
+      - name: Teste automático (todas as telas + horários)
+        run: python work/tests/smoke.py

@@ -3,7 +3,7 @@
    App leve (sem frameworks). Dados: Supabase (produção) ou modo local.
    ===================================================================== */
 const CFG = window.BW_CONFIG || {};
-const VERSION = '3.5.0';
+const VERSION = '3.6.0';
 const EMBED = !!CFG.EMBED;
 const SUPA = !!(CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY);
 const TABLES = ['profiles','clients','invoices','expenses','campaigns','tasks','content','messages','notifications','activity','settings','reminders','documents'];
@@ -186,7 +186,9 @@ const cargo = p => (p && p.title) || (p && p.role === 'admin' ? 'Administrador' 
 const CARGOS = ['CEO / Fundador', 'Co-founder', 'Gestor de tráfego', 'Comercial', 'Social media', 'Designer', 'Editor de vídeo', 'Copywriter', 'Atendimento', 'Financeiro', 'Estagiário'];
 const team = () => S.d.profiles.filter(p => p.role === 'admin' || p.role === 'comercial');
 const isOnline = p => !!p && ((S.me && p.id === S.me.id && !document.hidden) || (!!p.last_seen && (Date.now() - new Date(p.last_seen)) < 150000));
-const avatar = (p, size = 36) => `<span class="av" style="background:${p && p.avatar_url ? `#0b1a3d url('${esc(p.avatar_url)}') center/cover` : esc(p && p.color || '#2f7bff')};width:${size}px;height:${size}px">${p && p.avatar_url ? '' : esc(initials(p && p.name))}<i class="dot ${isOnline(p) ? 'on' : ''}"></i></span>`;
+/* foto só aceita imagem embutida (data:image) — evita CSS/URL injetado no estilo */
+const safeImg = u => typeof u === 'string' && /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(u);
+const avatar = (p, size = 36) => `<span class="av" style="background:${p && safeImg(p.avatar_url) ? `#0b1a3d url('${esc(p.avatar_url)}') center/cover` : esc(p && p.color || '#2f7bff')};width:${size}px;height:${size}px">${p && p.avatar_url ? '' : esc(initials(p && p.name))}<i class="dot ${isOnline(p) ? 'on' : ''}"></i></span>`;
 
 async function loadAll(only) {
   const ts = only ? [only] : TABLES;
@@ -1182,7 +1184,7 @@ async function availChange(op, ds, t, why, obs) {
 function availForm(op, ds, t, pre = '') {
   const timeFld = op === 'open' ? fld('Horário', 't', t || (ds === today() ? nextHour() : '15:00'), 'time', 'required') : `<input type="hidden" name="t" value="${t}">`;
   return `${pre}<input type="hidden" name="op" value="${op}"><input type="hidden" name="d" value="${ds}">${timeFld}
-    ${sel('Motivo (obrigatório)', 'why', [['', 'Escolha o motivo…'], ...AV_WHY[op]], '', 'required')}
+    ${sel('Motivo (obrigatório)', 'why', [['', 'Escolha o motivo…'], ...AV_WHY[op]], '')}
     <label class="fl">Observação <span class="muted small">(obrigatória em “Outro motivo”)</span><textarea name="obs" rows="2" maxlength="140" placeholder="Ex.: levar o Lorenzo ao médico"></textarea></label>`;
 }
 function freeList(ds) { return daySlots(ds).filter(x => !x.past && !x.locked && !x.meets.length && !x.closed).map(x => x.time); }
@@ -1502,7 +1504,10 @@ function contentForm(c = {}) {
 /* =====================================================================
    CHAT FLUTUANTE (Conversa + Anotações) · avisos de versão · popups
    ===================================================================== */
-const RELEASE = { version: '3.5.0', notes: [
+const RELEASE = { version: '3.6.0', notes: [
+  'Segurança reforçada: biblioteca do Supabase agora fica dentro do próprio app (sem depender de site externo) e funções internas de alerta bloqueadas para quem é de fora.',
+  'Código organizado por áreas e com teste automático a cada atualização — menos risco de uma mudança quebrar outra tela.',
+  'Botões de salvar não enviam duas vezes se você tocar rápido.',
   'Horários da semana mais profissionais: tocar num horário abre as opções (marcar reunião, bloquear, liberar) — nada muda com um toque só.',
   'Todo bloqueio, liberação ou horário extra exige motivo (e observação em “Outro motivo”), avisa a equipe e fica no Histórico.',
   'Horário bloqueado mostra o motivo no card; o cliente nunca vê motivos nem nomes.',
@@ -2478,7 +2483,7 @@ document.addEventListener('click', e => {
 document.addEventListener('submit', e => {
   const f = e.target; const fn = F[f.dataset.form]; if (!fn) return; e.preventDefault();
   if (!f.checkValidity()) { f.reportValidity(); return; }
-  const fd = new FormData(f); const btn = f.querySelector('button.pri, button.ok'); if (btn) btn.disabled = true;
+  const fd = new FormData(f); const btn = f.querySelector('button:not([type=button])'); if (btn) { if (btn.disabled) return; btn.disabled = true; } /* trava o envio duplo */
   Promise.resolve(fn(Object.fromEntries(fd), fd, f)).catch(err => toast('Não foi possível salvar', err.message, 'bad')).finally(() => { if (btn) btn.disabled = false; });
 });
 /* v2.7.8: bolinha da barra de meta — arrasta para marcar a quantidade rápido */
@@ -2839,7 +2844,7 @@ Object.assign(A, {
   const recovery = hashQ.get('type') === 'recovery', recErr = hashQ.get('error_description');
   if (SUPA) {
     try {
-      const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/+esm');
+      const { createClient } = window.supabase; /* biblioteca guardada no próprio app (vendor/), sem depender de CDN externo */
       sb = createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
       store = new SupaStore(sb); store.listen();
       const { data } = await sb.auth.getSession();
